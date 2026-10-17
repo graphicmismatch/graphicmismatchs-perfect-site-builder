@@ -61,9 +61,10 @@ function elMatrix(e) {
   const w = e.ownerDocument.defaultView;
   let m = new DOMMatrix();
   for (; e; e = e.offsetParent) {
-    const cs = w.getComputedStyle(e), p = e.offsetParent, abs = cs.position === 'absolute'; // computed left/top are sub-pixel exact
-    const l = new DOMMatrix().translateSelf((abs ? parseFloat(cs.left) : e.offsetLeft) + (p ? p.clientLeft - p.scrollLeft : 0),
-      (abs ? parseFloat(cs.top) : e.offsetTop) + (p ? p.clientTop - p.scrollTop : 0));
+    // computed left/top are sub-pixel exact; the border box starts after the margin (Style CSS like `margin: 0 auto`)
+    const cs = w.getComputedStyle(e), p = e.offsetParent, abs = cs.position === 'absolute';
+    const l = new DOMMatrix().translateSelf((abs ? parseFloat(cs.left) + (parseFloat(cs.marginLeft) || 0) : e.offsetLeft) + (p ? p.clientLeft - p.scrollLeft : 0),
+      (abs ? parseFloat(cs.top) + (parseFloat(cs.marginTop) || 0) : e.offsetTop) + (p ? p.clientTop - p.scrollTop : 0));
     if (cs.transform !== 'none') {
       const [ox, oy] = cs.transformOrigin.split(' ').map(parseFloat);
       l.translateSelf(ox, oy).multiplySelf(new DOMMatrix(cs.transform)).translateSelf(-ox, -oy);
