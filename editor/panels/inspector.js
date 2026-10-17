@@ -114,7 +114,7 @@ function renderNode() {
   if (!n) { el.append(h('div', { class: 'in-empty' }, S.S.P ? 'Select a node in the Hierarchy or an asset in the Project window.' : '')); return; }
   const isRoot = n.id === S.root()?.id;
 
-  // header (GameObject)
+  // header (WebObject)
   const act = h('input', { type: 'checkbox', title: 'Active' });
   act.onchange = () => setMany(ids, 'active', act.checked);
   const name = h('input', { class: 'in-name', spellcheck: 'false' });

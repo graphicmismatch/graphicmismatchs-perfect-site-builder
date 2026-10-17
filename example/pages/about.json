@@ -704,7 +704,7 @@
             {
               "type": "Text",
               "props": {
-                "text": "If you have built a menu in Unity, you already know this tool. Pages are scenes, elements are GameObjects with a <b>RectTransform</b>, and everything else is a component you add in the Inspector.",
+                "text": "If you have built a menu in Unity, you already know this tool. Pages are scenes, elements are WebObjects with a <b>RectTransform</b>, and everything else is a component you add in the Inspector.",
                 "size": 19,
                 "color": "#9aa0b8",
                 "tag": "p",

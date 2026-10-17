@@ -119,9 +119,9 @@ export function setTool(t) { S.tool = t; emit('tool'); }
 // ---------- node operations ----------
 const rect = (o = {}) => ({ anchorMin: [0.5, 0.5], anchorMax: [0.5, 0.5], pivot: [0.5, 0.5], pos: [0, 0], size: [100, 100], rotation: 0, scale: [1, 1], ...o });
 const stretch = { anchorMin: [0, 0], anchorMax: [1, 1], size: [0, 0] };
-// GameObject > UI menu. Each returns a node.
+// WebObject > UI menu. Each returns a node.
 export const PRESETS = {
-  'Create Empty': () => newNode('GameObject'),
+  'Create Empty': () => newNode('WebObject'),
   Panel: () => Object.assign(newNode('Panel', [{ type: 'Image', props: { color: '#ffffffc0' } }]), { rect: rect(stretch) }),
   Image: () => newNode('Image', [{ type: 'Image', props: {} }]),
   Text: () => Object.assign(newNode('Text', [{ type: 'Text', props: {} }]), { rect: rect({ size: [200, 50] }) }),

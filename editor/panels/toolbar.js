@@ -74,7 +74,7 @@ const customNode = name => {
   const type = 'component:' + name, n = S.PRESETS['Create Empty']();
   return Object.assign(n, { name, components: [{ type, props: S.propsOf({ type, props: {} }) }], rect: { ...n.rect, size: [300, 200] } });
 };
-// GameObject create entries (presets except Create Empty + custom components) under parentId.
+// WebObject create entries (presets except Create Empty + custom components) under parentId.
 export function createItems(parentId) {
   const customs = Object.keys(S.S.P?.components ?? {});
   return [
@@ -113,7 +113,7 @@ const allIds = () => [...S.walk(S.root())].slice(1).map(([n]) => n.id);
 const nonRoot = () => S.S.selection.some(id => id !== S.root()?.id);
 function componentItems() {
   const n = S.active();
-  if (!n) return [{ label: 'Select a GameObject first', disabled: true }];
+  if (!n) return [{ label: 'Select a WebObject first', disabled: true }];
   const isRoot = n === S.root(), cats = {};
   for (const [t, d] of Object.entries(S.builtins)) if (!d.root || isRoot) (cats[d.category] ??= []).push(t);
   const item = (t, label = words(t)) => ({ label, disabled: !t.startsWith('behaviour:') && !!S.getComponent(n, t), action: () => S.addComponent(n.id, t) });
@@ -158,7 +158,7 @@ const MENUS = {
       { label: 'Pause', checked: paused, action: togglePause },
     ];
   },
-  GameObject: () => {
+  WebObject: () => {
     const a = S.active();
     return [
       { label: 'Create Empty', action: () => S.create('Create Empty') },

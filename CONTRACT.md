@@ -245,7 +245,7 @@ Requests with a Host other than `127.0.0.1:PORT`/`localhost:PORT` get 403; non-G
 
 ## Editor (`editor/`)
 
-Unity default layout: toolbar (top), Hierarchy (left), Scene/Game (center), Inspector (right, full height),
+Unity default layout: toolbar (top), Hierarchy (left), Scene/Web (center), Inspector (right, full height),
 bottom tabs Project | Console | Animation | Generated Code. Each `editor/panels/<name>.js` exports `mount(el)` and owns
 `panels/<name>.css` (already linked). Theme tokens are CSS variables in `editor/style.css` (`--panel`, `--accent`, …).
 `main.js` mounts panels in order: toolbar, hierarchy, scene, inspector, project, console, animation, code; handles the

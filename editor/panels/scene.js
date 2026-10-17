@@ -1,5 +1,5 @@
-// Scene | Game view (Unity style): double-buffered preview iframes, pan/zoom, selection overlay,
-// rect/move/rotate/scale tools, anchor flower + pivot, asset drops, Game view for play mode.
+// Scene | Web view (Unity style): double-buffered preview iframes, pan/zoom, selection overlay,
+// rect/move/rotate/scale tools, anchor flower + pivot, asset drops, Web view for play mode.
 import * as S from '../state.js';
 import { reanchor } from '/lib/rect.js';
 import { activeBreakpoints } from '/lib/node.js';
@@ -233,7 +233,7 @@ function loop() {
 // ---------- view ----------
 function applyView() {
   const [W, H] = S.S.resolution;
-  if (mode === 'game') {
+  if (mode === 'web') {
     const vw = view.clientWidth, vh = view.clientHeight, gz = Math.min(vw / W, vh / H) * cfg.scale || 1;
     const ox = Math.max(0, (vw - W * gz) / 2), oy = Math.max(0, (vh - H * gz) / 2);
     Object.assign(sizer.style, { width: W * gz + 2 * ox + 'px', height: H * gz + 2 * oy + 'px' });
@@ -277,7 +277,7 @@ function frameSel() {
 function setMode(m) {
   mode = m; el.dataset.mode = m;
   for (const b of el.querySelectorAll('[data-mode-tab]')) b.classList.toggle('on', b.dataset.modeTab === m);
-  frames[front].style.height = (m === 'game' ? S.S.resolution[1] : pageH) + 'px';
+  frames[front].style.height = (m === 'web' ? S.S.resolution[1] : pageH) + 'px';
   hover = null; lastSvg = ''; svg.innerHTML = '';
   view.scrollTo(0, 0);
   applyView();
@@ -307,7 +307,7 @@ function swap(f) {
   const old = frames[front], [, H] = S.S.resolution;
   front = 1 - front;
   pageH = Math.max(H, f.contentDocument.documentElement.scrollHeight);
-  f.style.height = (mode === 'game' ? H : pageH) + 'px';
+  f.style.height = (mode === 'web' ? H : pageH) + 'px';
   f.classList.add('on'); old.classList.remove('on');
   old.onload = null; old.removeAttribute('srcdoc'); old.src = 'about:blank';
   win = S.S.previewWin = f.contentWindow;
@@ -528,7 +528,7 @@ export function mount(root) {
   el.classList.add('sc');
   if (cfg.res) S.S.resolution = [...cfg.res];
   el.innerHTML = `
-    <nav class="tabs"><button data-mode-tab="scene">Scene</button><button data-mode-tab="game">Game</button></nav>
+    <nav class="tabs"><button data-mode-tab="scene">Scene</button><button data-mode-tab="web">Web</button></nav>
     <div class="sc-bar">
       <select class="sc-res" title="Resolution">${RES.map(([w, h, n]) => `<option value="${w}x${h}">${w}x${h}${n ? ' ' + n : ''}</option>`).join('')}<option value="custom">Custom…</option></select>
       <span class="sc-custom" hidden><input type="number" class="sc-w" min="1" title="Width"> × <input type="number" class="sc-h" min="1" title="Height"></span>
@@ -540,7 +540,7 @@ export function mount(root) {
         <input type="number" class="sc-inc" min="0.01" step="any" title="Snap increment (px); rotation snaps to 15°">
       </span>
       <span class="sc-bps" title="Breakpoint being edited (lit = active at the current preview width)"></span>
-      <span class="sc-game">Scale <input type="range" class="sc-scale" min="1" max="5" step="0.1"> <output></output></span>
+      <span class="sc-web">Scale <input type="range" class="sc-scale" min="1" max="5" step="0.1"> <output></output></span>
     </div>
     <div class="sc-view" tabindex="0">
       <div class="sc-banner" hidden></div>
@@ -673,14 +673,14 @@ export function mount(root) {
     e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
   });
   view.addEventListener('drop', drop);
-  new ResizeObserver(() => mode === 'game' && applyView()).observe(view);
+  new ResizeObserver(() => mode === 'web' && applyView()).observe(view);
 
   // store events
   for (const ev of ['structure', 'page', 'load']) S.on(ev, rebuild);
   S.on('resolution', () => { resUI(); bpUI(); fitted = false; rebuild(); });
   S.on('play', () => {
     el.classList.toggle('playing', S.S.playing);
-    if (S.S.playing) { prevMode = mode; setMode('game'); } else setMode(prevMode);
+    if (S.S.playing) { prevMode = mode; setMode('web'); } else setMode(prevMode);
     rebuild();
   });
   S.on('props', ids => {

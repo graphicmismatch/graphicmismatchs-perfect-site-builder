@@ -18,9 +18,9 @@ The layout follows Unity's default editor:
 
 | Panel | What it does |
 |---|---|
-| Toolbar | File / Edit / GameObject / Component / Window menus, the Q W E R T tools, Play, page switcher, Build. |
+| Toolbar | File / Edit / WebObject / Component / Window menus, the Q W E R T tools, Play, page switcher, Build. |
 | Hierarchy | The page tree. Drag nodes to reparent them. Sibling order is draw order. |
-| Scene / Game | The real page rendered live. Rect / move / rotate / scale tools, an anchor gizmo, snapping, and resolution presets. Play runs scripts and animations in the Game view. |
+| Scene / Web | The real page rendered live. Rect / move / rotate / scale tools, an anchor gizmo, snapping, and resolution presets. Play runs scripts and animations in the Web view. |
 | Inspector | RectTransform with anchor presets, plus every component's fields. Drag a label to scrub a number. Add Component. |
 | Project | Drag images, video, audio, JSON or fonts in from your desktop. Drag them out onto the Scene, Hierarchy or Inspector. |
 | Animation | Dopesheet and curves, record mode, sprite swap, events. |
