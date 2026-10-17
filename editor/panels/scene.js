@@ -273,8 +273,7 @@ function rebuild() {
     const my = ++gen, f = frames[1 - front], [W, H] = S.S.resolution;
     Object.assign(f.style, { width: W + 'px', height: H + 'px' });
     f.onload = () => waitPSB(f, my, 0);
-    // absolute <base>: Chrome's srcdoc preload scanner resolves a relative one against the editor URL (404s)
-    f.srcdoc = S.previewHTML().replace('<base href="/', `<base href="${location.origin}/`).replace('</head>', HOOK + '\n</head>');
+    f.srcdoc = S.previewHTML().replace('</head>', HOOK + '\n</head>');
   });
 }
 function waitPSB(f, my, n) {

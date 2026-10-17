@@ -63,7 +63,8 @@ export function redo() { if (!redoStack.length) return; undoStack.push(snap()); 
 // merge: consecutive edits with the same label within 1s share one undo step (drags, typing).
 export function edit(label, fn, { kind = 'structure', ids = [], merge = false, files } = {}) {
   const now = performance.now();
-  if (!(merge && lastEdit.label === label && now - lastEdit.t < 1000)) { undoStack.push(snap()); if (undoStack.length > 200) undoStack.shift(); }
+  // labels with '#' are unique per gesture (e.g. 'size#12'): merge regardless of pauses
+  if (!(merge && lastEdit.label === label && (label.includes('#') || now - lastEdit.t < 1000))) { undoStack.push(snap()); if (undoStack.length > 200) undoStack.shift(); }
   redoStack.length = 0;
   lastEdit = { label, t: now };
   fn();
@@ -182,8 +183,9 @@ export function newPage(name) {
 // ---------- preview / generated code ----------
 export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, clips: S.P.clips, ...extra });
 // editor=true: behaviours/animators don't auto-run (Scene). Play mode passes editor=false.
+// Absolute <base>: Chrome's srcdoc preload scanner resolves a relative one against the editor URL.
 export const previewHTML = (editor = !S.playing) =>
-  renderDocument(root(), ctx({ editor, base: '/project/' }), { name: S.page, cssHref: null }).html;
+  renderDocument(root(), ctx({ editor, base: location.origin + '/project/' }), { name: S.page, cssHref: null }).html;
 export const generatedCode = () => renderDocument(root(), ctx(), { name: S.page }); // { html, css } exactly as built
 
 export function setPlaying(on) { S.playing = on; emit('play'); }

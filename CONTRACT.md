@@ -143,7 +143,7 @@ PSB.behaviour(id, Name) -> instance
   `:host { display: block }` default, `{{prop}}` interpolation in text and attribute values (HTML-escaped), re-render on
   attribute change, `this.props` typed from the schema, `this.root` (shadowRoot), `this.$(sel)`, `this.$$(sel)`,
   hooks `rendered()`, `connected()`, `disconnected()`, `propChanged(name, value)`, overridable `render()` returning an HTML
-  string, `emit(name, detail)` (bubbling composed CustomEvent).
+  string, `emit(name, detail)` (bubbling composed CustomEvent), `refresh()` (re-render now).
 
 ## Behaviours (`behaviours/<Name>.js`) — owner: runtime/components agent
 
@@ -169,6 +169,7 @@ Entry `{ target: nodeId, call, arg }` (`target` empty = the node owning the even
 `setActive` (arg `true|false|toggle`), `navigate` (arg page/URL, uses ctx.href), `Animator.play` (arg clip name or empty),
 `Animator.stop`, `Animator.pause`, `Media.play`, `Media.pause`, `Media.toggle` (Video/Audio on target),
 `behaviour:<Name>.<method>` (arg passed as string), `scrollTo` (target into view).
+`target` may also be a node path (resolved relative to the source node, then from the root).
 The editor lists callable entries per target from its components (+ behaviour `methods` from `S.behaviourMeta`).
 
 ## Animation — owner: animation agent
@@ -235,9 +236,11 @@ bottom tabs (`emit('show-tab', name)` switches) and splitters.
 S.S: { P, page, selection[], tool, resolution, playing, behaviourMeta, anim{clip,time,recording,playing,animatorId}, dirty, previewWin, hooks }
 on(ev, fn) -> unsubscribe     emit(ev, ...args)     log(msg, level='info'|'warn'|'error', extra)
 events: load structure props(ids) selection tool page anim assets log(entry) play resolution saved preview-ready show-tab frame
+        rename (F2 -> hierarchy) asset-select(projectPath) asset-ping(assetPath) (inspector <-> project)
 root() node(id) parentOf(id) parentSize(id) selected() active() def(type) propsOf(component) assetUrl(path)
 edit(label, fn, { kind, ids, merge, files })   undo() redo()
-setProp(id, path, value, opts)     // ALWAYS use this for property edits (record mode hooks in)
+setProp(id, path, value, opts)     // ALWAYS use this for property edits (record mode hooks in);
+                                   // opts.label groups many setProps into one undo step (drags, presets)
 select(ids, additive) setTool(t) PRESETS create(preset, parentId) addNode(node, parentId, index)
 deleteNodes(ids) duplicate(ids) reparent(id, newParentId, index) addComponent(id, type) removeComponent(id, i) moveComponent(id, i, to)
 setPage(name) newPage(name) previewHTML(editor) generatedCode() setPlaying(bool)
@@ -246,8 +249,8 @@ api.get/put/del/rename/build   save() build() upload(file, dir) load() reloadMet
 
 - `structure` = the Scene rebuilds the iframe (`srcdoc = previewHTML()`); `props(ids)` = patch those nodes via
   `previewWin.PSB.applyNode(...)` immediately, plus a debounced (~300 ms) full rebuild to catch tag/inner/layout changes.
-- Drag & drop between panels: `dataTransfer` types `application/x-psb-asset` (asset path) and
-  `application/x-psb-node` (node id). OS file drops anywhere in Project/Scene/Hierarchy import via `S.upload`.
+- Drag & drop between panels: `dataTransfer` types `application/x-psb-asset` (asset path, or clip name),
+  `application/x-psb-node` (node id) and `application/x-psb-component` (`component:X` / `behaviour:X`, drop on Inspector). OS file drops anywhere in Project/Scene/Hierarchy import via `S.upload`.
 - `parentSize(id)` → `[w, h]` untransformed CSS px of the node's parent (preview element, else `S.resolution`).
   Use it for `reanchor` (Inspector anchor presets) and Scene gizmos.
 - **Keyboard: `main.js` (shell) owns ALL global shortcuts.** Others must not bind global keys. F emits `frame`

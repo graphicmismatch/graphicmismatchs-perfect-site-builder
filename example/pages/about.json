@@ -484,11 +484,11 @@
       "active": true,
       "rect": {
         "anchorMin": [
-          0.5,
+          0,
           0
         ],
         "anchorMax": [
-          0.5,
+          1,
           0
         ],
         "pivot": [
@@ -500,7 +500,7 @@
           140
         ],
         "size": [
-          760,
+          -48,
           1360
         ],
         "rotation": 0,
@@ -517,6 +517,12 @@
             "controlWidth": true,
             "expandWidth": true,
             "controlHeight": true
+          }
+        },
+        {
+          "type": "Style",
+          "props": {
+            "css": "right: 24px; width: auto; max-width: 760px; margin: 0 auto;"
           }
         }
       ],
