@@ -121,7 +121,9 @@ Definition shape is documented at the top of that file. `componentDef(type, cust
 
 ## Rendering (`lib/render.js`)
 
-- `makeCtx({ pages, customs, behaviours, json, clips, editor, base })` → ctx with `asset(p)`, `font(p)`, `href(h)`.
+- `makeCtx({ pages, customs, behaviours, json, clips, editor, base, assetVersions })` → ctx with `asset(p)`, `font(p)`, `href(h)`.
+  `assetVersions` `{path: v}` appends `?v=` to asset URLs (build: content hash; dev server/editor: size+mtime) and is
+  passed to the runtime in the page data so it builds identical URLs. Versioned URLs are served `immutable`.
 - `renderPage(root, ctx)` → `{ body, css, data }`; `renderDocument(root, ctx, { name, cssHref })` → `{ html, css }`.
 - Every element: `class="<slug-of-name>"` (unique per page) and `data-gpsb="<node id>"`. Root also has `gpsb-canvas`.
 - Page data for the runtime: `<script type="application/json" id="gpsb-data">{ tree, clips, pages, behaviours, customs, editor }</script>`

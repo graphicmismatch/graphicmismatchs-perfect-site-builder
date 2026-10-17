@@ -272,12 +272,14 @@ export function newPage(name) {
 }
 
 // ---------- preview / generated code ----------
-export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, clips: S.P.clips, breakpoints: breakpoints(), ...extra });
+// asset versions from size + mtime: preview URLs change when a file changes, and are otherwise cached for good
+const assetVersions = () => Object.fromEntries((S.P.assets ?? []).map(a => [a.path, a.size.toString(36) + Math.floor(a.mtime ?? 0).toString(36)]));
+export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, clips: S.P.clips, breakpoints: breakpoints(), assetVersions: assetVersions(), ...extra });
 // editor=true: behaviours/animators don't auto-run (Scene). Play mode passes editor=false.
 // Absolute <base>: Chrome's srcdoc preload scanner resolves a relative one against the editor URL.
 export const previewHTML = (editor = !S.playing) =>
   renderDocument(root(), ctx({ editor, base: location.origin + '/project/' }), { name: S.page, cssHref: null }).html;
-export const generatedCode = () => renderDocument(root(), ctx(), { name: S.page }); // { html, css } exactly as built
+export const generatedCode = () => renderDocument(root(), ctx(), { name: S.page }); // { html, css } as built (the build versions assets by content hash)
 
 export function setPlaying(on) { S.playing = on; emit('play'); }
 

@@ -44,7 +44,7 @@ async function main() {
   check('index: Repeat renders one Post per site.json post', await page.eval(`GPSB.els(GPSB.find('Post').id).length`) === site.posts.length);
   check('index: {{data/site.json:...}} binding resolved', (await page.eval(`GPSB.el(GPSB.find('Eyebrow').id).textContent`)) === site.hero.eyebrow);
   const card = await page.eval(`(() => { const c = document.querySelector('gpsb-card'); return c?.shadowRoot ? { h3: c.shadowRoot.querySelector('h3')?.textContent, img: c.shadowRoot.querySelector('img')?.getAttribute('src') } : null; })()`);
-  check('index: custom element has a populated shadowRoot', card?.h3 === site.features[0].title && card?.img?.endsWith(site.features[0].icon), JSON.stringify(card));
+  check('index: custom element has a populated shadowRoot', card?.h3 === site.features[0].title && card?.img?.split('?')[0].endsWith(site.features[0].icon) && /\?v=[0-9a-f]{10}$/.test(card?.img ?? ''), JSON.stringify(card));
 
   const ring1 = await style('Ring', 'transform'), orb1 = await style('Orbiter', 'transform');
   await sleep(700);

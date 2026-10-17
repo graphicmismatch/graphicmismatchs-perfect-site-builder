@@ -111,6 +111,8 @@ function applyPreview() {
   if (!W?.applyNode || S.S.playing) return;
   const an = animator(), c = clip(), ok = inScope();
   const map = preview && an && c ? applyClip(an, c, A().time, meta()) : new Map();
+  if (preview && c && W.preload) for (const tr of c.tracks) for (const k of tr.keys) // sprite swaps: no blank frames
+    if (typeof k.v === 'string' && /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(k.v)) W.preload(W.ctx.asset(k.v));
   for (const id of map.keys()) if (!ok(id)) map.delete(id);
   try {
     for (const id of applied) if (!map.has(id)) { const n = S.node(id); if (n) W.applyNode(n, S.parentOf(id)); }

@@ -10,6 +10,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 import { renderDocument, makeCtx } from './lib/render.js';
 import { parseComponent, compileComponent } from './lib/compile.js';
 import { newNode } from './lib/node.js';
@@ -73,13 +74,25 @@ export async function loadProject(root) {
   }
   for (const f of await files(p('assets'))) {
     const st = await fsp.stat(p('assets/' + f));
-    assets.push({ path: f, type: assetType(f), size: st.size });
+    assets.push({ path: f, type: assetType(f), size: st.size, mtime: st.mtimeMs });
     if (ext(f) === 'json') json[f] = await tryJSON(root, 'assets/' + f, null, null, errors);
   }
   for (const c of Object.values(components)) if (c.error) errors.push({ file: `components/${c.name}.html`, error: c.error });
   return { project, pages, components, behaviours, clips, json, assets, errors };
 }
 
+// dev server: a version per asset from size + mtime (changes whenever the file does)
+const statVersions = P => Object.fromEntries(P.assets.map(a => [a.path, a.size.toString(36) + Math.floor(a.mtime).toString(36)]));
+// build: content hashes, so a published asset URL only changes when its bytes do
+async function hashVersions(root, P) {
+  const out = {};
+  for (const a of P.assets) {
+    const h = crypto.createHash('sha1');
+    for await (const chunk of fs.createReadStream(path.join(root, 'assets', a.path))) h.update(chunk);
+    out[a.path] = h.digest('hex').slice(0, 10);
+  }
+  return out;
+}
 const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, clips: P.clips, breakpoints: P.project.breakpoints, ...extra });
 
 // The output folder is deleted before every build: refuse anything that is not a previous build or a fresh folder.
@@ -111,7 +124,7 @@ export async function build(root, out = path.join(root, 'dist')) {
     const src = await fsp.readFile(path.join(root, 'components', name + '.html'), 'utf8');
     for (const [f, code] of Object.entries(compileComponent(name, src))) await fsp.writeFile(path.join(out, 'components', f), code);
   }
-  const ctx = ctxFor(P);
+  const ctx = ctxFor(P, { assetVersions: await hashVersions(root, P) });
   for (const [name, tree] of Object.entries(P.pages)) {
     const { html, css } = renderDocument(tree, ctx, { name });
     await fsp.writeFile(path.join(out, name + '.html'), html);
@@ -183,7 +196,13 @@ const absDir = p => { if (!p || !path.isAbsolute(String(p))) throw Object.assign
 async function sendFile(res, file) {
   const st = await fsp.stat(file).catch(() => null);
   if (!st?.isFile()) return send(res, 404, 'not found');
-  const head = { 'content-type': MIME[ext(file)] ?? 'application/octet-stream', 'accept-ranges': 'bytes', 'cache-control': 'no-store' };
+  // no-cache (not no-store): the browser keeps the file and revalidates it, so a page can reuse an image it already
+  // has (sprite swaps, re-applied styles) instead of re-downloading it and drawing nothing meanwhile; edits still show
+  const etag = `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`;
+  // versioned URLs (?v=, see assetVersions) never change content: cache for good, no revalidation per use
+  const cache = /[?&]v=/.test(res.req.url) ? 'public, max-age=31536000, immutable' : 'no-cache';
+  const head = { 'content-type': MIME[ext(file)] ?? 'application/octet-stream', 'accept-ranges': 'bytes', 'cache-control': cache, etag, 'last-modified': st.mtime.toUTCString() };
+  if (res.req.headers['if-none-match'] === etag) { res.writeHead(304, head); return res.end(); }
   // single byte range (media seeking; Safari needs it to play video at all)
   const m = /^bytes=(\d*)-(\d*)$/.exec(res.req.headers.range ?? '');
   let start = 0, end = st.size - 1;
@@ -288,7 +307,7 @@ function serve(initial) {
       const page = p.match(/^\/project\/([\w-]+)\.html$/)?.[1];
       if (page && fs.existsSync(safe(`pages/${page}.json`))) { // a page rendered on the fly (Links / IFrames in the editor preview)
         const P = await loadProject(root);
-        if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P), { name: page, cssHref: null }).html, MIME.html);
+        if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P) }), { name: page, cssHref: null }).html, MIME.html);
       }
       if (p.startsWith('/project/')) return sendFile(res, safe(p.slice(9)));
       if (p === '/api/project') { if (!root) throw notOpen(); return sendJSON(res, { root, ...await loadProject(root) }); }
