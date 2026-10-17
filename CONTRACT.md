@@ -143,7 +143,9 @@ GPSB.applyNode(node, parent?, els?)  // PURE: re-apply node data's style/attrs/p
                                     // with that id). Never writes the tree. Runtime code mutates GPSB.node(id) in
                                     // place then calls it; editor preview passes clones. Attributes and Style classes
                                     // a prop change no longer produces (disabled, inert, target...) are removed.
+                                    // Inline styles are updated per changed property (not rewritten each frame).
 GPSB.setActive(id, bool | 'toggle')  // toggle is per element (Repeat clones toggle independently)
+GPSB.preload(url)            // load + decode an image and keep it referenced (sprite swaps never show a blank frame)
 GPSB.nodeFor(el)              // node data for one element: canonical node, or a per-clone copy inside a Repeat ({{item}} resolved)
 GPSB.effective(node)          // node with the active breakpoint overrides     GPSB.breakpoints() -> active names
 GPSB.assets.url(p) .json(p) .text(p)
