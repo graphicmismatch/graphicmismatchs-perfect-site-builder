@@ -117,6 +117,56 @@ export function setProp(id, path, value, opts = {}) {
   edit(opts.label ?? `Set ${path} ${id}`, () => setPath(node(id), path, value), { kind: 'props', ids: [id], merge: true, ...opts });
 }
 
+// ---------- fit to children (Inspector button on Width / Height, Canvas Height) ----------
+// Smallest size along `axis` (0 = x, 1 = y) that encloses the node's children as rendered in the preview. Children
+// anchored at the centre or the far edge move when the node grows, so each one's constraint accounts for its anchor;
+// children that stretch with the node are skipped (they follow it). The near edge stays where it is.
+function fitExtent(el, axis) {
+  const W = el.ownerDocument.defaultView, cs = W.getComputedStyle(el), cur = axis ? el.clientHeight : el.clientWidth;
+  const padEnd = parseFloat(axis ? cs.paddingBottom : cs.paddingRight) || 0;
+  let P = null;
+  const need = v => { P = Math.max(P ?? 0, v); };
+  for (const c of el.children) {
+    const id = c.dataset?.gpsb, ccs = id && W.getComputedStyle(c);
+    if (!id || ccs.display === 'none') continue;
+    const start = axis ? c.offsetTop : c.offsetLeft, len = axis ? c.offsetHeight : c.offsetWidth;
+    if (ccs.position !== 'absolute') { need(start + len + padEnd); continue; } // in a layout group: flows from the start
+    const rt = view(id)?.rect;
+    if (!rt) continue;
+    const a0 = rt.anchorMin[axis], a1 = rt.anchorMax[axis];
+    if (a0 !== a1) continue;
+    const off = start - a0 * cur; // offset from its anchor point
+    if (a0 < 1) need((off + len) / (1 - a0));
+    if (a0 > 0 && off < 0) need(-off / a0);
+  }
+  return P;
+}
+export function fitToChildren(ids, axes = [0, 1]) {
+  const W = S.previewWin?.GPSB;
+  if (!W) return;
+  const label = `Fit to children #${performance.now()}`;
+  let done = 0;
+  for (const id of [ids].flat()) {
+    const n = node(id), el = W.el(id);
+    if (!n || !el) continue;
+    if (n === root()) { // the page: Canvas Height = how far the content reaches
+      const P = fitExtent(el, 1);
+      if (P != null) { setProp(id, 'Canvas.height', Math.ceil(P), { label }); done++; }
+      continue;
+    }
+    const rt = clone(view(id).rect), Pp = parentSize(id), size = [...rt.size], pos = [...rt.pos];
+    for (const i of axes) {
+      const P = fitExtent(el, i);
+      if (P == null) continue;
+      const s = Math.round((P - (rt.anchorMax[i] - rt.anchorMin[i]) * Pp[i]) * 100) / 100;
+      pos[i] = Math.round((pos[i] + rt.pivot[i] * (s - size[i])) * 100) / 100; // keep the near edge in place
+      size[i] = s;
+    }
+    if (size.some((v, i) => v !== rt.size[i])) { setProp(id, 'rect.size', size, { label }); setProp(id, 'rect.pos', pos, { label }); done++; }
+  }
+  if (!done) log('Nothing to fit: no visible children that position from the start or centre on that axis', 'warn');
+}
+
 // ---------- responsive breakpoints ----------
 export const breakpoints = () => sortBreakpoints(S.P?.project.breakpoints);
 // breakpoints applied while editing S.breakpoint: it and every wider one (widest first)

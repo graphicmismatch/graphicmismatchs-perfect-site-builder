@@ -27,6 +27,7 @@ In the editor, use File ▸ Open Project Hub / Open Recent to switch projects.
 
 ## Working faster
 
+- **⤢ next to Width / Height** sizes an object to fit its children; on the Canvas's Height it makes the page as long as its content.
 - **Arrow keys** nudge the selection (Shift: 10 px).
 - **WebObject ▸ Align** aligns or distributes the selection; with one object selected it aligns within the parent.
 - **Smart guides** snap moved objects to their neighbours' edges and centres (Scene toolbar ▸ Guides; hold Alt to skip).

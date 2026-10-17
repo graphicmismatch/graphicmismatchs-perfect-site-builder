@@ -425,6 +425,8 @@ setPage(name) newPage(name) previewHTML(editor) generatedCode() setPlaying(bool)
 api.get/put/del/rename/build   save() build() upload(file, dir) load() reloadMeta()
 ```
 
+- `fitToChildren(ids, axes)` (Inspector ⤢ on Width/Height or Right/Bottom, and Canvas Height): one-shot size that encloses
+  the children as rendered in the preview; anchors respected, stretched children skipped, the near edge stays put.
 - Productivity: `history()` / `jump(n)` (undo steps keep readable labels), arrow-key nudging (`nudge.*` shortcuts,
   Scene/page focus only), system-clipboard copy/paste in `hierarchy.js` (`{"gpsb-nodes":1, nodes, prefabs}`),
   `find.js` (Find & Replace through `setProp`, one undo step per page), Scene `align(kind)` (event `align`: left,

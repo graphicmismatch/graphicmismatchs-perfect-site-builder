@@ -212,3 +212,11 @@ textarea.mono { font: var(--mono); font-size: 11px; white-space: pre; tab-size: 
 .in-prefab .btn { padding: 0 6px; height: 18px; }
 .pfo > .f-lab, .pfo .rt-lab, .pfo.in-head .in-name { font-weight: 700; }
 .f-row.pfo, .rt-cell.pfo { box-shadow: inset 2px 0 var(--prefab); }
+
+/* fit to children buttons (Width / Height, Canvas Height) */
+.rt-labrow { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.rt-labrow .rt-lab { flex: 1; }
+.rt-fit { background: none; border: 0; padding: 0 3px; height: 14px; line-height: 14px; color: var(--text-dim); border-radius: 3px; font-size: 11px; }
+.rt-fit:hover { background: var(--hover-2); color: var(--text); }
+.f-row:has(.f-fit) { grid-template-columns: minmax(70px, 40%) 1fr auto; }
+.f-fit { height: 18px; }

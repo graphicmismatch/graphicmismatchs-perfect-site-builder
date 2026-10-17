@@ -208,10 +208,11 @@ function rectSection(ids, n) {
       }
     },
   });
-  const cell = (lab, b, key, sc = { step: 1 }) => {
+  const fitBtn = axis => h('button', { class: 'rt-fit', title: `Fit ${axis ? 'height' : 'width'} to children`, onclick: () => S.fitToChildren(ids, [axis]) }, '⤢');
+  const cell = (lab, b, key, sc = { step: 1 }, fit) => {
     const l = h('label', { class: 'rt-lab' }, lab), ni = numInput(b, sc);
     scrub(l, b, sc);
-    const c = h('div', { class: 'rt-cell' }, l, ni.el);
+    const c = h('div', { class: 'rt-cell' }, fit == null ? l : h('div', { class: 'rt-labrow' }, l, fitBtn(fit)), ni.el);
     c.dataset.k = key;
     live.push(ni.update);
     mark(c, id, b.paths ?? b.path, b);
@@ -221,8 +222,8 @@ function rectSection(ids, n) {
   const top = h('div', { class: 'rt-grid' },
     stretch[x] ? cell('Left', offB(x, 0), 'rt-l') : cell('Pos X', pb(ids, 'rect.pos.x', 0), 'rt-px'),
     stretch[y] ? cell('Top', offB(y, 0), 'rt-t') : cell('Pos Y', pb(ids, 'rect.pos.y', 0), 'rt-py'),
-    stretch[x] ? cell('Right', offB(x, 1), 'rt-r') : cell('Width', pb(ids, 'rect.size.x', 0), 'rt-w'),
-    stretch[y] ? cell('Bottom', offB(y, 1), 'rt-b') : cell('Height', pb(ids, 'rect.size.y', 0), 'rt-h'));
+    stretch[x] ? cell('Right', offB(x, 1), 'rt-r', undefined, x) : cell('Width', pb(ids, 'rect.size.x', 0), 'rt-w', undefined, x),
+    stretch[y] ? cell('Bottom', offB(y, 1), 'rt-b', undefined, y) : cell('Height', pb(ids, 'rect.size.y', 0), 'rt-h', undefined, y));
 
   const btn = h('button', { class: 'rt-preset', title: 'Anchor presets' });
   const drawBtn = () => { const r = S.view(id)?.rect; if (r) btn.innerHTML = presetSvg(axisOf(r, 0), axisOf(r, 1)); };
@@ -343,8 +344,9 @@ function compSection(n, c, ci) {
   if (!props.length && !missing && !err) body.push(h('div', { class: 'in-note' }, d?.behaviour ? 'No exposed props. Export `props` from the script to show fields here.' : 'No properties.'));
   const wrap = h('div');
   for (const [k, sc] of props) {
-    const b = pb([id], `${cp}.${k}`, sc.default);
-    add(wrap, field(sc, b, nice(k)), `${ci}.${k}`, b);
+    const b = pb([id], `${cp}.${k}`, sc.default), w = add(wrap, field(sc, b, nice(k)), `${ci}.${k}`, b);
+    if (t === 'Canvas' && k === 'height') // the page grows to its content
+      w.el.append(h('button', { class: 'rt-fit f-fit', title: 'Fit the page height to its content', onclick: () => S.fitToChildren(id) }, '⤢'));
   }
   body.push(wrap);
   if (d?.behaviour || d?.custom) body.push(h('div', { class: 'in-src' }, h('a', { onclick: () => openCode(d.behaviour ? S.S.P.behaviours[t.slice(10)]?.path : `components/${t.slice(10)}.html`) }, 'Edit Script')));
