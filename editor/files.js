@@ -10,7 +10,7 @@ export const props = {
 };
 
 export default class ${name} {
-  // injected: this.el, this.node, this.props, this.PSB, this.find(path), this.apply(), this.animator, this.setActive(bool)
+  // injected: this.el, this.node, this.props, this.GPSB, this.find(path), this.apply(), this.animator, this.setActive(bool)
   start() {}
 
   update(dt) {}
@@ -43,7 +43,7 @@ export const componentTemplate = name => `<template>
 </script>
 
 <script>
-  import { Component } from '../psb/component.js';
+  import { Component } from '../gpsb/component.js';
   export default class extends Component {
     rendered() {
       this.$('h3').onclick = () => this.emit('picked', this.props.title);

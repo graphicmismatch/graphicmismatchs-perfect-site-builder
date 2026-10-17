@@ -273,7 +273,7 @@ export function mount(root) {
     const r = e.target.closest('.row');
     if (!r) return;
     const id = r.dataset.id;
-    e.dataTransfer.setData('application/x-psb-node', id);
+    e.dataTransfer.setData('application/x-gpsb-node', id);
     e.dataTransfer.setData('text/plain', S.node(id)?.name ?? id);
     e.dataTransfer.effectAllowed = 'all';
     dragging = true; // no re-render while dragging: replacing the source row cancels the drag
@@ -282,8 +282,8 @@ export function mount(root) {
   };
   tree.ondragend = () => { dragging = false; dragIds = null; clearMarks(); render(); };
   tree.ondragover = e => {
-    const types = e.dataTransfer.types, isNode = types.includes('application/x-psb-node');
-    if (!isNode && !types.includes('application/x-psb-asset') && !types.includes('Files')) return;
+    const types = e.dataTransfer.types, isNode = types.includes('application/x-gpsb-node');
+    if (!isNode && !types.includes('application/x-gpsb-asset') && !types.includes('Files')) return;
     e.preventDefault(); e.stopPropagation();
     const t = dropTarget(e);
     clearMarks();
@@ -298,7 +298,7 @@ export function mount(root) {
     if (!S.S.P) return;
     const t = dropTarget(e), dt = e.dataTransfer;
     let [parentId, index] = place(t);
-    const nodeId = dt.getData('application/x-psb-node'), asset = dt.getData('application/x-psb-asset'), files = [...dt.files];
+    const nodeId = dt.getData('application/x-gpsb-node'), asset = dt.getData('application/x-gpsb-asset'), files = [...dt.files];
     dragging = false;
     if (nodeId) {
       const ids = dragIds ?? topLevel([nodeId]);

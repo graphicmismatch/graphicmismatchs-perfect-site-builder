@@ -135,7 +135,7 @@ export function accept(el, type, fn, ok = () => true) {
     if (ok(v)) fn(v); else S.log(`${v} can't be used here`, 'warn');
   });
 }
-const acceptAsset = (el, kind, fn) => accept(el, 'application/x-psb-asset', fn, v => (v == null ? !dragAsset || fits(dragAsset.kind, kind) : fits(assetKind(v), kind)));
+const acceptAsset = (el, kind, fn) => accept(el, 'application/x-gpsb-asset', fn, v => (v == null ? !dragAsset || fits(dragAsset.kind, kind) : fits(assetKind(v), kind)));
 
 // ---------- primitives ----------
 const evalNum = s => {
@@ -282,7 +282,7 @@ function nodeW(b, none = 'None (Node)') {
   pick.onclick = e => { e.stopPropagation(); pickNode(b.get(), v => b.set(v), box); };
   box.ondblclick = () => b.get() && S.node(b.get()) && S.select(b.get());
   box.onkeydown = e => { if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); b.set(''); } };
-  accept(box, 'application/x-psb-node', v => b.set(v), v => v == null || !!S.node(v));
+  accept(box, 'application/x-gpsb-node', v => b.set(v), v => v == null || !!S.node(v));
   return {
     el: box,
     update() {
@@ -316,9 +316,9 @@ const callLabel = c => CALL_LABEL[c] ?? c.replace(/^behaviour:/, '');
 
 let dl;
 function pagesList() {
-  dl ??= document.body.appendChild(h('datalist', { id: 'psb-pages' }));
+  dl ??= document.body.appendChild(h('datalist', { id: 'gpsb-pages' }));
   dl.replaceChildren(...Object.keys(S.S.P?.pages ?? {}).map(p => h('option', { value: p })));
-  return 'psb-pages';
+  return 'gpsb-pages';
 }
 
 function argW(call, tid, b) {
@@ -407,7 +407,7 @@ function listW(sc, b, label) {
     const grip = h('span', { class: 'ls-grip', draggable: 'true', title: 'Drag to reorder' }, '≡');
     const x = h('button', { class: 'mini x', title: 'Remove', onclick: () => { const a = arr(); a.splice(i, 1); b.set(a); } }, '×');
     const r = h('div', { class: 'ls-row' }, grip, f.el, x);
-    grip.ondragstart = e => { listDrag = { el, i }; e.dataTransfer.setData('application/x-psb-list', String(i)); e.dataTransfer.setDragImage(r, 8, 8); };
+    grip.ondragstart = e => { listDrag = { el, i }; e.dataTransfer.setData('application/x-gpsb-list', String(i)); e.dataTransfer.setDragImage(r, 8, 8); };
     grip.ondragend = () => (listDrag = null);
     r.ondragover = e => { if (listDrag?.el !== el) return; e.preventDefault(); e.stopPropagation(); r.classList.toggle('drop-above', e.offsetY < r.offsetHeight / 2); r.classList.toggle('drop-below', e.offsetY >= r.offsetHeight / 2); };
     r.ondragleave = () => r.classList.remove('drop-above', 'drop-below');

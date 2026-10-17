@@ -12,7 +12,7 @@ export default class Typewriter {
     this.text = this.textComp()?.props.text ?? '';
     if (this.props.autoplay) this.play();
   }
-  textNode() { return this.props.target ? this.PSB.node(this.props.target) : this.node; }
+  textNode() { return this.props.target ? this.GPSB.node(this.props.target) : this.node; }
   textComp() { return this.textNode()?.components.find(c => c.type === 'Text'); }
   // public: restart typing (from an event: behaviour:Typewriter.play); optional arg replaces the text
   play(text) {
@@ -34,6 +34,6 @@ export default class Typewriter {
     this.n = n;
     const caret = this.props.caret ? '<span class="caret">|</span>' : '';
     this.textComp().props.text = this.text.slice(0, n) + caret;
-    this.PSB.applyNode(this.textNode());
+    this.GPSB.applyNode(this.textNode());
   }
 }

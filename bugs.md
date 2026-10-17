@@ -37,7 +37,7 @@ Chromium. The "Repro" lines show what was run. Ordered by severity.
 deletes the whole project folder. A single editor bug that sends an empty path, such as a `deletePath('')`, would wipe
 the user's project without asking.
 
-Repro: on a copy of a project, `curl -X DELETE -H 'x-psb: 1' -H 'x-psb-project: …' 'http://127.0.0.1:PORT/api/file?path='`
+Repro: on a copy of a project, `curl -X DELETE -H 'x-gpsb: 1' -H 'x-gpsb-project: …' 'http://127.0.0.1:PORT/api/file?path='`
 returned `{"ok":true}`, and the project folder was gone.
 
 Fix: reject the root in `safe()` for writes (`p === root` → 403), or require a non-empty path in `/api/file` and
@@ -46,14 +46,14 @@ Fix: reject the root in `safe()` for writes (`p === root` → 403), or require a
 ## 2. `build --out` inside or equal to the project wipes it — Critical
 
 `build()` (`cli.js:75`) runs `fsp.rm(out, { recursive: true, force: true })` with no check on `out`. It loads the
-project into memory *before* deleting, so `psb build mysite --out mysite` writes pages from memory and prints
+project into memory *before* deleting, so `gpsb build mysite --out mysite` writes pages from memory and prints
 `built 1 page(s)`, but `project.json`, `pages/`, `assets/` and `animations/` are deleted, and assets are missing from the output.
 `--out ..`, `--out ~` and similar delete even more.
 
 Repro: `node cli.js build .tmp/bo --out .tmp/bo` → output OK, `project.json` and `pages/` gone.
 
 Fix: refuse an `out` that equals the project root, contains it, or contains a project source folder. Even better, only
-delete inside `out` when it looks like a previous build (for example, it has a `psb/runtime.js`).
+delete inside `out` when it looks like a previous build (for example, it has a `gpsb/runtime.js`).
 
 ## 3. Edits during a save are silently lost — High
 
@@ -78,7 +78,7 @@ changes are never removed:
 This hits animations, breakpoint overrides (the runtime re-applies on breakpoint change) and behaviour code alike. It
 only goes one way: changing a prop to add an attribute works, changing it back doesn't.
 
-Repro (built page): with `interactable: false` at build time, set it to `true` and call `PSB.applyNode`. The element
+Repro (built page): with `interactable: false` at build time, set it to `true` and call `GPSB.applyNode`. The element
 still has `disabled` / `inert`.
 
 Fix: track the attribute names the renderer manages (for example, the ones `nodeAttrs` produced last time, kept per
@@ -99,14 +99,14 @@ Fix: catch parse errors per file and report them (like `components` already does
 
 ## 6. `setActive` `toggle` doesn't work inside a `Repeat` — Medium
 
-`lib/behaviours.js:20` decides the toggle from `PSB.node(id).active`, the canonical node. Inside a `Repeat`,
-`PSB.setActive` writes to each clone's own data (`nodeFor(el)`), so the canonical `active` never changes. Every toggle
+`lib/behaviours.js:20` decides the toggle from `GPSB.node(id).active`, the canonical node. Inside a `Repeat`,
+`GPSB.setActive` writes to each clone's own data (`nodeFor(el)`), so the canonical `active` never changes. Every toggle
 computes "turn off" again, and the item can never be turned back on.
 
-Repro (built page with a 2-item Repeat): `PSB.invoke('item','setActive','toggle')` twice → both clones still
+Repro (built page with a 2-item Repeat): `GPSB.invoke('item','setActive','toggle')` twice → both clones still
 `display: none`.
 
-Fix: toggle per element (`PSB.nodeFor(el).active`) inside `setActive`, for example by accepting `'toggle'` there.
+Fix: toggle per element (`GPSB.nodeFor(el).active`) inside `setActive`, for example by accepting `'toggle'` there.
 
 ## 7. A broken component file fails the whole build — Medium
 
@@ -115,7 +115,7 @@ Fix: toggle per element (`PSB.nodeFor(el).active`) inside `setActive`, for examp
 page uses, aborts the build with a stack trace.
 
 Repro: add `components/Broken.html` with `<script type="application/json" props>{ bad }</script>` →
-`psb build` throws `SyntaxError`.
+`gpsb build` throws `SyntaxError`.
 
 Fix: skip components that have an `error` (log it), or only compile the components the pages use.
 
@@ -169,7 +169,7 @@ in the clips that target it (and drop the paths of the removed component).
 ## 12. Fonts used only in overrides get no `@font-face` — Low
 
 `renderPage` (`lib/render.js:166`) collects font assets from base `c.props` only. A font set only in a breakpoint
-override (for example Phone `Text.font = fonts/Lato-Black.ttf`) is used as `font-family: "psb-fonts-lato-black-ttf"`, but
+override (for example Phone `Text.font = fonts/Lato-Black.ttf`) is used as `font-family: "gpsb-fonts-lato-black-ttf"`, but
 that family is never declared, so the browser falls back.
 
 Repro: confirmed with `renderPage`: the CSS uses the family, but there is no `@font-face`.
@@ -233,7 +233,7 @@ Fix: wait for the process `exit` event before removing the profile, or wrap `rmS
 1. `safe(rel, write)` (`cli.js`) refuses to write, delete or rename the project folder itself (403). PUT, DELETE and
    both ends of `/api/rename` use it.
 2. `build()` resolves both paths and refuses an output folder that contains the project, sits inside a source folder,
-   or isn't empty and doesn't contain `psb/runtime.js` from a previous build. This check runs before anything is deleted.
+   or isn't empty and doesn't contain `gpsb/runtime.js` from a previous build. This check runs before anything is deleted.
 3. `save()` writes the text it serialized, and clears the dirty flag only if the file still serializes to that same
    text afterwards. The message now says how many files failed. `api.del`/`api.rename` now reject on HTTP errors.
 4. The runtime remembers which attributes (`role`, `aria-label`, `disabled`, `inert`, `target`, `rel`, plus whatever it
@@ -243,12 +243,12 @@ Fix: wait for the process `exit` event before removing the profile, or wrap `rmS
    out, a broken JSON asset becomes `null`, and a broken `project.json` falls back to defaults. The editor logs them,
    and `newPage` won't reuse the name of a page that failed to load. The build fails on broken pages, clips or
    `project.json`, and only warns for assets and components.
-6. `PSB.setActive(id, 'toggle')` toggles each element's own node data. `invoke('setActive', 'toggle')` uses it.
+6. `GPSB.setActive(id, 'toggle')` toggles each element's own node data. `invoke('setActive', 'toggle')` uses it.
 7. The build skips components that failed to parse, and reports them in `warnings` (printed by the CLI, logged by the editor).
 8. `alignFlex` flips the main axis when `reverse` is on.
-9. `Image` exposes its sprite as `--psb-sprite` / `--psb-sprite-size`. A tinted `Button` over a sprite no longer fills
+9. `Image` exposes its sprite as `--gpsb-sprite` / `--gpsb-sprite-size`. A tinted `Button` over a sprite no longer fills
    its background. Instead it draws a `::before` layer masked to the sprite and blended with `multiply`, and
-   `:hover`/`:active` change `--psb-tint`. Sprite swaps keep working because the mask reads the variable.
+   `:hover`/`:active` change `--gpsb-tint`. Sprite swaps keep working because the mask reads the variable.
    `rules()` now also receives the node (`rules(p, sel, ctx, node)`).
 10. `retarget` can also rename override keys. Component and behaviour renames use one matcher that handles
     `Type`, `Type.prop` and `Type[n].prop` in values, tracks, event calls and override keys.
@@ -263,7 +263,7 @@ Fix: wait for the process `exit` event before removing the profile, or wrap `rmS
     ancestor is selected too, so a child isn't copied twice.
 15. `sendFile` supports single byte ranges (`206`, `416`, `Accept-Ranges`) and no longer crashes the server if a read
     fails partway through.
-16. The `class` and `data-psb` attribute values are escaped.
+16. The `class` and `data-gpsb` attribute values are escaped.
 17. `restore` fires `page` when undo/redo switches pages.
 18. Removing the Chrome profile retries (`maxRetries`) and can't crash `test/browser.js` any more (the same retry is
     used in `test/e2e.js`).

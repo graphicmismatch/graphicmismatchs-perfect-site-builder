@@ -1,9 +1,9 @@
 {
-  "name": "perfect-site-builder",
+  "name": "gpsb",
   "version": "0.1.0",
   "description": "graphicmismatch's perfect site builder — a Unity uGUI-style visual static site generator",
   "type": "module",
-  "bin": { "psb": "cli.js" },
+  "bin": { "gpsb": "cli.js" },
   "scripts": {
     "test": "node test/core.test.js && node test/anim.test.js && node test/e2e.js",
     "serve": "node cli.js serve example",

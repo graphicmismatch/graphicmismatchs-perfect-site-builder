@@ -14,7 +14,7 @@ export const S = {
   anim: { clip: null, time: 0, recording: false, playing: false, animatorId: null },
   breakpoint: null,        // breakpoint name being edited (null = base): edits become overrides, like prefab overrides
   dirty: new Set(),        // project-relative files with unsaved changes
-  previewWin: null,        // Scene iframe contentWindow once loaded (window.PSB inside it)
+  previewWin: null,        // Scene iframe contentWindow once loaded (window.GPSB inside it)
   hooks: {
     setProp: null,         // (id, path, value) => true if handled (animation record mode)
     animState: null,       // (id, path) => null | { value, keyed } (inspector tint / displayed value)
@@ -39,7 +39,7 @@ export const def = type => componentDef(type, S.P?.components, S.behaviourMeta);
 export const propsOf = c => withDefaults(def(c.type), c.props);
 // Untransformed CSS px size of a node's parent (for reanchor / gizmos). Root or no preview -> resolution.
 export function parentSize(id) {
-  const p = parentOf(id), el = p && S.previewWin?.PSB?.el(p.id);
+  const p = parentOf(id), el = p && S.previewWin?.GPSB?.el(p.id);
   return el ? [el.offsetWidth, el.offsetHeight] : [...S.resolution];
 }
 export const assetUrl = p => '/project/assets/' + String(p).split('/').map(encodeURIComponent).join('/');
@@ -261,7 +261,7 @@ export const generatedCode = () => renderDocument(root(), ctx(), { name: S.page 
 export function setPlaying(on) { S.playing = on; emit('play'); }
 
 // ---------- files / server ----------
-const H = { 'x-psb': '1' }; // required by the server for every non-GET request (+ x-psb-project once loaded)
+const H = { 'x-gpsb': '1' }; // required by the server for every non-GET request (+ x-gpsb-project once loaded)
 const ok = r => (r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t))));
 export const api = {
   get: p => fetch('/api/file?path=' + encodeURIComponent(p)).then(r => (r.ok ? r.text() : Promise.reject(new Error(r.statusText)))),
@@ -321,7 +321,7 @@ export async function load() {
   const r = await fetch('/api/project');
   if (r.status === 409) return void location.replace('/'); // no project open: back to the Project Hub
   S.P = await r.json();
-  H['x-psb-project'] = encodeURIComponent(S.P.root);
+  H['x-gpsb-project'] = encodeURIComponent(S.P.root);
   for (const e of S.P.errors ?? []) log(`${e.file}: ${e.error}` + (/^(pages|animations)\//.test(e.file) ? ' (not loaded; fix the file and reload)' : ''), 'error');
   if (!S.P.pages[S.page]) S.page = Object.keys(S.P.pages)[0];
   await loadBehaviours();

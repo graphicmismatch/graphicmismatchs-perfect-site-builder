@@ -11,7 +11,7 @@ const OPENABLE = ['component', 'behaviour', 'json', 'text', 'file'];
 let el, treeEl, gridEl, crumbs, footPath, searchEl, slider, fileIn;
 let cur = 'assets', selPath = null, size = 72, query = '', renaming = false, pending = false, M = { items: [], folders: new Set() };
 const expanded = new Set(['assets']);
-try { size = +localStorage.psbTile || 72; cur = localStorage.psbFolder || 'assets'; } catch {}
+try { size = +localStorage.gpsbTile || 72; cur = localStorage.gpsbFolder || 'assets'; } catch {}
 
 export function mount(root) {
   el = root;
@@ -24,7 +24,7 @@ export function mount(root) {
   gridEl = h('div', { class: 'pj-grid' });
   footPath = h('span', { class: 'pj-path' });
   slider = h('input', { type: 'range', min: 32, max: 128, step: 4, value: size, class: 'pj-size', title: 'Thumbnail size' });
-  slider.oninput = () => { size = +slider.value; try { localStorage.psbTile = size; } catch {} layout(); };
+  slider.oninput = () => { size = +slider.value; try { localStorage.gpsbTile = size; } catch {} layout(); };
   fileIn = h('input', { type: 'file', multiple: true, hidden: true, onchange: () => { importFiles([...fileIn.files], cur); fileIn.value = ''; } });
   el.append(
     h('div', { class: 'pj-bar' }, plus, crumbs, searchEl),
@@ -145,8 +145,8 @@ function tile(it) {
   t.ondragstart = e => {
     if (it.kind === 'folder') return e.preventDefault();
     const dt = e.dataTransfer;
-    if (it.drag != null) { dt.setData('application/x-psb-asset', it.drag); setDragAsset({ kind: it.kind, value: it.drag }); }
-    if (it.comp) dt.setData('application/x-psb-component', it.comp);
+    if (it.drag != null) { dt.setData('application/x-gpsb-asset', it.drag); setDragAsset({ kind: it.kind, value: it.drag }); }
+    if (it.comp) dt.setData('application/x-gpsb-component', it.comp);
     dt.setData('text/plain', it.drag ?? it.path);
     dt.effectAllowed = 'copyLink';
   };
@@ -168,7 +168,7 @@ function mark() {
 function setFolder(k) {
   cur = k; query = ''; searchEl.value = '';
   for (let d = k; d.includes('/'); d = parentDir(d)) expanded.add(parentDir(d));
-  try { localStorage.psbFolder = k; } catch {}
+  try { localStorage.gpsbFolder = k; } catch {}
   draw();
 }
 

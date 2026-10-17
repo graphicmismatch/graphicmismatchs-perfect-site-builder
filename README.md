@@ -1,4 +1,4 @@
-# graphicmismatch's perfect site builder
+# graphicmismatch's perfect site builder (gpsb)
 
 A visual static site generator that works like Unity's uGUI. You lay out pages in a Unity-style editor using
 RectTransforms, anchors, pivots and layout groups, add components and keyframe animations, and it generates plain
@@ -13,6 +13,8 @@ node cli.js build example          # -> example/dist (static, host anywhere)
 node cli.js new my-site            # start a new project
 ```
 
+After `npm link` (or a global install) the same commands are available as `gpsb`, e.g. `gpsb serve example`.
+
 ## Project Hub
 
 The first screen lists your projects with their path, page and asset counts, and when you last opened each one.
@@ -20,7 +22,7 @@ The first screen lists your projects with their path, page and asset counts, and
 - **Add:** register a project folder that already exists.
 - **Remove:** take a project off the list; its files stay on disk.
 
-The list and your preferences are saved in `~/.config/perfect-site-builder/`, so they carry over between projects.
+The list and your preferences are saved in `~/.config/gpsb/`, so they carry over between projects.
 In the editor, use File ▸ Open Project Hub / Open Recent to switch projects.
 
 ## Configurable UI
@@ -80,7 +82,7 @@ Shortcuts work as in Unity:
 - **Assets** live in `assets/` and are referenced by path.
   - JSON can be bound into any text field, for example `{{data/site.json:hero.title}}`.
   - A **Repeat** creates one copy of its children per item in a JSON array, with `{{item.name}}` and `{{index}}` available.
-  - Scripts can load data with `await PSB.assets.json('data/site.json')`.
+  - Scripts can load data with `await GPSB.assets.json('data/site.json')`.
 
 ## Custom components (HTML + CSS + JS)
 
@@ -95,7 +97,7 @@ Shortcuts work as in Unity:
   { "title": { "type": "string", "default": "Hello" }, "image": { "type": "asset:image", "default": "" } }
 </script>
 <script>
-  import { Component } from '../psb/component.js';
+  import { Component } from '../gpsb/component.js';
   export default class extends Component {
     rendered() { this.$('h2').onclick = () => this.emit('picked', this.props.title); }
   }

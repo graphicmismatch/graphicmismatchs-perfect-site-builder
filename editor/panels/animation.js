@@ -97,7 +97,7 @@ function retarget() {
 
 // ---------- Scene preview ----------
 function applyPreview() {
-  const W = S.S.previewWin?.PSB;
+  const W = S.S.previewWin?.GPSB;
   if (!W?.applyNode || S.S.playing) return;
   const an = animator(), c = clip();
   const map = preview && an && c ? applyClip(an, c, A().time, meta()) : new Map();
@@ -379,8 +379,8 @@ function field(tr, i) {
   } else if (type === 'number' || type === 'int') { f = document.createElement('input'); f.type = 'number'; f.step = type === 'int' ? '1' : 'any'; f.onchange = () => f.value !== '' && write(type === 'int' ? Math.round(+f.value) : +f.value); }
   else {
     f = document.createElement('input'); f.type = 'text'; f.spellcheck = false; f.onchange = () => write(f.value);
-    f.ondragover = e => e.dataTransfer.types.includes('application/x-psb-asset') && e.preventDefault();
-    f.ondrop = e => { const p = e.dataTransfer.getData('application/x-psb-asset'); if (p) { e.preventDefault(); write(p); } };
+    f.ondragover = e => e.dataTransfer.types.includes('application/x-gpsb-asset') && e.preventDefault();
+    f.ondrop = e => { const p = e.dataTransfer.getData('application/x-gpsb-asset'); if (p) { e.preventDefault(); write(p); } };
   }
   f.classList.add('an-field');
   return f;

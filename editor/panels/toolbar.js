@@ -110,7 +110,7 @@ export async function buildSite() {
 
 // ---------- projects (File > Open Recent) ----------
 let recent = [];
-const H = { 'x-psb': '1', 'content-type': 'application/json' };
+const H = { 'x-gpsb': '1', 'content-type': 'application/json' };
 const loadRecent = () => fetch('/api/hub/projects').then(r => r.json()).then(d => {
   recent = d.projects.filter(p => p.exists && p.path !== d.open).sort((a, b) => (b.lastOpened ?? '').localeCompare(a.lastOpened ?? '')).slice(0, 10);
 }).catch(() => {});
@@ -205,15 +205,15 @@ function applyPause() {
   el.querySelector('[data-act=pause]').classList.toggle('on', paused);
   if (!w || !S.S.playing) return;
   try {
-    w.psbRaf ??= w.requestAnimationFrame;
+    w.gpsbRaf ??= w.requestAnimationFrame;
     if (paused) {
       w.requestAnimationFrame = cb => (held.push(cb), 0);
       pauseT = w.performance.now();
       frozen = [...w.document.getAnimations().filter(a => a.playState === 'running'), ...[...w.document.querySelectorAll('video, audio')].filter(m => !m.paused)];
       frozen.forEach(a => a.pause());
     } else {
-      w.requestAnimationFrame = w.psbRaf;
-      held.splice(0).forEach(cb => w.psbRaf.call(w, cb));
+      w.requestAnimationFrame = w.gpsbRaf;
+      held.splice(0).forEach(cb => w.gpsbRaf.call(w, cb));
       frozen.splice(0).forEach(a => a.play()?.catch?.(() => {}));
     }
   } catch (e) { S.log(`Pause: ${e.message}`, 'warn'); }

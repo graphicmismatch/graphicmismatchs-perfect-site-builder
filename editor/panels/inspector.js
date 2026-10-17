@@ -8,8 +8,8 @@ import { icon, compIcon } from '../icons.js';
 import { openCode, createScript, createComponent, validName } from '../files.js';
 
 let el, live = [], sig = '', assetPath = null, clipboard = null, presetN = 0;
-const fold = (() => { try { return JSON.parse(localStorage.psbFold || '{}'); } catch { return {}; } })();
-const saveFold = () => { try { localStorage.psbFold = JSON.stringify(fold); } catch {} };
+const fold = (() => { try { return JSON.parse(localStorage.gpsbFold || '{}'); } catch { return {}; } })();
+const saveFold = () => { try { localStorage.gpsbFold = JSON.stringify(fold); } catch {} };
 
 export function mount(root) {
   el = root;
@@ -22,7 +22,7 @@ export function mount(root) {
   S.on('anim', () => !assetPath && refresh());
   S.on('breakpoint', () => !assetPath && render());
   // drop a component/behaviour from the Project panel to add it (like dropping a script in Unity)
-  accept(el, 'application/x-psb-component', t => S.S.selection.length && S.addComponent(S.S.selection.at(-1), t), () => !assetPath && S.S.selection.length > 0);
+  accept(el, 'application/x-gpsb-component', t => S.S.selection.length && S.addComponent(S.S.selection.at(-1), t), () => !assetPath && S.S.selection.length > 0);
   render();
 }
 
@@ -496,7 +496,7 @@ function renderAsset(p) {
     body.append(data === null || data === undefined ? h('div', { class: 'in-warn', html: icon('warn') }, h('span', {}, 'Invalid JSON (could not parse).')) : jsonTree(data, rel));
     usage('Bind any text prop: ', code(`{{${rel}:key.path}}`), '. Click a key to copy its binding. Arrays drive a ', h('i', {}, 'Repeat'), ' (Source = this file, Path = the array key; use ', code('{{item.x}}'), ' inside).');
   } else if (m.kind === 'font') {
-    const fam = 'psb-prev-' + rel.replace(/\W/g, '_');
+    const fam = 'gpsb-prev-' + rel.replace(/\W/g, '_');
     new FontFace(fam, `url("${url}")`).load().then(f => document.fonts.add(f)).catch(e => S.log(`Font ${rel}: ${e.message}`, 'warn'));
     body.append(h('div', { class: 'as-font', style: `font-family:"${fam}"` }, h('div', { style: 'font-size:28px' }, 'Aa Bb Cc 123'), h('div', {}, 'The quick brown fox jumps over the lazy dog.')));
     usage('Drag onto a Text or Canvas ', h('i', {}, 'Font'), ' field, or type ', code(rel), '.');
@@ -519,7 +519,7 @@ function renderAsset(p) {
       if (bm.error) body.prepend(h('div', { class: 'in-warn', html: icon('warn') }, h('span', {}, bm.error)));
       body.prepend(h('div', { class: 'as-kv' }, ...kv({ Props: Object.keys(bm.props ?? {}).join(', ') || '—', Methods: (bm.methods ?? []).join(', ') || '—' })));
       usage('Add Component › Scripts › ', h('b', {}, m.name), ', or drag it onto the Inspector. Call methods from events: ', code(`behaviour:${m.name}.${(bm.methods ?? []).find(x => x !== 'start' && x !== 'update') ?? 'method'}`), '.');
-    } else usage('Path: ', code(rel ?? p), m.kind === 'text' ? ' · load at runtime with ' : '', m.kind === 'text' ? code(`PSB.assets.text('${rel}')`) : '');
+    } else usage('Path: ', code(rel ?? p), m.kind === 'text' ? ' · load at runtime with ' : '', m.kind === 'text' ? code(`GPSB.assets.text('${rel}')`) : '');
     S.api.get(p).then(t => { sizeOf(t); pre.textContent = t.length > 20000 ? t.slice(0, 20000) + '\n…' : t; }, e => (pre.textContent = e.message));
   }
 }

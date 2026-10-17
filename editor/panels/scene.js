@@ -7,13 +7,13 @@ import { activeBreakpoints } from '/lib/node.js';
 const RES = [[1920, 1080], [1280, 720], [1366, 768], [1440, 900], [390, 844, 'phone'], [768, 1024, 'tablet']];
 const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 4];
 const cfg = { grid: true, gizmos: true, snap: false, inc: 10, scale: 1, res: null };
-try { Object.assign(cfg, JSON.parse(localStorage.psbScene || '{}')); } catch {}
-const saveCfg = () => { try { localStorage.psbScene = JSON.stringify(cfg); } catch {} };
+try { Object.assign(cfg, JSON.parse(localStorage.gpsbScene || '{}')); } catch {}
+const saveCfg = () => { try { localStorage.gpsbScene = JSON.stringify(cfg); } catch {} };
 const ROT = `url("data:image/svg+xml,${encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><g fill='none' stroke-linecap='round'><path d='M5 11a5 5 0 1 0 5-5' stroke='white' stroke-width='4'/><path d='M5 11a5 5 0 1 0 5-5' stroke='black' stroke-width='1.6'/></g><path d='M10 2v8l4-4z' stroke='white' stroke-width='1'/></svg>")}") 10 10, crosshair`;
 
 // page console/errors -> editor console (end of <head>: before any deferred module or body script runs)
 const HOOK = `<script>(() => {
-  const f = frameElement && frameElement.psbLog; if (!f) return;
+  const f = frameElement && frameElement.gpsbLog; if (!f) return;
   const str = a => a.map(x => typeof x === 'string' ? x : x instanceof Error ? x.stack || x.message : (() => { try { return JSON.stringify(x) ?? String(x); } catch { return String(x); } })()).join(' ');
   for (const [k, l] of [['log', 'info'], ['info', 'info'], ['warn', 'warn'], ['error', 'error']]) { const o = console[k]; console[k] = (...a) => { o.apply(console, a); f(str(a), l); }; }
   addEventListener('error', e => f(e.message + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''), 'error'));
@@ -73,14 +73,14 @@ function elMatrix(e) {
   return m;
 }
 function info(id) {
-  const e = win?.PSB?.el(id);
+  const e = win?.GPSB?.el(id);
   if (!e?.offsetParent) return null; // inactive / missing
   const M = stage().multiplySelf(elMatrix(e)), [w, h] = box(e);
   return { e, M, w, h, q: [[0, 0], [w, 0], [w, h], [0, h]].map(([x, y]) => M.transformPoint({ x, y })) };
 }
 // parent's layout space (padding box, unscrolled) -> view
 function parentFrame(id) {
-  const p = S.parentOf(id), e = p && win?.PSB?.el(p.id);
+  const p = S.parentOf(id), e = p && win?.GPSB?.el(p.id);
   if (!e) return null;
   return { M: stage().multiplySelf(elMatrix(e)).translateSelf(e.clientLeft - e.scrollLeft, e.clientTop - e.scrollTop), P: box(e) };
 }
@@ -201,7 +201,7 @@ const hit = v => geo()?.h.find(h => h.test(v));
 // ---------- overlay ----------
 function draw() {
   let s = '';
-  if (win?.PSB && S.root()) {
+  if (win?.GPSB && S.root()) {
     const [W, H] = S.S.resolution, a = stage().transformPoint({ x: 0, y: 0 });
     s += `<rect class="cv" x="${f1(a.x)}" y="${f1(a.y)}" width="${f1(W * zoom)}" height="${f1(pageH * zoom)}"/>`;
     if (pageH > H) s += line({ x: a.x, y: a.y + H * zoom }, { x: a.x + W * zoom, y: a.y + H * zoom }, 'fold');
@@ -293,15 +293,15 @@ function rebuild() {
     clearTimeout(propsTimer);
     const my = ++gen, f = frames[1 - front], [W, H] = S.S.resolution;
     Object.assign(f.style, { width: W + 'px', height: H + 'px' });
-    f.onload = () => waitPSB(f, my, 0);
+    f.onload = () => waitGPSB(f, my, 0);
     f.srcdoc = S.previewHTML().replace('</head>', HOOK + '\n</head>');
   });
 }
-function waitPSB(f, my, n) {
+function waitGPSB(f, my, n) {
   if (my !== gen) return;
-  if (f.contentWindow?.PSB) return swap(f);
+  if (f.contentWindow?.GPSB) return swap(f);
   if (n > 300) return S.log('Preview runtime did not start', 'error');
-  setTimeout(() => waitPSB(f, my, n + 1), 20);
+  setTimeout(() => waitGPSB(f, my, n + 1), 20);
 }
 function swap(f) {
   const old = frames[front], [, H] = S.S.resolution;
@@ -322,7 +322,7 @@ function picks(v) {
   if (!doc) return ids;
   const f = stage().inverse().transformPoint(v);
   for (const e of doc.elementsFromPoint(f.x, f.y)) {
-    const id = e.closest('[data-psb]')?.dataset.psb;
+    const id = e.closest('[data-gpsb]')?.dataset.gpsb;
     if (id && id !== rootId && !ids.includes(id) && S.node(id)) ids.push(id);
   }
   return ids;
@@ -502,10 +502,10 @@ const natural = p => new Promise(ok => {
 async function drop(e) {
   if (mode !== 'scene') return;
   e.preventDefault();
-  const v = vpt(e), parentId = picks(v)[0] ?? S.root().id, pe = win?.PSB?.el(parentId);
+  const v = vpt(e), parentId = picks(v)[0] ?? S.root().id, pe = win?.GPSB?.el(parentId);
   const local = pe ? stage().multiplySelf(elMatrix(pe)).translateSelf(pe.clientLeft - pe.scrollLeft, pe.clientTop - pe.scrollTop).inverse().transformPoint(v) : { x: 0, y: 0 };
   const P = pe ? box(pe) : S.S.resolution, dt = e.dataTransfer, paths = [];
-  const asset = dt.getData('application/x-psb-asset');
+  const asset = dt.getData('application/x-gpsb-asset');
   try { if (asset) paths.push(asset); else for (const f of dt.files) paths.push(await S.upload(f)); }
   catch (err) { return S.log(`Import failed: ${err.message}`, 'error'); }
   for (const p of paths) {
@@ -551,7 +551,7 @@ export function mount(root) {
   const $ = s => el.querySelector(s);
   view = $('.sc-view'); world = $('.sc-world'); sizer = $('.sc-sizer'); svg = $('.sc-ov'); zoomSel = $('.sc-zoom');
   frames = [...el.querySelectorAll('iframe')];
-  for (const f of frames) f.psbLog = (msg, level) => S.log(msg, level, { source: 'page' });
+  for (const f of frames) f.gpsbLog = (msg, level) => S.log(msg, level, { source: 'page' });
 
   // toolbar
   const resSel = $('.sc-res'), custom = $('.sc-custom'), wIn = $('.sc-w'), hIn = $('.sc-h'), inc = $('.sc-inc'), scale = $('.sc-scale');
@@ -669,7 +669,7 @@ export function mount(root) {
   view.addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = false; view.style.cursor = ''; e.stopPropagation(); } });
   view.addEventListener('blur', () => (spaceDown = false));
   view.addEventListener('dragover', e => {
-    if (mode !== 'scene' || ![...e.dataTransfer.types].some(t => t === 'application/x-psb-asset' || t === 'Files')) return;
+    if (mode !== 'scene' || ![...e.dataTransfer.types].some(t => t === 'application/x-gpsb-asset' || t === 'Files')) return;
     e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
   });
   view.addEventListener('drop', drop);
@@ -684,10 +684,10 @@ export function mount(root) {
     rebuild();
   });
   S.on('props', ids => {
-    const PSB = win?.PSB;
-    if (PSB) for (const id of ids) {
+    const GPSB = win?.GPSB;
+    if (GPSB) for (const id of ids) {
       const n = S.node(id);
-      if (n) try { PSB.applyNode(n, S.parentOf(id)); } catch (e) { console.warn(e); }
+      if (n) try { GPSB.applyNode(n, S.parentOf(id)); } catch (e) { console.warn(e); }
     }
     if (!S.S.playing) rebuildLater(); // playing: keep the running page, patch only
   });

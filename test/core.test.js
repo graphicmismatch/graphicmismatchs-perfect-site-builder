@@ -129,18 +129,18 @@ assert.deepEqual([nodeStyle(rev, pg, makeCtx())['justify-content'], nodeStyle(re
 const sb = newNode('Sb', [{ type: 'Image', props: { sprite: 'img/b.png' } }, { type: 'Button', props: {} }]);
 const sbs = nodeStyle(sb, pg, makeCtx());
 assert.equal(sbs['background-color'], 'transparent');
-assert.equal(sbs['--psb-tint'], '#ffffff');
+assert.equal(sbs['--gpsb-tint'], '#ffffff');
 pg.children.push(sb);
 const sbCss = renderPage(pg, makeCtx()).css;
-assert.match(sbCss, /\.sb::before \{[^}]*mask: var\(--psb-sprite\)/);
-assert.match(sbCss, /\.sb:hover \{ --psb-tint: #f5f5f5 !important; \}/);
+assert.match(sbCss, /\.sb::before \{[^}]*mask: var\(--gpsb-sprite\)/);
+assert.match(sbCss, /\.sb:hover \{ --gpsb-tint: #f5f5f5 !important; \}/);
 assert.ok(!/\.sb:hover \{ background-color/.test(sbCss));
 // a font used only in an override still gets @font-face
 pg = canvasNode();
 const ft = newNode('Ft', [{ type: 'Text', props: {} }]);
 setOverride(ft, 'Phone', 'Text.font', 'fonts/X.ttf');
 pg.children.push(ft);
-assert.match(renderPage(pg, makeCtx()).css, /@font-face \{\n {2}font-family: "psb-fonts-x-ttf"/);
+assert.match(renderPage(pg, makeCtx()).css, /@font-face \{\n {2}font-family: "gpsb-fonts-x-ttf"/);
 // overrides under an empty Repeat: no .undefined rule
 pg = canvasNode();
 const emptyRep = newNode('List', [{ type: 'Repeat', props: { source: 'none.json' } }]), ghost = newNode('Ghost');

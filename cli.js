@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // graphicmismatch's perfect site builder
-//   psb [hub] [--port N]       open the Project Hub at http://127.0.0.1:4000
-//   psb serve [dir] [--port N] same, with <dir> registered and opened in the editor
-//   psb new   <dir>            create an empty project
-//   psb build [dir] [--out D]  write the static site (default <dir>/dist)
+//   gpsb [hub] [--port N]       open the Project Hub at http://127.0.0.1:4000
+//   gpsb serve [dir] [--port N] same, with <dir> registered and opened in the editor
+//   gpsb new   <dir>            create an empty project
+//   gpsb build [dir] [--out D]  write the static site (default <dir>/dist)
 import http from 'node:http';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -64,7 +64,7 @@ export async function loadProject(root) {
   for (const f of await files(p('components'))) if (f.endsWith('.html')) {
     const name = f.slice(0, -5);
     try { components[name] = parseComponent(name, await fsp.readFile(p('components/' + f), 'utf8')); }
-    catch (e) { components[name] = { name, tag: 'psb-error', props: {}, error: String(e) }; }
+    catch (e) { components[name] = { name, tag: 'gpsb-error', props: {}, error: String(e) }; }
   }
   for (const f of await files(p('behaviours'))) if (f.endsWith('.js')) behaviours[f.slice(0, -3)] = { path: 'behaviours/' + f };
   for (const f of await files(p('animations'))) if (f.endsWith('.anim.json')) {
@@ -89,7 +89,7 @@ async function checkOut(root, out) {
   for (const d of ['pages', 'assets', 'components', 'behaviours', 'animations'])
     if (inside(out, path.join(root, d))) throw new Error(`refusing to build into ${out}: it is inside the project's ${d}/ folder`);
   const ents = await fsp.readdir(out).catch(() => []);
-  if (ents.length && !fs.existsSync(path.join(out, 'psb', 'runtime.js')))
+  if (ents.length && !['gpsb', 'psb'].some(d => fs.existsSync(path.join(out, d, 'runtime.js')))) // psb/: built before the rename
     throw new Error(`refusing to build into ${out}: it is not empty and does not look like a previous build`);
 }
 
@@ -102,8 +102,8 @@ export async function build(root, out = path.join(root, 'dist')) {
   if (fatal.length) throw new Error('cannot build:\n' + fatal.map(e => `  ${e.file}: ${e.error}`).join('\n'));
   const warnings = P.errors.map(e => `${e.file}: ${e.error}`);
   await fsp.rm(out, { recursive: true, force: true });
-  await fsp.mkdir(path.join(out, 'psb'), { recursive: true });
-  for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f !== 'compile.js') await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'psb', f));
+  await fsp.mkdir(path.join(out, 'gpsb'), { recursive: true });
+  for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f !== 'compile.js') await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'gpsb', f));
   for (const d of ['assets', 'behaviours']) if (fs.existsSync(path.join(root, d))) await fsp.cp(path.join(root, d), path.join(out, d), { recursive: true });
   await fsp.mkdir(path.join(out, 'components'), { recursive: true });
   for (const name of Object.keys(P.components)) {
@@ -129,7 +129,14 @@ export async function create(root) {
 }
 
 // ---------- user config: project registry + editor preferences (shared by every project and port) ----------
-const CONFIG = process.env.PSB_CONFIG_DIR ?? path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config'), 'perfect-site-builder');
+const CONFIG_HOME = process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config');
+const CONFIG = process.env.GPSB_CONFIG_DIR ?? path.join(CONFIG_HOME, 'gpsb');
+// carry the project list + preferences over from the folder used before the gpsb rename
+function migrateConfig() {
+  const old = path.join(CONFIG_HOME, 'perfect-site-builder');
+  if (process.env.GPSB_CONFIG_DIR || fs.existsSync(CONFIG) || !fs.existsSync(old)) return;
+  try { fs.cpSync(old, CONFIG, { recursive: true }); } catch (e) { console.warn(`could not copy settings from ${old}: ${e.message}`); }
+}
 const cfgFile = n => path.join(CONFIG, n);
 const readCfg = (n, d) => readJSON(cfgFile(n), d);
 const writeCfg = async (n, v) => { await fsp.mkdir(CONFIG, { recursive: true }); await fsp.writeFile(cfgFile(n), JSON.stringify(v, null, 2)); };
@@ -243,13 +250,14 @@ async function hubApi(req, res, p, q) {
 }
 const clients = new Set();
 function serve(initial) {
+  migrateConfig();
   const server = http.createServer(async (req, res) => {
     try {
       // only our own pages may talk to us: block DNS rebinding (Host) and cross-site writes (custom header)
       if (![`127.0.0.1:${PORT}`, `localhost:${PORT}`].includes(req.headers.host)) return send(res, 403, 'bad host');
-      if (req.method !== 'GET' && req.headers['x-psb'] !== '1') return send(res, 403, 'missing x-psb header');
+      if (req.method !== 'GET' && req.headers['x-gpsb'] !== '1') return send(res, 403, 'missing x-gpsb header');
       // writes from an editor tab must target the project it loaded (another may have been opened since)
-      if (req.method !== 'GET' && p0(req).startsWith('/api/') && !p0(req).startsWith('/api/hub/') && p0(req) !== '/api/prefs' && req.headers['x-psb-project'] !== encodeURIComponent(root ?? ''))
+      if (req.method !== 'GET' && p0(req).startsWith('/api/') && !p0(req).startsWith('/api/hub/') && p0(req) !== '/api/prefs' && req.headers['x-gpsb-project'] !== encodeURIComponent(root ?? ''))
         return send(res, 409, 'a different project is open now; reload the editor');
       const u = new URL(req.url, 'http://x');
       const p = decodeURIComponent(u.pathname);
@@ -269,7 +277,7 @@ function serve(initial) {
         if (req.method === 'PUT') { await writeCfg('prefs.json', await bodyJSON(req)); return sendJSON(res, { ok: true }); }
         return sendJSON(res, await readCfg('prefs.json', {}));
       }
-      if (p.startsWith('/project/psb/')) return sendFile(res, path.join(TOOL, 'lib', path.basename(p)));
+      if (p.startsWith('/project/gpsb/')) return sendFile(res, path.join(TOOL, 'lib', path.basename(p)));
       const comp = p.match(/^\/project\/components\/(.+?)(\.script)?\.js$/);
       if (comp) {
         const src = await fsp.readFile(safe(`components/${comp[1]}.html`), 'utf8').catch(e => { if (e.code === 409) throw e; return null; });
@@ -315,10 +323,10 @@ function serve(initial) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (cmd === 'new') create(ROOT).then(() => console.log(`created ${ROOT}\nnext: psb serve ${dir}`), e => { console.error(e.message); process.exit(1); });
+  if (cmd === 'new') create(ROOT).then(() => console.log(`created ${ROOT}\nnext: gpsb serve ${dir}`), e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'build') build(ROOT, OUT && path.resolve(OUT)).then(r => { for (const w of r.warnings) console.warn('warning: ' + w); console.log(`built ${r.pages.length} page(s) -> ${r.out}`); }, e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'serve' || cmd === 'hub') {
-    if (cmd === 'serve' && !isProject(ROOT)) { console.error(`no project.json in ${ROOT} (run: psb new ${dir})`); process.exit(1); }
+    if (cmd === 'serve' && !isProject(ROOT)) { console.error(`no project.json in ${ROOT} (run: gpsb new ${dir})`); process.exit(1); }
     serve(cmd === 'serve' ? ROOT : null);
-  } else { console.log('usage: psb [hub] | psb serve [dir] [--port N] | psb new <dir> | psb build [dir] [--out D]'); process.exit(1); }
+  } else { console.log('usage: gpsb [hub] | gpsb serve [dir] [--port N] | gpsb new <dir> | gpsb build [dir] [--out D]'); process.exit(1); }
 }

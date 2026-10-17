@@ -12,8 +12,8 @@ const MAX = 2000;
 const pad = n => String(n).padStart(2, '0');
 const stamp = d => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 const keyOf = e => `${e.level}|${e.source ?? ''}|${e.msg}`;
-const store = (k, v) => { try { localStorage['psbCon' + k] = JSON.stringify(v); } catch {} };
-const stored = (k, d) => { try { return JSON.parse(localStorage['psbCon' + k] ?? 'null') ?? d; } catch { return d; } };
+const store = (k, v) => { try { localStorage['gpsbCon' + k] = JSON.stringify(v); } catch {} };
+const stored = (k, d) => { try { return JSON.parse(localStorage['gpsbCon' + k] ?? 'null') ?? d; } catch { return d; } };
 
 let entries = [], selected = null, queued = false, unseen = false;
 const alert = () => document.querySelector('#dock [data-tab=console]')?.classList.toggle('alert', unseen);
