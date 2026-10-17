@@ -58,6 +58,8 @@ generated CSS; text content, raw HTML/Style code and JS modules are never rewrit
   Helpers: `lib/rect.js` → `rectStyle`, `rectPixels(rt, W, H)`, `reanchor(rt, W, H, {anchorMin, anchorMax, pivot})`.
 - Children of a node with a layout group (anything whose def has `childStyle`) are `position: relative` and ignore pos
   (unless they have `LayoutElement.ignoreLayout`).
+- `rect._layoutPos` (runtime only, set by the animator while `rect.pos` animates): laid out there, moved to `rect.pos` with
+  `translate()` (no relayout per frame); removed on `stop()`. Never saved.
 - Sibling order = DOM order = draw order (later on top). `rect.zIndex` (int, default 0, optional in old files) overrides it:
   non-zero → CSS `z-index` (higher on top; negative goes behind siblings at 0). Animatable (stepped) and overridable per breakpoint.
 - `overrides` (optional): `{ "<breakpoint>": { "<property path>": value } }` — responsive overrides, see below.
@@ -123,7 +125,10 @@ LayoutElement, ContentSizeFitter, AspectRatioFitter, ScrollRect, Mask, RectMask2
 - `Toggle.group` = a node with `ToggleGroup`: the toggles render as radios sharing a name (`allowSwitchOff` handled at runtime).
 - `Mask` clips to the rect, or to the node's Image sprite shape when it has one; `RectMask2D` = `clip-path: inset(padding)`.
 - `Form` makes the node a `<form>`; Button `type` submit/reset, control `name`s. Empty `action` = not sent (onSubmit only).
-- `PageMeta` (root only): `<html lang>`, favicon, canonical URL, og:title/description/image/url.
+- `PageMeta` (root only): `<html lang>`, favicon, canonical URL, og:title/description/image/url, `noindex`, `head` code.
+- `Image.element: img` renders `<img class="gpsb-img" alt loading decoding=async>` filling the rect at `z-index: -1` inside an
+  `isolation: isolate` element (children, Button tint, Mask and state sprites keep working); `background` (default) is a
+  CSS background. The Image preset uses `img`.
 - Toggle / Slider / InputField / Dropdown render the native control (`<input>`, `<select>`, `<textarea>`) inside the
   node element, filling its rect, with browser default styling. User edits are written back into the element's node
   data (`def.state`), so `GPSB.nodeFor(el)` reads the current value and re-applies keep it. Interactive runtime set-up

@@ -137,6 +137,18 @@ Each key's easing can be linear, constant, ease-in/out, or a custom cubic-bezier
 
 Record mode works as in Unity. Press the red button, then move things in the Scene or change Inspector fields, and keys are written at the playhead.
 
+## Publishing
+
+File ▸ Project Settings sets how the site is built:
+- **Site URL**, so `sitemap.xml` and `robots.txt` are written and sites under a sub-path (`https://example.com/docs/`) work.
+- **Clean URLs**: `about/` instead of `about.html`.
+- **Minify**: compact HTML and CSS.
+- **Custom code**: for every page's `<head>` or the end of `<body>`.
+
+A page named `404` becomes the host's not-found page. Files in `public/` are copied to the site root as they are
+(`CNAME`, `_redirects`, `.well-known/`). Asset URLs carry a content hash, so hosts can cache them forever.
+Images can be real `<img>` tags (Image ▸ Element) with alt text and lazy loading. Position animations run on the GPU.
+
 ## Extending
 
 - **Extension components** (`extensions/<Name>.js`) are added like built-in components: they show up in Add Component,

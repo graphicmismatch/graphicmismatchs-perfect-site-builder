@@ -249,4 +249,18 @@ assert.ok(mini.html.length < pretty.length && !/\n {2}<div/.test(mini.html));
 assert.ok(mini.html.includes('a\n  b')); // text content is never touched
 assert.match(mini.css, /\.box\{position:absolute;/);
 
+// ---- Image as <img>; animated position via translate ----
+pg = canvasNode();
+const photo = newNode('Photo', [{ type: 'Image', props: { sprite: 'img/p.jpg', element: 'img', alt: 'A "cat"', fit: 'cover', loading: 'eager' } }]);
+pg.children.push(photo);
+const imgHtml = renderPage(pg, makeCtx()).body;
+assert.match(imgHtml, /<img class="gpsb-img" src="assets\/img\/p\.jpg" alt="A &#34;cat&#34;" loading="eager" decoding="async"[^>]*object-fit:cover;z-index:-1/);
+assert.ok(!/role="img"/.test(imgHtml)); // the <img> carries the alt, not the element
+assert.deepEqual([nodeStyle(photo, pg, makeCtx())['background-image'], nodeStyle(photo, pg, makeCtx()).isolation], ['none', 'isolate']);
+const moving = rt({ anchorMin: [0, 0], anchorMax: [0, 0], pivot: [0, 0], pos: [30, 5], size: [10, 10], rotation: 45 });
+moving._layoutPos = [10, 5];
+s = rectStyle(moving);
+assert.deepEqual([s.left, s.top, s.transform], ['10px', '5px', 'translate(20px, 0px) rotate(45deg)']);
+assert.equal(rectStyle(moving, true).transform, 'rotate(45deg)'); // layout children: position comes from the layout
+
 console.log('core ok');

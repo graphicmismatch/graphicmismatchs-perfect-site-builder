@@ -143,7 +143,7 @@ function scrollbar(name, vertical, r) {
 export const PRESETS = {
   'Create Empty': () => newNode('WebObject'),
   Panel: () => Object.assign(newNode('Panel', [{ type: 'Image', props: { color: '#ffffffc0' } }]), { rect: rect(stretch) }),
-  Image: () => newNode('Image', [{ type: 'Image', props: {} }]),
+  Image: () => newNode('Image', [{ type: 'Image', props: { element: 'img' } }]),
   'Raw Image': () => newNode('Raw Image', [{ type: 'RawImage', props: {} }]),
   Text: () => Object.assign(newNode('Text', [{ type: 'Text', props: {} }]), { rect: rect({ size: [200, 50] }) }),
   Button: () => {
