@@ -96,11 +96,22 @@ function retarget() {
 }
 
 // ---------- Scene preview ----------
+// Selecting an element inside the Animator previews only that element's (and its children's) tracks;
+// selecting the Animator itself, or nothing inside it, previews the whole clip.
+function inScope() {
+  const an = animator();
+  if (!an) return () => true;
+  const under = id => { for (let n = S.node(id); n; n = S.parentOf(n.id)) if (n.id === an.id) return true; return false; };
+  const ids = S.S.selection.filter(under);
+  if (!ids.length || ids.includes(an.id)) return () => true;
+  return id => { for (let n = S.node(id); n && n.id !== an.id; n = S.parentOf(n.id)) if (ids.includes(n.id)) return true; return false; };
+}
 function applyPreview() {
   const W = S.S.previewWin?.GPSB;
   if (!W?.applyNode || S.S.playing) return;
-  const an = animator(), c = clip();
+  const an = animator(), c = clip(), ok = inScope();
   const map = preview && an && c ? applyClip(an, c, A().time, meta()) : new Map();
+  for (const id of map.keys()) if (!ok(id)) map.delete(id);
   try {
     for (const id of applied) if (!map.has(id)) { const n = S.node(id); if (n) W.applyNode(n, S.parentOf(id)); }
     for (const [id, n] of map) { const p = S.parentOf(id); W.applyNode(n, (p && map.get(p.id)) ?? p); }
@@ -139,7 +150,7 @@ function recordHook(id, path, value) {
 function animState(id, path) {
   if (!preview && !A().recording) return null;
   const an = animator(), c = clip(), rel = an && c ? pathOf(an, id) : null;
-  if (rel == null) return null;
+  if (rel == null || !inScope()(id)) return null;
   const tr = findTrack(c, rel, path);
   if (tr?.keys.length) return { value: evalTrack(tr, A().time), keyed: !!keyAt(tr) };
   const axes = c.tracks.filter(x => x.path === rel && x.keys.length && x.prop.startsWith(path + '.'));
