@@ -228,14 +228,39 @@ Clip `animations/<Name>.anim.json`:
   Preview drives the Scene iframe through `S.previewWin.PSB.applyNode(clone, parentClone)`; re-apply after every
   `props`/`preview-ready` event (subscribers run in mount order; animation mounts after scene).
 
+## Project Hub, preferences, user config
+
+`psb` / `psb hub` starts the server with no project open; `psb serve <dir>` also opens <dir>. `/` is always the
+**Project Hub** (`editor/hub.html`); the editor is at `/editor/` (302 to `/` while no project is open; the editor itself
+returns to `/` if `/api/project` answers 409). User config lives in `$PSB_CONFIG_DIR` or
+`~/.config/perfect-site-builder/`: `projects.json` (registry `[{path, added, lastOpened}]`) and `prefs.json`.
+
+```
+GET  /api/hub/projects        -> { projects: [{path, name, exists, open, pages, assets, modified, added, lastOpened}], open, home }
+GET  /api/hub/ls?path=<abs>   -> { path, parent, project, dirs: [{name, project}], sep }   (folder browser, default home)
+POST /api/hub/open   {path}   open a project in the editor (registers it, lastOpened = now)
+POST /api/hub/add    {path}   register an existing project folder (must contain project.json)
+POST /api/hub/remove {path}   forget it (files stay on disk)
+POST /api/hub/create {dir, name, template: 'empty'|'showcase'} -> { path }  (showcase = copy of example/)
+GET|PUT /api/prefs            the whole prefs object
+```
+Project writes (`PUT/DELETE /api/file`, `/api/rename`, `/api/build`) must send `x-psb-project: encodeURIComponent(S.S.P.root)`
+(S.api does); a tab whose project is no longer the open one gets 409.
+
+**Preferences** — `editor/prefs.js`: `load()`, `get(key, default)`, `set(key, value|undefined)` (debounced save),
+`all()`, `onChange(fn)`, `apply(doc)`, `DEFAULTS`. Keys: `theme` ('dark'|'light'), `accent` (hex), `uiScale`,
+`fontSize`, `layout` (current dock layout), `layouts` ({name: layout} saved layouts), `shortcuts` ({action: key combo}
+overrides); panels namespace their own keys (`scene.grid`, …). Theme tokens are defined in `editor/style.css` under
+`:root[data-theme=dark|light]`; panel CSS must use the tokens, never hard-coded chrome colors.
+
 ## Dev server (`cli.js serve`)
 
 Binds 127.0.0.1 only. Every project path is resolved and rejected (403) if outside the project root.
 
 ```
-GET  /                         editor/index.html          GET /editor/* /lib/*   tool files
+GET  /                         editor/hub.html (Project Hub)   GET /editor/  editor/index.html   GET /editor/* /lib/*  tool files
 GET  /project/psb/*            lib/*                      GET /project/components/<Name>.js|.script.js  compiled on the fly
-GET  /project/*                project files              GET /api/project  -> { project, pages, components, behaviours, clips, json, assets[{path,type,size}] }
+GET  /project/*                project files              GET /api/project  -> { root, project, pages, components, behaviours, clips, json, assets[{path,type,size}] }
 GET|PUT|DELETE /api/file?path= read / write (raw body, streamed) / delete a project file
 POST /api/rename?from=&to=     POST /api/build -> { out, pages }
 GET  /api/events               SSE { file } on external changes (editor hot-reloads components/behaviours/assets)
@@ -286,7 +311,8 @@ api.get/put/del/rename/build   save() build() upload(file, dir) load() reloadMet
 | area | files |
 |---|---|
 | lead | `lib/{rect,node,components,render,runtime,compile}.js`, `cli.js`, `editor/state.js`, this file |
-| shell | `editor/index.html style.css main.js`, `panels/{toolbar,hierarchy,console,code}.*` |
+| shell | `editor/index.html style.css main.js prefs.js` (+ new layout/preferences modules), `panels/{toolbar,hierarchy,console,code}.*` |
+| hub | `editor/hub.{html,js,css}` |
 | inspector | `panels/{inspector,project}.*` (+ new `editor/*.js` helpers you create) |
 | scene | `panels/scene.*` |
 | animation | `lib/anim.js`, `lib/animator.js`, `panels/animation.*` |

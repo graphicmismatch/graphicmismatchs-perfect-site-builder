@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // graphicmismatch's perfect site builder
+//   psb [hub] [--port N]       open the Project Hub at http://127.0.0.1:4000
+//   psb serve [dir] [--port N] same, with <dir> registered and opened in the editor
 //   psb new   <dir>            create an empty project
-//   psb serve [dir] [--port N] open the editor at http://127.0.0.1:4000
 //   psb build [dir] [--out D]  write the static site (default <dir>/dist)
 import http from 'node:http';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { renderDocument, makeCtx } from './lib/render.js';
 import { parseComponent, compileComponent } from './lib/compile.js';
@@ -16,7 +18,7 @@ const TOOL = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const flag = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args.splice(i, 2)[1] : d; };
 const PORT = +flag('--port', 4000), OUT = flag('--out');
-const [cmd = 'serve', dir = '.'] = args;
+const [cmd = 'hub', dir = '.'] = args;
 const ROOT = path.resolve(dir);
 
 export const ASSET_TYPES = {
@@ -96,15 +98,49 @@ export async function create(root) {
   await fsp.writeFile(path.join(root, 'pages/index.json'), JSON.stringify(canvas, null, 2));
 }
 
-// ---------- dev server (editor) ----------
+// ---------- user config: project registry + editor preferences (shared by every project and port) ----------
+const CONFIG = process.env.PSB_CONFIG_DIR ?? path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config'), 'perfect-site-builder');
+const cfgFile = n => path.join(CONFIG, n);
+const readCfg = (n, d) => readJSON(cfgFile(n), d);
+const writeCfg = async (n, v) => { await fsp.mkdir(CONFIG, { recursive: true }); await fsp.writeFile(cfgFile(n), JSON.stringify(v, null, 2)); };
+const isProject = d => fs.existsSync(path.join(d, 'project.json'));
+
+async function register(dir, touch = false) {
+  const list = (await readCfg('projects.json', [])).filter(x => x.path !== dir);
+  const prev = (await readCfg('projects.json', [])).find(x => x.path === dir);
+  list.unshift({ path: dir, added: prev?.added ?? Date.now(), lastOpened: touch ? Date.now() : prev?.lastOpened ?? null });
+  await writeCfg('projects.json', list);
+}
+async function projectList() {
+  const out = [];
+  for (const x of await readCfg('projects.json', [])) {
+    const exists = isProject(x.path);
+    const info = { ...x, exists, name: path.basename(x.path), open: x.path === root };
+    if (exists) {
+      const pj = await readJSON(path.join(x.path, 'project.json'), {});
+      const pages = (await files(path.join(x.path, 'pages'))).filter(f => f.endsWith('.json'));
+      const st = await fsp.stat(path.join(x.path, 'project.json'));
+      Object.assign(info, { name: pj.name || info.name, pages: pages.length, assets: (await files(path.join(x.path, 'assets'))).filter(f => !path.basename(f).startsWith('.')).length, modified: st.mtimeMs });
+    }
+    out.push(info);
+  }
+  return out.sort((a, b) => (b.lastOpened ?? 0) - (a.lastOpened ?? 0));
+}
+
+// ---------- dev server (hub + editor) ----------
+let root = null, watcher = null; // project currently open in the editor
+const notOpen = () => Object.assign(new Error('no project open'), { code: 409 });
 function safe(rel) {
-  const p = path.resolve(ROOT, String(rel ?? ''));
-  if (p !== ROOT && !p.startsWith(ROOT + path.sep)) throw Object.assign(new Error('path outside project'), { code: 403 });
+  if (!root) throw notOpen();
+  const p = path.resolve(root, String(rel ?? ''));
+  if (p !== root && !p.startsWith(root + path.sep)) throw Object.assign(new Error('path outside project'), { code: 403 });
   return p;
 }
 const send = (res, code, body, type = 'text/plain') => { res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' }); res.end(body); };
 const sendJSON = (res, v) => send(res, 200, JSON.stringify(v), MIME.json);
 const readBody = req => new Promise((ok, err) => { const c = []; req.on('data', d => c.push(d)); req.on('end', () => ok(Buffer.concat(c))); req.on('error', err); });
+const bodyJSON = async req => JSON.parse(String(await readBody(req)) || '{}');
+const absDir = p => { if (!p || !path.isAbsolute(String(p))) throw Object.assign(new Error('absolute path required'), { code: 400 }); return path.resolve(String(p)); };
 
 async function sendFile(res, file) {
   const st = await fsp.stat(file).catch(() => null);
@@ -113,32 +149,95 @@ async function sendFile(res, file) {
   fs.createReadStream(file).pipe(res);
 }
 
+async function openProject(dir) {
+  if (!isProject(dir)) throw Object.assign(new Error(`no project.json in ${dir}`), { code: 400 });
+  root = dir;
+  await register(dir, true);
+  watcher?.close();
+  let t;
+  watcher = fs.watch(root, { recursive: true }, (_, f) => {
+    if (!f || f.startsWith('dist') || f.startsWith('.')) return;
+    clearTimeout(t);
+    t = setTimeout(() => { for (const c of clients) c.write(`data: ${JSON.stringify({ file: f.split(path.sep).join('/') })}\n\n`); }, 100);
+  });
+}
+
+async function hubApi(req, res, p, q) {
+  if (p === '/api/hub/projects') return sendJSON(res, { projects: await projectList(), open: root, home: os.homedir() });
+  if (p === '/api/hub/ls') { // directory browser for New / Add
+    const dir = absDir(q.get('path') || os.homedir());
+    const ents = await fsp.readdir(dir, { withFileTypes: true }).catch(() => []);
+    const dirs = ents.filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => ({ name: e.name, project: isProject(path.join(dir, e.name)) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return sendJSON(res, { path: dir, parent: path.dirname(dir) === dir ? null : path.dirname(dir), project: isProject(dir), dirs, sep: path.sep });
+  }
+  if (req.method !== 'POST') return send(res, 405, 'POST only');
+  const b = await bodyJSON(req);
+  if (p === '/api/hub/open') { await openProject(absDir(b.path)); return sendJSON(res, { ok: true, open: root }); }
+  if (p === '/api/hub/add') {
+    const d = absDir(b.path);
+    if (!isProject(d)) throw Object.assign(new Error(`no project.json in ${d}`), { code: 400 });
+    await register(d); return sendJSON(res, { ok: true });
+  }
+  if (p === '/api/hub/remove') { // forget only; files stay on disk
+    const d = absDir(b.path);
+    await writeCfg('projects.json', (await readCfg('projects.json', [])).filter(x => x.path !== d));
+    if (root === d) { root = null; watcher?.close(); }
+    return sendJSON(res, { ok: true });
+  }
+  if (p === '/api/hub/create') {
+    const name = String(b.name ?? '').trim();
+    if (!/^[\w.-][\w .-]*$/.test(name)) throw Object.assign(new Error('invalid project name'), { code: 400 });
+    const d = path.join(absDir(b.dir), name);
+    if (fs.existsSync(d) && (await fsp.readdir(d)).length) throw Object.assign(new Error(`${d} exists and is not empty`), { code: 409 });
+    if (b.template === 'showcase') {
+      await fsp.cp(path.join(TOOL, 'example'), d, { recursive: true, filter: f => !f.includes(`${path.sep}dist`) });
+      const pj = path.join(d, 'project.json');
+      await fsp.writeFile(pj, JSON.stringify({ ...await readJSON(pj, {}), name }, null, 2));
+    } else await create(d);
+    await register(d);
+    return sendJSON(res, { ok: true, path: d });
+  }
+  send(res, 404, 'not found');
+}
 const clients = new Set();
-function serve() {
+function serve(initial) {
   const server = http.createServer(async (req, res) => {
     try {
-      // only our own editor may talk to us: block DNS rebinding (Host) and cross-site writes (custom header)
+      // only our own pages may talk to us: block DNS rebinding (Host) and cross-site writes (custom header)
       if (![`127.0.0.1:${PORT}`, `localhost:${PORT}`].includes(req.headers.host)) return send(res, 403, 'bad host');
       if (req.method !== 'GET' && req.headers['x-psb'] !== '1') return send(res, 403, 'missing x-psb header');
+      // writes from an editor tab must target the project it loaded (another may have been opened since)
+      if (req.method !== 'GET' && p0(req).startsWith('/api/') && !p0(req).startsWith('/api/hub/') && p0(req) !== '/api/prefs' && req.headers['x-psb-project'] !== encodeURIComponent(root ?? ''))
+        return send(res, 409, 'a different project is open now; reload the editor');
       const u = new URL(req.url, 'http://x');
       const p = decodeURIComponent(u.pathname);
       const q = u.searchParams;
-      if (p === '/') return sendFile(res, path.join(TOOL, 'editor/index.html'));
+      if (p === '/' || p === '/hub') return sendFile(res, path.join(TOOL, 'editor/hub.html'));
+      if (p === '/editor' || p === '/editor/') {
+        if (!root) { res.writeHead(302, { location: '/' }); return res.end(); }
+        return sendFile(res, path.join(TOOL, 'editor/index.html'));
+      }
       if (p.startsWith('/editor/') || p.startsWith('/lib/')) {
         const f = path.resolve(TOOL, '.' + p);
         if (!f.startsWith(TOOL + path.sep)) return send(res, 403, 'forbidden');
         return sendFile(res, f);
       }
+      if (p.startsWith('/api/hub/')) return await hubApi(req, res, p, q);
+      if (p === '/api/prefs') {
+        if (req.method === 'PUT') { await writeCfg('prefs.json', await bodyJSON(req)); return sendJSON(res, { ok: true }); }
+        return sendJSON(res, await readCfg('prefs.json', {}));
+      }
       if (p.startsWith('/project/psb/')) return sendFile(res, path.join(TOOL, 'lib', path.basename(p)));
       const comp = p.match(/^\/project\/components\/(.+?)(\.script)?\.js$/);
       if (comp) {
-        const src = await fsp.readFile(safe(`components/${comp[1]}.html`), 'utf8').catch(() => null);
+        const src = await fsp.readFile(safe(`components/${comp[1]}.html`), 'utf8').catch(e => { if (e.code === 409) throw e; return null; });
         if (src == null) return send(res, 404, 'no component');
         const out = compileComponent(comp[1], src);
         return send(res, 200, out[comp[1] + (comp[2] ?? '') + '.js'] ?? '', MIME.js);
       }
       if (p.startsWith('/project/')) return sendFile(res, safe(p.slice(9)));
-      if (p === '/api/project') return sendJSON(res, await loadProject(ROOT));
+      if (p === '/api/project') { if (!root) throw notOpen(); return sendJSON(res, { root, ...await loadProject(root) }); }
       if (p === '/api/file') {
         const f = safe(q.get('path'));
         if (req.method === 'PUT') {
@@ -155,7 +254,7 @@ function serve() {
         await fsp.rename(safe(q.get('from')), to);
         return sendJSON(res, { ok: true });
       }
-      if (p === '/api/build' && req.method === 'POST') return sendJSON(res, await build(ROOT, OUT && path.resolve(OUT)));
+      if (p === '/api/build' && req.method === 'POST') { if (!root) throw notOpen(); return sendJSON(res, await build(root, OUT && path.resolve(OUT))); }
       if (p === '/api/events') { // file-change notifications (external edits -> editor reload)
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store' });
         res.write(': hi\n\n');
@@ -164,23 +263,21 @@ function serve() {
       }
       send(res, 404, 'not found');
     } catch (e) {
-      send(res, e.code === 403 ? 403 : 500, String(e.message ?? e));
+      send(res, [400, 403, 409].includes(e.code) ? e.code : 500, String(e.message ?? e));
     }
   });
-  let t;
-  fs.watch(ROOT, { recursive: true }, (_, f) => {
-    if (!f || f.startsWith('dist') || f.startsWith('.')) return;
-    clearTimeout(t);
-    t = setTimeout(() => { for (const c of clients) c.write(`data: ${JSON.stringify({ file: f.split(path.sep).join('/') })}\n\n`); }, 100);
+  const p0 = req => decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  server.listen(PORT, '127.0.0.1', async () => {
+    if (initial) await openProject(initial);
+    console.log(`graphicmismatch's perfect site builder\n  hub:     http://127.0.0.1:${PORT}/${initial ? `\n  project: ${initial}\n  editor:  http://127.0.0.1:${PORT}/editor/` : ''}`);
   });
-  server.listen(PORT, '127.0.0.1', () => console.log(`graphicmismatch's perfect site builder\n  project: ${ROOT}\n  editor:  http://127.0.0.1:${PORT}/`));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (cmd === 'new') create(ROOT).then(() => console.log(`created ${ROOT}\nnext: psb serve ${dir}`), e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'build') build(ROOT, OUT && path.resolve(OUT)).then(r => console.log(`built ${r.pages.length} page(s) -> ${r.out}`), e => { console.error(e); process.exit(1); });
-  else if (cmd === 'serve') {
-    if (!fs.existsSync(path.join(ROOT, 'project.json'))) { console.error(`no project.json in ${ROOT} (run: psb new ${dir})`); process.exit(1); }
-    serve();
-  } else { console.log('usage: psb new <dir> | psb serve [dir] [--port N] | psb build [dir] [--out D]'); process.exit(1); }
+  else if (cmd === 'serve' || cmd === 'hub') {
+    if (cmd === 'serve' && !isProject(ROOT)) { console.error(`no project.json in ${ROOT} (run: psb new ${dir})`); process.exit(1); }
+    serve(cmd === 'serve' ? ROOT : null);
+  } else { console.log('usage: psb [hub] | psb serve [dir] [--port N] | psb new <dir> | psb build [dir] [--out D]'); process.exit(1); }
 }

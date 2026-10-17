@@ -221,7 +221,7 @@ export const generatedCode = () => renderDocument(root(), ctx(), { name: S.page 
 export function setPlaying(on) { S.playing = on; emit('play'); }
 
 // ---------- files / server ----------
-const H = { 'x-psb': '1' }; // required by the server for every non-GET request
+const H = { 'x-psb': '1' }; // required by the server for every non-GET request (+ x-psb-project once loaded)
 export const api = {
   get: p => fetch('/api/file?path=' + encodeURIComponent(p)).then(r => (r.ok ? r.text() : Promise.reject(new Error(r.statusText)))),
   put: (p, body) => fetch('/api/file?path=' + encodeURIComponent(p), { method: 'PUT', body, headers: H }).then(r => (r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t))))),
@@ -273,7 +273,10 @@ async function loadBehaviours() {
 }
 
 export async function load() {
-  S.P = await fetch('/api/project').then(r => r.json());
+  const r = await fetch('/api/project');
+  if (r.status === 409) return void location.replace('/'); // no project open: back to the Project Hub
+  S.P = await r.json();
+  H['x-psb-project'] = encodeURIComponent(S.P.root);
   if (!S.P.pages[S.page]) S.page = Object.keys(S.P.pages)[0];
   await loadBehaviours();
   emit('load'); emit('page'); emit('assets'); emit('structure'); emit('selection'); emit('anim');
@@ -281,7 +284,10 @@ export async function load() {
 
 // Re-read assets / components / behaviours / json without touching pages or clips (unsaved edits survive).
 export async function reloadMeta() {
-  const P = await fetch('/api/project').then(r => r.json());
+  const r = await fetch('/api/project');
+  if (!r.ok) return log('Project reload failed: ' + await r.text(), 'error');
+  const P = await r.json();
+  if (P.root !== S.P.root) return log('A different project was opened in the Hub; reload this tab to edit it.', 'warn');
   for (const k of ['components', 'behaviours', 'assets', 'json']) S.P[k] = P[k];
   await loadBehaviours();
   emit('assets'); emit('structure');

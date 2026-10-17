@@ -112,10 +112,14 @@ async function main() {
   check('about: zero console errors / exceptions', page.errors.length === 0, page.errors.join(' | '));
 
   // ---- editor ----
-  const ed = spawn(process.execPath, ['cli.js', 'serve', 'example', '--port', String(EDITOR_PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+  const cfg = path.join(ROOT, '.tmp', 'e2e-config'); // keep the user's real project list / prefs untouched
+  fs.rmSync(cfg, { recursive: true, force: true });
+  const ed = spawn(process.execPath, ['cli.js', 'serve', 'example', '--port', String(EDITOR_PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PSB_CONFIG_DIR: cfg } });
   cleanups.push(() => ed.kill());
   await new Promise((ok, err) => { ed.stdout.on('data', d => /editor:/.test(d) && ok()); ed.on('exit', c => err(new Error(`editor server exited ${c}`))); });
   await page.open(`http://127.0.0.1:${EDITOR_PORT}/`);
+  check('hub: lists the opened example project', !!await page.until(`document.body.innerText.includes('${path.join(ROOT, 'example').replace(/\\/g, '\\\\')}')`, 5000));
+  await page.open(`http://127.0.0.1:${EDITOR_PORT}/editor/`);
   const names = ['Canvas', 'Hero', 'Ring', 'Orbiter', 'Feature Card', 'Inspector Panel', 'Gallery Grid'];
   await page.until(`document.querySelector('[data-panel=hierarchy]')?.innerText.includes('Inspector Panel')`, 5000);
   const tree = await page.eval(`document.querySelector('[data-panel=hierarchy]')?.innerText ?? ''`);
