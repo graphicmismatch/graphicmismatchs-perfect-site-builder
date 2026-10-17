@@ -6,6 +6,25 @@ format and API documented there.
 
 Status legend: ☐ to do · ◐ in progress · ☑ done
 
+**Constraint for everything below: the output stays extensible.** You should be able to add dynamic components
+later (data fetched at runtime, embeds, third-party widgets, things that need their own scripts) without changing how
+pages are built. Section 0 adds that foundation first. Every later item has to keep the output contract it defines
+(for example, minifying never removes `data-gpsb` hooks or module structure, and clean URLs keep module paths
+working).
+
+---
+
+## 0. Extensible output (foundation)
+
+| | Item | Design |
+|---|---|---|
+| ☐ | **One component registry** | Built-ins and extensions use the same definition format (`category, props, tag, style, attrs, inner, rules, childStyle, patch, state, init`) and the same registry (`registerComponent(name, def)` in `lib/components.js`). The editor's Add Component menu, the inspector, the animation window, the build and the runtime all read the registry, so anything registered behaves like a built-in. |
+| ☐ | **Extension components** | `extensions/<Name>.js` in a project: an ES module whose default export is a definition, or a factory `({ esc, cssUrl, control, near, findComp }) => definition` (no imports needed, so the same file runs in Node and the browser). Loaded by the build (Node), the dev server and editor (browser, hot-reloaded), and the published runtime (the page data lists the extensions a page uses; the runtime imports them from `extensions/` before applying anything). Copied to `dist/extensions/`. |
+| ☐ | **Runtime hooks for dynamic components** | `init({ el, GPSB, ci })` (fetch data, start widgets, subscribe to events), `patch` (re-render on prop changes / animation), `state` (user-edited values), `head(p, ctx)` → extra `<head>` HTML (scripts, stylesheets, preconnects; deduplicated per page). `inner` renders the build-time HTML (placeholder or server-rendered content). |
+| ☐ | **Custom code injection** | `project.json` `inject: { head, bodyEnd }` for every page, plus `PageMeta.head` per page (analytics, consent banners, verification tags). |
+| ☐ | **Build hooks** | Optional `build.js` in the project (Node only, never shipped): `transformPage({ name, html, css })` → `{ html, css }`, and `afterBuild({ out, project, pages })` (RSS, search index, uploads). |
+| ☐ | **Output contract** | Documented in `CONTRACT.md` and kept stable: every element has `data-gpsb="<id>"` and a stable class, page data in `#gpsb-data`, the `window.GPSB` API and the `gpsb:ready` event, unbundled ES modules (`gpsb/`, `components/`, `behaviours/`, `extensions/`), and asset URLs via `ctx.asset`. Minifying, clean URLs and versioned asset URLs all have to keep these. |
+
 ---
 
 ## 1. Production-ready output
@@ -57,6 +76,7 @@ The docs will say so.
 
 ## Order of work
 
+0. Extensible output foundation (every later item builds on it).
 1. Production output (project settings dialog first, since 2 and 3 use it).
 2. Design tokens, then prefabs.
 3. Flowing presets, then Markdown, then collections (these build on clean URLs and the sitemap).
