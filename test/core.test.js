@@ -26,6 +26,12 @@ s = rectStyle(rt({ rotation: 45, scale: [2, 1], pivot: [1, 0] }));
 assert.equal(s.transform, 'rotate(45deg) scale(2, 1)');
 assert.equal(s['transform-origin'], '100% 0%');
 
+// explicit z ordering: 0 / missing = DOM order, otherwise z-index (rounded), also in layouts
+assert.equal(rectStyle(rt({}))['z-index'], undefined);
+assert.equal(rectStyle({ ...rt({}), zIndex: undefined })['z-index'], undefined);
+assert.equal(rectStyle(rt({ zIndex: 3 }))['z-index'], '3');
+assert.equal(rectStyle(rt({ zIndex: -1.6 }), true)['z-index'], '-2');
+
 // pixels + reanchor keeps the rect in place
 const a = rt({ pos: [30, -10], size: [80, 60] });
 const before = rectPixels(a, 800, 600);

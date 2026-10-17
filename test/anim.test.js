@@ -81,8 +81,9 @@ assert.equal(clipLength({ tracks: [vec], events: [] }), 3);
 // animatable properties come from the schemas
 const props = animatableProps(root, { customs: { Card: { props: { title: { type: 'string', default: '' }, pad: { type: 'vec4', default: [0, 0, 0, 0] } } } }, behaviours: { Spin: { props: { speed: { type: 'number', default: 90 } } } } });
 const has = (path, prop) => props.find(p => p.path === path && p.prop === prop);
-for (const p of ['active', 'rect.pos.x', 'rect.pos.y', 'rect.size.x', 'rect.size.y', 'rect.anchorMin.x', 'rect.anchorMin.y', 'rect.anchorMax.x', 'rect.anchorMax.y', 'rect.pivot.x', 'rect.pivot.y', 'rect.rotation', 'rect.scale.x', 'rect.scale.y'])
+for (const p of ['active', 'rect.pos.x', 'rect.pos.y', 'rect.size.x', 'rect.size.y', 'rect.anchorMin.x', 'rect.anchorMin.y', 'rect.anchorMax.x', 'rect.anchorMax.y', 'rect.pivot.x', 'rect.pivot.y', 'rect.rotation', 'rect.scale.x', 'rect.scale.y', 'rect.zIndex'])
   assert.ok(has('Title', p), p);
+assert.equal(has('Title', 'rect.zIndex').kind, 'step');
 assert.equal(has('Title', 'Image.color').kind, 'color');
 assert.equal(has('Logo', 'Image.sprite').kind, 'step');
 assert.equal(has('Title', 'Text.size').kind, 'float');

@@ -117,7 +117,7 @@ export function select(ids, additive = false) {
 export function setTool(t) { S.tool = t; emit('tool'); }
 
 // ---------- node operations ----------
-const rect = (o = {}) => ({ anchorMin: [0.5, 0.5], anchorMax: [0.5, 0.5], pivot: [0.5, 0.5], pos: [0, 0], size: [100, 100], rotation: 0, scale: [1, 1], ...o });
+const rect = (o = {}) => ({ anchorMin: [0.5, 0.5], anchorMax: [0.5, 0.5], pivot: [0.5, 0.5], pos: [0, 0], size: [100, 100], rotation: 0, scale: [1, 1], zIndex: 0, ...o });
 const stretch = { anchorMin: [0, 0], anchorMax: [1, 1], size: [0, 0] };
 // WebObject > UI menu. Each returns a node.
 export const PRESETS = {

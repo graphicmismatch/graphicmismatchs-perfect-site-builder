@@ -32,7 +32,7 @@ animations/<Name>.anim.json  animation clips (inlined into pages that use them)
 ```json
 { "id": "a1b2c3", "name": "Hero Title", "active": true,
   "rect": { "anchorMin": [0.5,0.5], "anchorMax": [0.5,0.5], "pivot": [0.5,0.5],
-            "pos": [0,0], "size": [100,100], "rotation": 0, "scale": [1,1] },
+            "pos": [0,0], "size": [100,100], "rotation": 0, "scale": [1,1], "zIndex": 0 },
   "components": [ { "type": "Text", "props": { "text": "Hi" } } ],
   "children": [] }
 ```
@@ -45,7 +45,8 @@ animations/<Name>.anim.json  animation clips (inlined into pages that use them)
   Helpers: `lib/rect.js` → `rectStyle`, `rectPixels(rt, W, H)`, `reanchor(rt, W, H, {anchorMin, anchorMax, pivot})`.
 - Children of a node with a layout group (anything whose def has `childStyle`) are `position: relative` and ignore pos
   (unless they have `LayoutElement.ignoreLayout`).
-- Sibling order = DOM order = draw order (later on top).
+- Sibling order = DOM order = draw order (later on top). `rect.zIndex` (int, default 0, optional in old files) overrides it:
+  non-zero → CSS `z-index` (higher on top; negative goes behind siblings at 0). Animatable (stepped) and overridable per breakpoint.
 - `overrides` (optional): `{ "<breakpoint>": { "<property path>": value } }` — responsive overrides, see below.
 - Component `type`: built-in name (`Image`), `component:<Name>` (components/Name.html), `behaviour:<Name>` (behaviours/Name.js).
   Multiple components per node; one of each built-in type, any number of behaviours.
@@ -78,7 +79,7 @@ Strings may contain JSON bindings resolved at build time: `{{data/site.json:hero
 
 `lib/node.js` `getProp(node, path)` / `setProp(node, path, value)`:
 `name`, `active`, `rect.pos`, `rect.pos.x`, `rect.size.y`, `rect.anchorMin.x`, `rect.anchorMax.y`, `rect.pivot.x`,
-`rect.rotation`, `rect.scale.x`, `<Type>.<prop>` (first component of that type; `<Type>[n].<prop>` = n-th, 0-based,
+`rect.rotation`, `rect.scale.x`, `rect.zIndex`, `<Type>.<prop>` (first component of that type; `<Type>[n].<prop>` = n-th, 0-based,
 `componentPath(node, i)` builds it, e.g. `Image.color`, `Image.sprite`,
 `Text.text`, `CanvasGroup.alpha`), `component:Card.title`, `behaviour:Spin.speed`. Vector index: `.x .y .z .w` or `.0 .1`.
 

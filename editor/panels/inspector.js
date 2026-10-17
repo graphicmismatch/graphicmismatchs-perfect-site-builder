@@ -223,6 +223,7 @@ function rectSection(ids, n) {
   fb(sub, { type: 'vec2', ...sc01 }, anchorB(ids, 'pivot'), 'Pivot', 'rt-pv');
   fb(sub, { type: 'number', step: 1 }, pb(ids, 'rect.rotation', 0), 'Rotation', 'rt-rot');
   v2('Scale', 'rect.scale', 'rt-sc', sc01);
+  fb(sub, { type: 'int', step: 1, help: 'Stacking order among siblings; higher draws on top. 0 = hierarchy order.' }, pb(ids, 'rect.zIndex', 0), 'Z Index', 'rt-z');
 
   const inLayout = S.parentOf(id)?.components.some(c => S.def(c.type)?.childStyle) && !n.components.find(c => c.type === 'LayoutElement')?.props?.ignoreLayout;
   return section('rect', 'Rect Transform', icon('rect'), null,
