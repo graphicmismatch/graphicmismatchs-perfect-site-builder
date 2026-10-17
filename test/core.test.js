@@ -1,0 +1,65 @@
+// node test/core.test.js
+import assert from 'node:assert/strict';
+import { rectStyle, rectPixels, reanchor, defaultRect } from '../lib/rect.js';
+import { newNode, getProp, setProp, nodeAtPath } from '../lib/node.js';
+import { renderPage, makeCtx, bind } from '../lib/render.js';
+
+const rt = o => ({ ...defaultRect(), ...o });
+
+// centered 100x100, pivot center -> left = 50% - 50px
+let s = rectStyle(rt({}));
+assert.equal(s.left, 'calc(50% - 50px)');
+assert.equal(s.width, '100px');
+assert.equal(s['transform-origin'], undefined);
+
+// top-left anchor, pivot top-left, pos (10, 20) -> left 10px, top 20px
+s = rectStyle(rt({ anchorMin: [0, 0], anchorMax: [0, 0], pivot: [0, 0], pos: [10, 20], size: [30, 40] }));
+assert.deepEqual([s.left, s.top, s.width, s.height], ['10px', '20px', '30px', '40px']);
+assert.equal(s['transform-origin'], '0% 0%');
+
+// full stretch with 10px insets: offsetMin (10,10) offsetMax (-10,-10) -> size -20, pos 0
+s = rectStyle(rt({ anchorMin: [0, 0], anchorMax: [1, 1], size: [-20, -20], pos: [0, 0] }));
+assert.deepEqual([s.left, s.width], ['10px', 'calc(100% - 20px)']);
+
+// rotation + scale + pivot
+s = rectStyle(rt({ rotation: 45, scale: [2, 1], pivot: [1, 0] }));
+assert.equal(s.transform, 'rotate(45deg) scale(2, 1)');
+assert.equal(s['transform-origin'], '100% 0%');
+
+// pixels + reanchor keeps the rect in place
+const a = rt({ pos: [30, -10], size: [80, 60] });
+const before = rectPixels(a, 800, 600);
+const moved = reanchor(a, 800, 600, { anchorMin: [0, 0], anchorMax: [1, 0], pivot: [0, 1] });
+assert.deepEqual(rectPixels(moved, 800, 600), before);
+
+// layout children ignore position
+s = rectStyle(rt({ pos: [99, 99], size: [50, 20] }), true);
+assert.deepEqual([s.position, s.left, s.width], ['relative', undefined, '50px']);
+
+// property paths
+const n = newNode('A', [{ type: 'Image', props: { color: '#ff0000' } }]);
+setProp(n, 'rect.pos.x', 12); setProp(n, 'Image.color', '#00ff00'); setProp(n, 'rect.scale', [3, 3]);
+assert.equal(getProp(n, 'rect.pos.0'), 12);
+assert.equal(getProp(n, 'Image.color'), '#00ff00');
+assert.equal(getProp(n, 'rect.scale.y'), 3);
+assert.equal(setProp(n, 'Text.text', 'x'), false);
+n.children.push(newNode('B'));
+n.children[0].children.push(newNode('C'));
+assert.equal(nodeAtPath(n, 'B/C').name, 'C');
+
+// binding + repeat
+const ctx = makeCtx({ json: { 'site.json': { hero: { title: 'Hi' }, posts: [{ t: 'one' }, { t: 'two' }] } } });
+assert.equal(bind('{{site.json:hero.title}}!', ctx), 'Hi!');
+assert.equal(bind('{{ site.json:posts[1].t }}', ctx), 'two');
+assert.equal(bind('{{missing.json:x}}', ctx), '{{missing.json:x}}');
+const root = newNode('Canvas', [{ type: 'Canvas', props: {} }]);
+const list = newNode('List', [{ type: 'Repeat', props: { source: 'site.json', path: 'posts' } }, { type: 'VerticalLayoutGroup', props: {} }]);
+list.children.push(newNode('Item', [{ type: 'Text', props: { text: '{{index}}: {{item.t}}' } }]));
+root.children.push(list);
+const out = renderPage(root, ctx);
+assert.match(out.body, /0: one/);
+assert.match(out.body, /1: two/);
+assert.match(out.css, /\.item \{\n  position: relative;/);
+assert.equal(out.css.match(/\.item \{/g).length, 1);
+
+console.log('core ok');

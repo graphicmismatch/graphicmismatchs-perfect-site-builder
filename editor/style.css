@@ -1,0 +1,48 @@
+/* Unity-style dark editor theme. Panels add their own CSS in panels/<name>.css. */
+:root {
+  --bg: #191919; --panel: #282828; --panel-2: #383838; --header: #3c3c3c; --field: #2a2a2a; --field-border: #212121;
+  --border: #1a1a1a; --text: #d2d2d2; --text-dim: #8a8a8a; --accent: #2c5d87; --accent-hi: #3a79bb; --sel: #2c5d87;
+  --hover: #ffffff10; --red: #c23b3b; --record: #8b2a2a; --anim-key: #2a4d73; --warn: #d8a02c; --ok: #5ab05a;
+  --left-w: 260px; --right-w: 340px; --bottom-h: 280px;
+  --font: 12px/1.4 Inter, "Segoe UI", system-ui, sans-serif; --mono: 12px/1.4 ui-monospace, "JetBrains Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--text); font: var(--font); overflow: hidden; user-select: none;
+  display: grid;
+  grid-template-columns: var(--left-w) 4px 1fr 4px var(--right-w);
+  grid-template-rows: 34px 1fr 4px var(--bottom-h) 22px;
+}
+#toolbar { grid-column: 1 / -1; grid-row: 1; background: var(--header); border-bottom: 1px solid var(--border); }
+#area-left { grid-column: 1; grid-row: 2; }
+#area-center { grid-column: 3; grid-row: 2; }
+#area-right { grid-column: 5; grid-row: 2 / 5; }
+#area-bottom { grid-column: 1 / 4; grid-row: 4; }
+#status { grid-column: 1 / -1; grid-row: 5; background: var(--header); border-top: 1px solid var(--border); padding: 0 8px; line-height: 22px; color: var(--text-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.area { background: var(--panel); display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.panel { flex: 1; min-height: 0; overflow: auto; position: relative; }
+.panel[hidden] { display: none; }
+.tabs { display: flex; background: var(--bg); flex: none; height: 24px; }
+.tabs button { background: none; border: 0; color: var(--text-dim); font: inherit; padding: 0 12px; border-top: 2px solid transparent; cursor: default; }
+.tabs button.on { background: var(--panel); color: var(--text); border-top-color: var(--accent-hi); }
+.split { background: var(--border); }
+.split.v { grid-row: 2; cursor: col-resize; }
+.split.v[data-var="--left-w"] { grid-column: 2; }
+.split.v[data-var="--right-w"] { grid-column: 4; }
+.split.h { grid-column: 1 / 4; grid-row: 3; cursor: row-resize; }
+button, input, select, textarea { font: inherit; color: inherit; }
+input, select, textarea { background: var(--field); border: 1px solid var(--field-border); border-radius: 3px; padding: 1px 4px; min-width: 0; }
+input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent-hi); }
+input, textarea { user-select: text; }
+.btn { background: #585858; border: 1px solid #303030; border-radius: 3px; padding: 1px 8px; color: var(--text); }
+.btn:hover { background: #676767; }
+.btn.on { background: var(--accent); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #4a4a4a; border-radius: 5px; border: 2px solid var(--panel); }
+::-webkit-scrollbar-track { background: transparent; }
+.menu { position: fixed; z-index: 1000; background: #2b2b2b; border: 1px solid #111; box-shadow: 0 4px 16px #0008; padding: 4px 0; min-width: 180px; }
+.menu > div { padding: 3px 20px; white-space: nowrap; }
+.menu > div:hover { background: var(--accent); }
+.menu > hr { border: 0; border-top: 1px solid #444; margin: 4px 0; }

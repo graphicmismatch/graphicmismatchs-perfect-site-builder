@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:,">
+  <title>graphicmismatch's perfect site builder</title>
+  <link rel="stylesheet" href="/editor/style.css">
+  <link rel="stylesheet" href="/editor/panels/toolbar.css">
+  <link rel="stylesheet" href="/editor/panels/hierarchy.css">
+  <link rel="stylesheet" href="/editor/panels/scene.css">
+  <link rel="stylesheet" href="/editor/panels/inspector.css">
+  <link rel="stylesheet" href="/editor/panels/project.css">
+  <link rel="stylesheet" href="/editor/panels/console.css">
+  <link rel="stylesheet" href="/editor/panels/animation.css">
+  <link rel="stylesheet" href="/editor/panels/code.css">
+</head>
+<body>
+  <header id="toolbar"></header>
+  <section class="area" id="area-left"><nav class="tabs"><button class="on">Hierarchy</button></nav><div class="panel" data-panel="hierarchy"></div></section>
+  <div class="split v" data-var="--left-w" data-dir="1"></div>
+  <section class="area" id="area-center"><div class="panel" data-panel="scene"></div></section>
+  <div class="split v" data-var="--right-w" data-dir="-1" style="grid-row: 2 / 5"></div>
+  <section class="area" id="area-right"><nav class="tabs"><button class="on">Inspector</button></nav><div class="panel" data-panel="inspector"></div></section>
+  <div class="split h" data-var="--bottom-h" data-dir="-1"></div>
+  <section class="area" id="area-bottom">
+    <nav class="tabs" data-tabs>
+      <button data-tab="project" class="on">Project</button><button data-tab="console">Console</button><button data-tab="animation">Animation</button><button data-tab="code">Generated Code</button>
+    </nav>
+    <div class="panel" data-panel="project"></div>
+    <div class="panel" data-panel="console" hidden></div>
+    <div class="panel" data-panel="animation" hidden></div>
+    <div class="panel" data-panel="code" hidden></div>
+  </section>
+  <footer id="status"></footer>
+  <script type="module" src="/editor/main.js"></script>
+</body>
+</html>
