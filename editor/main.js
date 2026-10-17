@@ -4,6 +4,8 @@ import * as prefs from './prefs.js';
 import * as layout from './layout.js';
 import { keymap, comboOf, openPreferences } from './preferences.js';
 import { buildSite, togglePause, step } from './panels/toolbar.js';
+import { openFind } from './find.js';
+import './recovery.js';
 
 await prefs.load();
 const panelEls = Object.fromEntries([...document.querySelectorAll('#dock > .panel')].map(p => [p.dataset.panel, p]));
@@ -30,7 +32,7 @@ const RUN = {
   'tool.hand': () => S.setTool('hand'), 'tool.move': () => S.setTool('move'), 'tool.rotate': () => S.setTool('rotate'),
   'tool.scale': () => S.setTool('scale'), 'tool.rect': () => S.setTool('rect'),
   save: () => S.save(), build: buildSite, prefs: () => openPreferences(),
-  undo: S.undo, redo: S.redo,
+  undo: S.undo, redo: S.redo, find: () => openFind(),
   duplicate: () => nonRoot() && S.duplicate(), delete: () => nonRoot() && S.deleteNodes(),
   selectAll: () => S.select([...S.walk(S.root())].slice(1).map(([n]) => n.id)),
   rename: () => S.S.selection.length && S.emit('rename'), frame: () => S.emit('frame'),

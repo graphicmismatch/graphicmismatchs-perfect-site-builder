@@ -46,7 +46,7 @@ export function parentSize(id) {
   return el ? [el.offsetWidth, el.offsetHeight] : [...S.resolution];
 }
 export const assetUrl = p => '/project/assets/' + String(p).split('/').map(encodeURIComponent).join('/');
-export { getProp, walk, clone, newId, builtins, getComponent, collapsePrefabs };
+export { getProp, walk, clone, newId, builtins, getComponent, collapsePrefabs, componentPath };
 
 // ---------- undo / edits ----------
 const undoStack = [], redoStack = []; // entries: { label, snap }

@@ -25,6 +25,17 @@ The first screen lists your projects with their path, page and asset counts, and
 The list and your preferences are saved in `~/.config/gpsb/`, so they carry over between projects.
 In the editor, use File ▸ Open Project Hub / Open Recent to switch projects.
 
+## Working faster
+
+- **Arrow keys** nudge the selection (Shift: 10 px).
+- **WebObject ▸ Align** aligns or distributes the selection; with one object selected it aligns within the parent.
+- **Smart guides** snap moved objects to their neighbours' edges and centres (Scene toolbar ▸ Guides; hold Alt to skip).
+- **Copy / paste** go through the system clipboard, into other pages, tabs or projects. Prefabs come along.
+- **Edit ▸ Find & Replace** (Ctrl+Shift+F) searches text and names on every page.
+- **Edit ▸ Undo History** jumps to any step.
+- **Saving:** Preferences ▸ Saving turns on autosave. Unsaved changes are always kept in the browser and offered back if
+  the editor closes before you save.
+
 ## Configurable UI
 
 - **Dock layout:** drag any panel tab to reorder it, move it to another area, or split an area.

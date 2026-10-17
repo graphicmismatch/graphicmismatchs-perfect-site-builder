@@ -160,3 +160,23 @@ input, textarea { user-select: text; }
 .prefs-keys .ops button:disabled { opacity: .3; }
 .prefs-keys tr.conflict .keys { border-color: var(--err-text); }
 .prefs-keys .warn { color: var(--err-text); font-size: .9em; }
+
+/* Find & Replace */
+.fr-win { height: min(620px, 90vh); }
+.fr-win .prefs-body { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
+.fr-row { display: flex; gap: 8px; align-items: center; }
+.fr-row .prefs-in { flex: 1; }
+.fr-opts label { display: inline-flex; gap: 4px; align-items: center; }
+.fr-count { flex: 1; text-align: right; color: var(--text-dim); }
+.fr-list { width: 100%; border-collapse: collapse; }
+.fr-list td { padding: 3px 6px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; cursor: default; }
+.fr-list tr:hover td { background: var(--hover); }
+.fr-where { white-space: nowrap; } .fr-where small { display: block; color: var(--text-dim); }
+.fr-snip { width: 100%; word-break: break-word; }
+.fr-snip mark { background: color-mix(in srgb, var(--accent-hi) 45%, transparent); color: inherit; }
+.fr-list .btn { height: 18px; padding: 0 6px; }
+
+/* crash recovery offer */
+.recovery-bar { position: fixed; left: 50%; top: 42px; transform: translateX(-50%); z-index: 2500; display: flex; gap: 8px; align-items: center; max-width: min(900px, 94vw);
+  padding: 8px 10px; background: var(--menu); color: var(--text); border: 1px solid var(--accent-hi); border-radius: 5px; box-shadow: 0 8px 28px var(--shadow); font: var(--font); }
+.recovery-bar span { flex: 1; }

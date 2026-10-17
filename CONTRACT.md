@@ -425,6 +425,12 @@ setPage(name) newPage(name) previewHTML(editor) generatedCode() setPlaying(bool)
 api.get/put/del/rename/build   save() build() upload(file, dir) load() reloadMeta()
 ```
 
+- Productivity: `history()` / `jump(n)` (undo steps keep readable labels), arrow-key nudging (`nudge.*` shortcuts,
+  Scene/page focus only), system-clipboard copy/paste in `hierarchy.js` (`{"gpsb-nodes":1, nodes, prefabs}`),
+  `find.js` (Find & Replace through `setProp`, one undo step per page), Scene `align(kind)` (event `align`: left,
+  center, right, top, middle, bottom, distributeX, distributeY; one object aligns within its parent), smart guides
+  (`cfg.guides`, Alt skips), `recovery.js` (autosave pref `autosave` seconds; unsaved files mirrored to IndexedDB
+  `gpsb-recovery` per project root and offered back on load).
 - `structure` = the Scene rebuilds the iframe (`srcdoc = previewHTML()`); `props(ids)` = patch those nodes via
   `previewWin.GPSB.applyNode(...)` immediately, plus a debounced (~300 ms) full rebuild to catch tag/inner/layout changes.
 - Drag & drop between panels: `dataTransfer` types `application/x-gpsb-asset` (asset path, or clip name),

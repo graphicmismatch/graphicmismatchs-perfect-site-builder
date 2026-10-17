@@ -5,6 +5,7 @@ import * as layout from '../layout.js';
 import * as prefs from '../prefs.js';
 import { openPreferences, shortcut as sc } from '../preferences.js';
 import { openProjectSettings } from '../settings.js';
+import { openFind } from '../find.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const svg = (d, extra = '') => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d ? `<path d="${d}"/>` : ''}${extra}</svg>`;
@@ -193,6 +194,7 @@ const MENUS = {
       { label: 'Undo History', sub: historyItems() },
       '-',
       { label: 'Select All', shortcut: sc('selectAll'), action: () => S.select(allIds()) },
+      { label: 'Find & Replace…', shortcut: sc('find'), action: () => openFind() },
       { label: 'Deselect All', action: () => S.select([]), disabled: !sel },
       '-',
       { label: 'Rename', shortcut: sc('rename'), action: () => S.emit('rename'), disabled: !sel },
@@ -222,6 +224,14 @@ const MENUS = {
       { label: 'Create Empty Child', action: () => S.create('Create Empty', a.id), disabled: !a },
       '-',
       ...createItems(a?.id),
+      '-',
+      { label: 'Align', disabled: !nonRoot(), sub: [
+        ...[['left', 'Left'], ['center', 'Centre'], ['right', 'Right']].map(([k, l]) => ({ label: `Align ${l}`, action: () => S.emit('align', k) })), '-',
+        ...[['top', 'Top'], ['middle', 'Middle'], ['bottom', 'Bottom']].map(([k, l]) => ({ label: `Align ${l}`, action: () => S.emit('align', k) })), '-',
+        { label: 'Distribute Horizontally', action: () => S.emit('align', 'distributeX'), disabled: S.S.selection.length < 3 },
+        { label: 'Distribute Vertically', action: () => S.emit('align', 'distributeY'), disabled: S.S.selection.length < 3 },
+        { label: 'One object aligns within its parent', disabled: true },
+      ] },
       '-',
       ...prefabItems(a),
     ];

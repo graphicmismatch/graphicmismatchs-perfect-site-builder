@@ -6,7 +6,7 @@ import { activeBreakpoints } from '/lib/node.js';
 
 const RES = [[1920, 1080], [1280, 720], [1366, 768], [1440, 900], [390, 844, 'phone'], [768, 1024, 'tablet']];
 const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 4];
-const cfg = { grid: true, gizmos: true, snap: false, inc: 10, scale: 1, res: null };
+const cfg = { grid: true, gizmos: true, snap: false, guides: true, inc: 10, scale: 1, res: null };
 try { Object.assign(cfg, JSON.parse(localStorage.gpsbScene || '{}')); } catch {}
 const saveCfg = () => { try { localStorage.gpsbScene = JSON.stringify(cfg); } catch {} };
 const ROT = `url("data:image/svg+xml,${encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><g fill='none' stroke-linecap='round'><path d='M5 11a5 5 0 1 0 5-5' stroke='white' stroke-width='4'/><path d='M5 11a5 5 0 1 0 5-5' stroke='black' stroke-width='1.6'/></g><path d='M10 2v8l4-4z' stroke='white' stroke-width='1'/></svg>")}") 10 10, crosshair`;
@@ -214,6 +214,7 @@ function draw() {
       const hk = drag?.key ?? hotKey;
       s += g.h.map(h => h.svg(h.key === hk ? ' hot' : '')).reverse().join('');
     }
+    if (drag?.guides?.length) s += drag.guides.join('');
     if (drag?.k === 'marquee' && drag.cur) {
       const { v, cur } = drag;
       s += `<rect class="marq" x="${f1(Math.min(v.x, cur.x))}" y="${f1(Math.min(v.y, cur.y))}" width="${f1(Math.abs(cur.x - v.x))}" height="${f1(Math.abs(cur.y - v.y))}"/>`;
@@ -405,10 +406,64 @@ function up(e) {
   hoverAt(vpt(e));
 }
 
+// ---------- smart guides: edges/centres of the moved boxes snap to siblings' and the parent's (screen space) ----------
+const GUIDE_PX = 6;
+const aabb = q => { const xs = q.map(p => p.x), ys = q.map(p => p.y); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+function guideLines(targets) {
+  const ids = new Set(targets.map(t => t.id)), parents = new Set(targets.map(t => S.parentOf(t.id)?.id)), xs = [], ys = [];
+  const addBox = ([x0, y0, x1, y1]) => { xs.push(x0, (x0 + x1) / 2, x1); ys.push(y0, (y0 + y1) / 2, y1); };
+  for (const pid of parents) {
+    const p = S.node(pid); if (!p) continue;
+    const pi = info(pid); if (pi) addBox(aabb(pi.q));
+    for (const c of p.children) if (!ids.has(c.id)) { const ci = info(c.id); if (ci) addBox(aabb(ci.q)); }
+  }
+  return { xs, ys, box: aabb(targets.flatMap(t => [[0, 0], [t.w, 0], [t.w, t.h], [0, t.h]].map(([x, y]) => t.M.transformPoint({ x, y })))) };
+}
+// screen delta (dx, dy) -> snapped delta + the guide lines to draw
+function snapDelta(d, dx, dy, e) {
+  d.guides = [];
+  if (!cfg.guides || e.altKey || snapping(e)) return [dx, dy];
+  d.lines ??= guideLines(d.targets);
+  const [x0, y0, x1, y1] = d.lines.box, best = (cands, own) => {
+    let m = null;
+    for (const o of own) for (const c of cands) { const diff = c - o; if (Math.abs(diff) < GUIDE_PX && (!m || Math.abs(diff) < Math.abs(m.diff))) m = { diff, at: c }; }
+    return m;
+  };
+  const bx = d.ax[0] ? best(d.lines.xs, [x0 + dx, (x0 + x1) / 2 + dx, x1 + dx]) : null, by = d.ax[1] ? best(d.lines.ys, [y0 + dy, (y0 + y1) / 2 + dy, y1 + dy]) : null;
+  if (bx) { dx += bx.diff; d.guides.push(line({ x: bx.at, y: -1e4 }, { x: bx.at, y: 1e4 }, 'guide')); }
+  if (by) { dy += by.diff; d.guides.push(line({ x: -1e4, y: by.at }, { x: 1e4, y: by.at }, 'guide')); }
+  return [dx, dy];
+}
+
+// ---------- align / distribute (WebObject > Align): screen-space boxes, moved in each node's parent space ----------
+export function align(kind) {
+  const ts = movable().map(snap0).filter(Boolean);
+  if (!ts.length) return;
+  const bs = ts.map(t => aabb([[0, 0], [t.w, 0], [t.w, t.h], [0, t.h]].map(([x, y]) => t.M.transformPoint({ x, y }))));
+  const pi = ts.length === 1 && info(S.parentOf(ts[0].id)?.id); // one object: align within its parent
+  const ref = pi ? aabb(pi.q) : [Math.min(...bs.map(b => b[0])), Math.min(...bs.map(b => b[1])), Math.max(...bs.map(b => b[2])), Math.max(...bs.map(b => b[3]))];
+  const label = 'Align#' + ++seq, moves = bs.map(() => [0, 0]);
+  if (kind === 'distributeX' || kind === 'distributeY') {
+    if (ts.length < 3) return S.log('Distribute needs 3 or more objects', 'warn');
+    const i = kind === 'distributeX' ? 0 : 1, order = bs.map((b, k) => k).sort((a, b) => bs[a][i] - bs[b][i]);
+    const total = bs[order.at(-1)][i + 2] - bs[order[0]][i], sizes = order.reduce((s, k) => s + bs[k][i + 2] - bs[k][i], 0), gap = (total - sizes) / (order.length - 1);
+    let at = bs[order[0]][i];
+    for (const k of order) { moves[k][i] = at - bs[k][i]; at += bs[k][i + 2] - bs[k][i] + gap; }
+  } else bs.forEach((b, k) => {
+    const [i, f] = { left: [0, 0], center: [0, 0.5], right: [0, 1], top: [1, 0], middle: [1, 0.5], bottom: [1, 1] }[kind];
+    moves[k][i] = (ref[i] + (ref[i + 2] - ref[i]) * f) - (b[i] + (b[i + 2] - b[i]) * f);
+  });
+  ts.forEach((t, k) => {
+    const o = t.M.transformPoint({ x: 0, y: 0 }), a = t.Mpi.transformPoint(o), b = t.Mpi.transformPoint({ x: o.x + moves[k][0], y: o.y + moves[k][1] });
+    if (moves[k][0] || moves[k][1]) put(t.id, 'pos', [t.r.pos[0] + b.x - a.x, t.r.pos[1] + b.y - a.y], label);
+  });
+}
+
 const TOOLS = {
   move(d, v, e) {
+    const [dx, dy] = snapDelta(d, v.x - d.v.x, v.y - d.v.y, e), w = { x: d.v.x + dx, y: d.v.y + dy };
     for (const t of d.targets) {
-      const a = t.Mpi.transformPoint(d.v), b = t.Mpi.transformPoint(v), dl = [b.x - a.x, b.y - a.y];
+      const a = t.Mpi.transformPoint(d.v), b = t.Mpi.transformPoint(w), dl = [b.x - a.x, b.y - a.y];
       put(t.id, 'pos', t.r.pos.map((p, i) => (!d.ax[i] ? p : snapping(e) ? snapv(p + dl[i]) : p + dl[i])));
     }
   },
@@ -543,6 +598,7 @@ export function mount(root) {
         <button class="btn" data-k="grid" title="Show grid">Grid</button>
         <button class="btn" data-k="gizmos" title="Show anchor gizmos (rect tool)">Anchors</button>
         <button class="btn" data-k="snap" title="Snap to increment (or hold Ctrl while dragging)">Snap</button>
+        <button class="btn" data-k="guides" title="Smart guides: snap to other objects' edges and centres while moving (hold Alt to skip)">Guides</button>
         <input type="number" class="sc-inc" min="0.01" step="any" title="Snap increment (px); rotation snaps to 15°">
       </span>
       <span class="sc-bps" title="Breakpoint being edited (lit = active at the current preview width)"></span>
@@ -709,6 +765,7 @@ export function mount(root) {
     if (!S.S.playing) rebuildLater(); // playing: keep the running page, patch only
   });
   S.on('frame', frameSel);
+  S.on('align', align);
   S.on('tool', () => { hotKey = null; });
   S.on('page', () => { hover = null; });
   setMode('scene');

@@ -64,13 +64,13 @@ The docs will say so.
 
 | | Item | Design |
 |---|---|---|
-| ☐ | **Autosave + crash recovery** | A preference: autosave off / after N seconds idle. Independently, unsaved state is mirrored to IndexedDB every few seconds, per project. On load, if it's newer than what's on disk, a banner offers **Restore** or **Discard**. |
-| ☐ | **Align & distribute** | For multi-selection (toolbar + WebObject menu): align left/centre/right/top/middle/bottom and distribute horizontally/vertically, computed in each node's parent space. Nodes driven by a layout group are skipped. |
-| ☐ | **Smart guides & snapping** | Dragging in the Scene snaps edges and centres to siblings and the parent (threshold in screen px) and draws guides. Alt disables it. On by default, with a toggle in the Scene toolbar. |
-| ☐ | **Keyboard nudging** | Arrow keys move the selection by 1 px, Shift+arrow by 10 px (snap increment while snapping). Recorded as one undo step per burst. |
-| ☐ | **Copy/paste across pages and projects** | Copying also writes the nodes (with their referenced clips' names) to the system clipboard as JSON. Pasting accepts it in any page or project tab. |
-| ☐ | **Find & replace** | Searches text and string props on every page (or only this one), lists the matches, jumps to a node, and replaces with one undo step. |
-| ☐ | **Undo history panel** | Undo steps keep their labels. A History panel lists them, and clicking one jumps there. |
+| ☑ | **Autosave + crash recovery** | A preference: autosave off / after N seconds idle. Independently, unsaved state is mirrored to IndexedDB every few seconds, per project. On load, if it's newer than what's on disk, a banner offers **Restore** or **Discard**. |
+| ☑ | **Align & distribute** | For multi-selection (toolbar + WebObject menu): align left/centre/right/top/middle/bottom and distribute horizontally/vertically, computed in each node's parent space. Nodes driven by a layout group are skipped. |
+| ☑ | **Smart guides & snapping** | Dragging in the Scene snaps edges and centres to siblings and the parent (threshold in screen px) and draws guides. Alt disables it. On by default, with a toggle in the Scene toolbar. |
+| ☑ | **Keyboard nudging** | Arrow keys move the selection by 1 px, Shift+arrow by 10 px (snap increment while snapping). Recorded as one undo step per burst. |
+| ☑ | **Copy/paste across pages and projects** | Copying also writes the nodes (with their referenced clips' names) to the system clipboard as JSON. Pasting accepts it in any page or project tab. |
+| ☑ | **Find & replace** | Searches text and string props on every page (or only this one), lists the matches, jumps to a node, and replaces with one undo step. |
+| ☑ | **Undo history** | Undo steps keep their labels (node ids shown as names). Edit ▸ Undo History lists them, and picking one jumps there. A menu rather than a dockable panel, so the layout presets stay as they are. |
 
 ---
 
