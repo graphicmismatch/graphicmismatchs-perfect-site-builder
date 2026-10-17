@@ -66,7 +66,7 @@ export async function loadProject(root) {
   return { project, pages, components, behaviours, clips, json, assets };
 }
 
-const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, clips: P.clips, ...extra });
+const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, clips: P.clips, breakpoints: P.project.breakpoints, ...extra });
 
 export async function build(root, out = path.join(root, 'dist')) {
   const P = await loadProject(root);

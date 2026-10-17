@@ -1,7 +1,7 @@
 // node test/core.test.js
 import assert from 'node:assert/strict';
 import { rectStyle, rectPixels, reanchor, defaultRect } from '../lib/rect.js';
-import { newNode, getProp, setProp, nodeAtPath } from '../lib/node.js';
+import { newNode, getProp, setProp, nodeAtPath, setOverride, clearOverride, isOverridden, withOverrides, effectiveTree, activeBreakpoints, componentPath } from '../lib/node.js';
 import { renderPage, makeCtx, bind } from '../lib/render.js';
 
 const rt = o => ({ ...defaultRect(), ...o });
@@ -61,5 +61,54 @@ assert.match(out.body, /0: one/);
 assert.match(out.body, /1: two/);
 assert.match(out.css, /\.item \{\n  position: relative;/);
 assert.equal(out.css.match(/\.item \{/g).length, 1);
+
+// indexed component paths
+const twin = newNode('Twin', [{ type: 'behaviour:Spin', props: { speed: 1 } }, { type: 'Image', props: {} }, { type: 'behaviour:Spin', props: { speed: 2 } }]);
+assert.equal(getProp(twin, 'behaviour:Spin.speed'), 1);
+assert.equal(getProp(twin, 'behaviour:Spin[1].speed'), 2);
+setProp(twin, 'behaviour:Spin[1].speed', 5);
+assert.equal(twin.components[2].props.speed, 5);
+assert.equal(componentPath(twin, 2), 'behaviour:Spin[1]');
+assert.equal(componentPath(twin, 1), 'Image');
+
+// breakpoint overrides
+const bpsT = [{ name: 'Tablet', maxWidth: 1024 }, { name: 'Phone', maxWidth: 600 }];
+assert.deepEqual(activeBreakpoints(bpsT, 500), ['Tablet', 'Phone']);
+assert.deepEqual(activeBreakpoints(bpsT, 800), ['Tablet']);
+assert.deepEqual(activeBreakpoints(bpsT, 1200), []);
+const o = newNode('O', [{ type: 'Text', props: { size: 40 } }]);
+setOverride(o, 'Phone', 'rect.pos', [5, 6]);
+setOverride(o, 'Phone', 'rect.pos.y', 9);           // merged into the wider rect.pos override
+assert.deepEqual(o.overrides.Phone, { 'rect.pos': [5, 9] });
+setOverride(o, 'Tablet', 'Text.size', 30);
+setOverride(o, 'Phone', 'Text.size', 20);
+assert.ok(isOverridden(o, 'Phone', 'rect.pos.x') && isOverridden(o, 'Phone', 'rect') && !isOverridden(o, 'Tablet', 'rect.pos'));
+assert.equal(withOverrides(o, ['Tablet']).components[0].props.size, 30);
+const ph = withOverrides(o, ['Tablet', 'Phone']);
+assert.equal(ph.components[0].props.size, 20);
+assert.deepEqual(ph.rect.pos, [5, 9]);
+assert.equal(o.components[0].props.size, 40);        // base untouched
+assert.equal(withOverrides(o, []), o);
+clearOverride(o, 'Phone', 'rect.pos.x');
+assert.deepEqual(Object.keys(o.overrides.Phone), ['Text.size']);
+clearOverride(o, 'Phone'); clearOverride(o, 'Tablet');
+assert.equal(o.overrides, undefined);
+
+// effectiveTree shares untouched subtrees; render emits only diffs inside @media
+const page = newNode('Canvas', [{ type: 'Canvas', props: {} }]);
+const row = newNode('Row', [{ type: 'HorizontalLayoutGroup', props: { spacing: 10 } }]);
+const cell = newNode('Cell', [{ type: 'Image', props: {} }]);
+const still = newNode('Still', [{ type: 'Image', props: {} }]);
+row.children.push(cell); page.children.push(row, still);
+setOverride(row, 'Phone', 'HorizontalLayoutGroup.spacing', 2);
+setOverride(still, 'Tablet', 'rect.size.x', 50);
+const eff = effectiveTree(page, ['Tablet', 'Phone']);
+assert.notEqual(eff, page);
+assert.equal(eff.children[0].children[0], cell);
+const css = renderPage(page, makeCtx({ breakpoints: bpsT })).css;
+assert.match(css, /@media \(max-width: 1024px\) \{\n  \.still \{\n    left: calc\(50% - 25px\);\n    width: 50px;\n  \}\n\}/);
+assert.match(css, /@media \(max-width: 600px\) \{\n  \.row \{\n    gap: 2px;\n  \}\n\}/);
+assert.ok(!/@media[^}]*\.cell/.test(css));
+assert.equal(renderPage(page, makeCtx({ breakpoints: [] })).css.includes('@media'), false);
 
 console.log('core ok');

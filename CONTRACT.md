@@ -19,7 +19,7 @@ everyone working on the code. Read it fully before changing anything.
 ## Project on disk
 
 ```
-project.json                 { "name": "..." }
+project.json                 { "name": "...", "breakpoints": [{ "name": "Tablet", "maxWidth": 1024 }, ...] }
 pages/<name>.json            one node tree per page (= a Unity scene) -> dist/<name>.html + <name>.css
 assets/**                    images, video, audio, json, fonts, text (copied to dist/assets/)
 components/<Name>.html       custom components (template/style/props/script) -> dist/components/<Name>.js
@@ -46,6 +46,7 @@ animations/<Name>.anim.json  animation clips (inlined into pages that use them)
 - Children of a node with a layout group (anything whose def has `childStyle`) are `position: relative` and ignore pos
   (unless they have `LayoutElement.ignoreLayout`).
 - Sibling order = DOM order = draw order (later on top).
+- `overrides` (optional): `{ "<breakpoint>": { "<property path>": value } }` — responsive overrides, see below.
 - Component `type`: built-in name (`Image`), `component:<Name>` (components/Name.html), `behaviour:<Name>` (behaviours/Name.js).
   Multiple components per node; one of each built-in type, any number of behaviours.
 
@@ -77,8 +78,24 @@ Strings may contain JSON bindings resolved at build time: `{{data/site.json:hero
 
 `lib/node.js` `getProp(node, path)` / `setProp(node, path, value)`:
 `name`, `active`, `rect.pos`, `rect.pos.x`, `rect.size.y`, `rect.anchorMin.x`, `rect.anchorMax.y`, `rect.pivot.x`,
-`rect.rotation`, `rect.scale.x`, `<Type>.<prop>` (first component of that type, e.g. `Image.color`, `Image.sprite`,
+`rect.rotation`, `rect.scale.x`, `<Type>.<prop>` (first component of that type; `<Type>[n].<prop>` = n-th, 0-based,
+`componentPath(node, i)` builds it, e.g. `Image.color`, `Image.sprite`,
 `Text.text`, `CanvasGroup.alpha`), `component:Card.title`, `behaviour:Spin.speed`. Vector index: `.x .y .z .w` or `.0 .1`.
+
+## Responsive breakpoints
+
+`project.json` `breakpoints` (default `DEFAULT_BREAKPOINTS`: Tablet ≤1024, Phone ≤600 px viewport width). Any property
+path can be overridden per breakpoint on a node (`node.overrides`). Overrides cascade widest → narrowest: at 500 px both
+Tablet and Phone apply, Phone last. `lib/node.js`: `sortBreakpoints`, `activeBreakpoints(bps, width)`,
+`withOverrides(node, names)`, `effectiveTree(root, names)`, `setOverride` (merges `rect.pos.x` into an existing
+`rect.pos`), `clearOverride`, `isOverridden`.
+- Build: `@media (max-width: Npx)` blocks containing only the declarations that differ from the next-wider level.
+- Runtime: `applyNode` always renders `PSB.effective(node)`; on a breakpoint change, overridden nodes and every element the
+  runtime styled inline are re-applied (so text/attribute overrides work too). Animation writes base values; an override of
+  the same property wins.
+- Editor: `S.S.breakpoint` = breakpoint being edited (null = base). While set, `S.setProp` stores overrides (record mode
+  still takes precedence). Read displayed values from `S.view(id)`; `S.isOverridden(id, path)`, `S.revertOverride(id, path?)`,
+  `S.breakpoints()`, `S.setBreakpoint(name|null)`, `S.setBreakpoints(list)` (entries may carry `from` to rename), event `breakpoint`.
 
 ## Built-in components (`lib/components.js`)
 
@@ -109,9 +126,13 @@ PSB.applyNode(node, parent?, els?)  // PURE: re-apply node data's style/attrs/pa
                                     // with that id). Never writes the tree. Runtime code mutates PSB.node(id) in
                                     // place then calls it; editor preview passes clones.
 PSB.setActive(id, bool)
+PSB.nodeFor(el)              // node data for one element: canonical node, or a per-clone copy inside a Repeat ({{item}} resolved)
+PSB.effective(node)          // node with the active breakpoint overrides     PSB.breakpoints() -> active names
 PSB.assets.url(p) .json(p) .text(p)
 // added by animator.js:
-PSB.animator(id) -> controller { play(clip?), stop(), pause(), resume(), seek(t), playing, time, clip, speed }
+PSB.animator(id, el?) -> controller { play(clip?), stop(), pause(), resume(), seek(t), playing, time, clip, speed, el }
+                       // one controller per Animator element (Repeat clones animate independently); without el, a
+                       // proxy driving all of them
 // added by behaviours.js:
 PSB.invoke(targetId, call, arg, sourceId?)   // runs one event entry (see Events)
 PSB.behaviour(id, Name) -> instance
@@ -194,8 +215,8 @@ Clip `animations/<Name>.anim.json`:
 - `lib/anim.js` (isomorphic): `sampleClip(clip, t) -> [{ path, prop, value }]`, `evalTrack(track, t)`, `ease(e, u)`,
   `lerpValue(a, b, u)`, `applyClip(animatorNode, clip, t) -> Map<id, clonedNode>` (clones of affected nodes with sampled
   values set — **editor preview only**).
-- Runtime animation (like Unity) overwrites values: write samples into `PSB.node(id)` in place with `setProp`, then
-  `PSB.applyNode(node)`.
+- Runtime animation (like Unity) overwrites values: write samples into the target element's `PSB.nodeFor(el)` in place
+  with `setProp`, then `PSB.applyNode(node, undefined, el)`. `Animator.*` and `Repeat.*` props are not animatable.
 - `lib/animator.js#boot(PSB)`: one controller per Animator node; `playOn` start/hover/click/visible/manual; speed;
   loop or hold last frame; fires clip events through `PSB.invoke(animatorNodeId-relative target, call, arg)`;
   exposes `PSB.animator(id)`.
@@ -236,8 +257,9 @@ bottom tabs (`emit('show-tab', name)` switches) and splitters.
 S.S: { P, page, selection[], tool, resolution, playing, behaviourMeta, anim{clip,time,recording,playing,animatorId}, dirty, previewWin, hooks }
 on(ev, fn) -> unsubscribe     emit(ev, ...args)     log(msg, level='info'|'warn'|'error', extra)
 events: load structure props(ids) selection tool page anim assets log(entry) play resolution saved preview-ready show-tab frame
-        rename (F2 -> hierarchy) asset-select(projectPath) asset-ping(assetPath) (inspector <-> project)
+        rename (F2 -> hierarchy) asset-select(projectPath) asset-ping(assetPath) (inspector <-> project) breakpoint
 root() node(id) parentOf(id) parentSize(id) selected() active() def(type) propsOf(component) assetUrl(path)
+view(id) breakpoints() editNames() setBreakpoint(name) setBreakpoints(list) isOverridden(id, path) revertOverride(id, path?)
 edit(label, fn, { kind, ids, merge, files })   undo() redo()
 setProp(id, path, value, opts)     // ALWAYS use this for property edits (record mode hooks in);
                                    // opts.label groups many setProps into one undo step (drags, presets)

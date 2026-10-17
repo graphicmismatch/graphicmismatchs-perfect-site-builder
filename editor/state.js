@@ -1,5 +1,5 @@
 // Editor state store. Every panel imports this; see CONTRACT.md "Editor".
-import { findNode, walk, setProp as setPath, getProp, newNode, newId, clone, getComponent } from '/lib/node.js';
+import { findNode, walk, setProp as setPath, getProp, newNode, newId, clone, getComponent, sortBreakpoints, withOverrides, setOverride, clearOverride, isOverridden as overridden } from '/lib/node.js';
 import { componentDef, withDefaults, builtins } from '/lib/components.js';
 import { renderDocument, makeCtx } from '/lib/render.js';
 
@@ -12,6 +12,7 @@ export const S = {
   playing: false,
   behaviourMeta: {},       // Name -> { props, methods } (imported from behaviours/Name.js)
   anim: { clip: null, time: 0, recording: false, playing: false, animatorId: null },
+  breakpoint: null,        // breakpoint name being edited (null = base): edits become overrides, like prefab overrides
   dirty: new Set(),        // project-relative files with unsaved changes
   previewWin: null,        // Scene iframe contentWindow once loaded (window.PSB inside it)
   hooks: {
@@ -21,7 +22,7 @@ export const S = {
 };
 
 // ---------- events ----------
-// load | structure | props(ids) | selection | tool | page | anim | assets | log(entry) | play | resolution | saved | preview-ready
+// load | structure | props(ids) | selection | tool | page | anim | assets | log(entry) | play | resolution | saved | preview-ready | breakpoint
 const subs = {};
 export const on = (ev, fn) => ((subs[ev] ??= []).push(fn), () => (subs[ev] = subs[ev].filter(f => f !== fn)));
 export const emit = (ev, ...a) => subs[ev]?.forEach(f => { try { f(...a); } catch (e) { console.error(e); if (ev !== 'log') log(`${ev} handler: ${e.message}`, 'error'); } });
@@ -72,10 +73,39 @@ export function edit(label, fn, { kind = 'structure', ids = [], merge = false, f
   emit(kind, ids);
 }
 
-// Central property setter (Inspector, Scene gizmos, ...). Record mode may intercept it.
+// Central property setter (Inspector, Scene gizmos, ...). Record mode may intercept it; while a breakpoint is being
+// edited the value is stored as an override of that breakpoint instead of the base value.
 export function setProp(id, path, value, opts = {}) {
   if (S.hooks.setProp?.(id, path, value)) return;
+  if (S.breakpoint && path !== 'name') {
+    const bp = S.breakpoint;
+    return edit(opts.label ?? `Override ${path} ${id}`, () => setOverride(node(id), bp, path, value), { kind: 'props', ids: [id], merge: true, ...opts });
+  }
   edit(opts.label ?? `Set ${path} ${id}`, () => setPath(node(id), path, value), { kind: 'props', ids: [id], merge: true, ...opts });
+}
+
+// ---------- responsive breakpoints ----------
+export const breakpoints = () => sortBreakpoints(S.P?.project.breakpoints);
+// breakpoints applied while editing S.breakpoint: it and every wider one (widest first)
+export const editNames = () => { const b = breakpoints(), i = b.findIndex(x => x.name === S.breakpoint); return i < 0 ? [] : b.slice(0, i + 1).map(x => x.name); };
+// node as seen at the edited breakpoint (read values from this, write with setProp)
+export const view = id => { const n = node(id); return n && withOverrides(n, editNames()); };
+export const isOverridden = (id, path, bp = S.breakpoint) => !!bp && overridden(node(id) ?? {}, bp, path);
+export function revertOverride(id, path, bp = S.breakpoint) {
+  if (bp) edit(`Revert ${path ?? 'all'} ${id}`, () => clearOverride(node(id), bp, path), { kind: 'props', ids: [id] });
+}
+export function setBreakpoint(name) {
+  S.breakpoint = breakpoints().some(b => b.name === name) ? name : null;
+  emit('breakpoint');
+}
+// replace the list ([{name, maxWidth}]); renamed entries carry `from` so overrides follow them
+export function setBreakpoints(list) {
+  for (const b of list) if (b.from && b.from !== b.name) for (const [page, tree] of Object.entries(S.P.pages)) for (const [n] of walk(tree))
+    if (n.overrides?.[b.from]) { n.overrides[b.name] = n.overrides[b.from]; delete n.overrides[b.from]; S.dirty.add(`pages/${page}.json`); }
+  S.P.project.breakpoints = list.map(({ name, maxWidth }) => ({ name, maxWidth: +maxWidth }));
+  S.dirty.add('project.json');
+  if (S.breakpoint && !breakpoints().some(b => b.name === S.breakpoint)) S.breakpoint = null;
+  emit('breakpoint'); emit('structure');
 }
 
 // ---------- selection / tools ----------
@@ -181,7 +211,7 @@ export function newPage(name) {
 }
 
 // ---------- preview / generated code ----------
-export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, clips: S.P.clips, ...extra });
+export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, clips: S.P.clips, breakpoints: breakpoints(), ...extra });
 // editor=true: behaviours/animators don't auto-run (Scene). Play mode passes editor=false.
 // Absolute <base>: Chrome's srcdoc preload scanner resolves a relative one against the editor URL.
 export const previewHTML = (editor = !S.playing) =>
