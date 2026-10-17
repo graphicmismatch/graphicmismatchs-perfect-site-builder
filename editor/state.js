@@ -1,5 +1,5 @@
 // Editor state store. Every panel imports this; see CONTRACT.md "Editor".
-import { findNode, walk, setProp as setPath, getProp, newNode, newId, clone, getComponent, sortBreakpoints, withOverrides, setOverride, clearOverride, isOverridden as overridden } from '/lib/node.js';
+import { findNode, walk, setProp as setPath, getProp, newNode, newId, clone, getComponent, sortBreakpoints, withOverrides, setOverride, clearOverride, isOverridden as overridden, componentPath, nodeAtPath } from '/lib/node.js';
 import { componentDef, withDefaults, builtins } from '/lib/components.js';
 import { renderDocument, makeCtx } from '/lib/render.js';
 
@@ -50,11 +50,12 @@ const undoStack = [], redoStack = [];
 let lastEdit = { label: '', t: 0 };
 const snap = () => JSON.stringify({ page: S.page, tree: root(), clips: S.P.clips });
 function restore(json) {
-  const s = JSON.parse(json);
+  const s = JSON.parse(json), pageChanged = s.page !== S.page;
   S.page = s.page; S.P.pages[s.page] = s.tree; S.P.clips = s.clips;
   S.dirty.add(`pages/${s.page}.json`);
   for (const k of Object.keys(s.clips)) S.dirty.add(`animations/${k}.anim.json`);
   S.selection = S.selection.filter(id => node(id));
+  if (pageChanged) emit('page');
   emit('structure'); emit('anim'); emit('selection');
 }
 export function undo() { if (!undoStack.length) return; redoStack.push(snap()); restore(undoStack.pop()); }
@@ -162,13 +163,22 @@ export function deleteNodes(ids = S.selection) {
   select([]);
 }
 
-const reid = n => { n.id = newId(); n.children?.forEach(reid); return n; };
+// Copy of a subtree with fresh ids; references between its own nodes (event targets, node props) follow the copies.
+export function cloneTree(n) {
+  const c = clone(n), ids = new Map();
+  for (const [x] of walk(c)) { const id = newId(); ids.set(x.id, id); x.id = id; }
+  const fix = o => {
+    for (const k in o) { const v = o[k]; if (typeof v === 'string') { if (ids.has(v)) o[k] = ids.get(v); } else if (v && typeof v === 'object') fix(v); }
+  };
+  for (const [x] of walk(c)) { fix(x.components); if (x.overrides) fix(x.overrides); }
+  return c;
+}
 export function duplicate(ids = S.selection) {
   const out = [];
   edit('Duplicate', () => {
     for (const id of ids) {
-      const p = parentOf(id); if (!p) continue;
-      const c = reid(clone(node(id)));
+      const p = parentOf(id); if (!p || ids.some(o => o !== id && findNode(node(o), id))) continue; // inside another duplicated node
+      const c = cloneTree(node(id));
       p.children.splice(p.children.findIndex(x => x.id === id) + 1, 0, c);
       out.push(c.id);
     }
@@ -196,15 +206,45 @@ export function addComponent(id, type) {
   if (getComponent(n, type) && !type.startsWith('behaviour:')) return log(`${n.name} already has ${type}`, 'warn');
   edit('Add ' + type, () => n.components.push({ type, props: withDefaults(d, {}) }));
 }
-export function removeComponent(id, i) { edit('Remove component', () => node(id).components.splice(i, 1)); }
-export function moveComponent(id, i, to) {
-  edit('Move component', () => { const c = node(id).components; c.splice(to, 0, c.splice(i, 1)[0]); });
+export function removeComponent(id, i) { changeComponents(id, 'Remove component', c => c.splice(i, 1)); }
+export function moveComponent(id, i, to) { changeComponents(id, 'Move component', c => c.splice(to, 0, c.splice(i, 1)[0])); }
+
+// Remove/reorder components and keep `<Type>[n].prop` paths (overrides, animation tracks) on the same component:
+// removing Spin[0] turns Spin[1].speed into Spin.speed. Overrides of a removed component are dropped; its tracks are
+// dropped only when another component would take over their path (otherwise they stay, shown as missing).
+function changeComponents(id, label, change) {
+  const n = node(id), files = [`pages/${S.page}.json`];
+  const before = n.components.map((c, i) => [c, componentPath(n, i)]);
+  edit(label, () => {
+    change(n.components);
+    const map = new Map(before.map(([c, p]) => { const i = n.components.indexOf(c); return [p, i < 0 ? null : componentPath(n, i)]; }));
+    const taken = new Set([...map.values()].filter(Boolean));
+    const head = prop => prop.split('.')[0].replace(/\[0\]$/, '');
+    const re = prop => { const h = head(prop); return !map.has(h) ? prop : map.get(h) && map.get(h) + prop.slice(prop.indexOf('.')); };
+    for (const [bp, o] of Object.entries(n.overrides ?? {}))
+      n.overrides[bp] = Object.fromEntries(Object.entries(o).flatMap(([k, v]) => (re(k) ? [[re(k), v]] : [])));
+    const seen = new Set();
+    for (const [a] of walk(root())) for (const name of getComponent(a, 'Animator')?.props?.clips ?? []) {
+      const clip = S.P.clips[name];
+      if (!clip) continue;
+      let hit = false;
+      clip.tracks = clip.tracks.filter(tr => {
+        if (seen.has(tr) || nodeAtPath(a, tr.path) !== n || re(tr.prop) === tr.prop) return true;
+        seen.add(tr); hit = true;
+        const p = re(tr.prop);
+        if (p) { tr.prop = p; return true; }
+        return !taken.has(head(tr.prop));
+      });
+      if (hit) files.push(`animations/${name}.anim.json`);
+    }
+  }, { files });
+  if (files.length > 1) emit('anim');
 }
 
 // ---------- pages ----------
 export function setPage(name) { if (!S.P.pages[name]) return; S.page = name; S.selection = []; emit('page'); emit('structure'); emit('selection'); }
 export function newPage(name) {
-  if (S.P.pages[name]) return log(`Page ${name} exists`, 'warn');
+  if (S.P.pages[name] || S.P.errors?.some(e => e.file === `pages/${name}.json`)) return log(`Page ${name} exists`, 'warn');
   const canvas = newNode('Canvas', [{ type: 'Canvas', props: { title: name } }, { type: 'CanvasScaler', props: {} }]);
   S.P.pages[name] = canvas; S.dirty.add(`pages/${name}.json`);
   setPage(name);
@@ -222,33 +262,38 @@ export function setPlaying(on) { S.playing = on; emit('play'); }
 
 // ---------- files / server ----------
 const H = { 'x-psb': '1' }; // required by the server for every non-GET request (+ x-psb-project once loaded)
+const ok = r => (r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t))));
 export const api = {
   get: p => fetch('/api/file?path=' + encodeURIComponent(p)).then(r => (r.ok ? r.text() : Promise.reject(new Error(r.statusText)))),
-  put: (p, body) => fetch('/api/file?path=' + encodeURIComponent(p), { method: 'PUT', body, headers: H }).then(r => (r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t))))),
-  del: p => fetch('/api/file?path=' + encodeURIComponent(p), { method: 'DELETE', headers: H }).then(r => r.json()),
-  rename: (from, to) => fetch(`/api/rename?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'POST', headers: H }).then(r => r.json()),
-  build: () => fetch('/api/build', { method: 'POST', headers: H }).then(r => (r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t))))),
+  put: (p, body) => fetch('/api/file?path=' + encodeURIComponent(p), { method: 'PUT', body, headers: H }).then(ok),
+  del: p => fetch('/api/file?path=' + encodeURIComponent(p), { method: 'DELETE', headers: H }).then(ok),
+  rename: (from, to) => fetch(`/api/rename?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'POST', headers: H }).then(ok),
+  build: () => fetch('/api/build', { method: 'POST', headers: H }).then(ok),
 };
 
 export async function save() {
   const files = [...S.dirty];
+  const content = f => {
+    const body = f === 'project.json' ? S.P.project : f.startsWith('pages/') ? S.P.pages[f.slice(6, -5)]
+      : f.startsWith('animations/') ? S.P.clips[f.slice(11, -10)] : undefined;
+    return body === undefined ? undefined : JSON.stringify(body, null, 2);
+  };
+  let ok = 0;
   for (const f of files) {
-    let body;
-    if (f === 'project.json') body = S.P.project;
-    else if (f.startsWith('pages/')) body = S.P.pages[f.slice(6, -5)];
-    else if (f.startsWith('animations/')) body = S.P.clips[f.slice(11, -10)];
+    const text = content(f);
     try {
-      if (body === undefined) await api.del(f); else await api.put(f, JSON.stringify(body, null, 2));
-      S.dirty.delete(f);
+      if (text === undefined) await api.del(f); else await api.put(f, text);
+      ok++;
+      if (content(f) === text) S.dirty.delete(f); // edited while the request was in flight: stays dirty
     } catch (e) { log(`Save ${f} failed: ${e.message}`, 'error'); }
   }
-  log(`Saved ${files.length} file(s)`);
+  log(`Saved ${ok} file(s)` + (ok < files.length ? `, ${files.length - ok} failed` : ''), ok < files.length ? 'warn' : 'info');
   emit('saved');
 }
 
 export async function build() {
   await save();
-  try { const r = await api.build(); log(`Built ${r.pages.length} page(s) -> ${r.out}`); }
+  try { const r = await api.build(); for (const w of r.warnings ?? []) log(`Build: ${w}`, 'warn'); log(`Built ${r.pages.length} page(s) -> ${r.out}`); }
   catch (e) { log(`Build failed: ${e.message}`, 'error'); }
 }
 
@@ -277,6 +322,7 @@ export async function load() {
   if (r.status === 409) return void location.replace('/'); // no project open: back to the Project Hub
   S.P = await r.json();
   H['x-psb-project'] = encodeURIComponent(S.P.root);
+  for (const e of S.P.errors ?? []) log(`${e.file}: ${e.error}` + (/^(pages|animations)\//.test(e.file) ? ' (not loaded; fix the file and reload)' : ''), 'error');
   if (!S.P.pages[S.page]) S.page = Object.keys(S.P.pages)[0];
   await loadBehaviours();
   emit('load'); emit('page'); emit('assets'); emit('structure'); emit('selection'); emit('anim');
@@ -289,6 +335,7 @@ export async function reloadMeta() {
   const P = await r.json();
   if (P.root !== S.P.root) return log('A different project was opened in the Hub; reload this tab to edit it.', 'warn');
   for (const k of ['components', 'behaviours', 'assets', 'json']) S.P[k] = P[k];
+  for (const e of P.errors ?? []) if (/^(components|assets)\//.test(e.file)) log(`${e.file}: ${e.error}`, 'error');
   await loadBehaviours();
   emit('assets'); emit('structure');
 }

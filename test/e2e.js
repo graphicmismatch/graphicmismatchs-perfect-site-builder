@@ -137,7 +137,7 @@ async function chrome(W = 1440, H = 900) {
   const port = 9300 + Math.floor(Math.random() * 500);
   const proc = spawn(bin, ['--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--mute-audio', '--autoplay-policy=no-user-gesture-required',
     `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, `--window-size=${W},${H}`, 'about:blank'], { stdio: 'ignore' });
-  cleanups.push(() => { proc.kill('SIGKILL'); fs.rmSync(profile, { recursive: true, force: true }); });
+  cleanups.push(() => { proc.kill('SIGKILL'); fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
   let target;
   for (let i = 0; i < 50 && !target; i++) {
     await sleep(100);

@@ -80,7 +80,8 @@ export async function createClip(name) {
 }
 
 // Rewrite references in every page (and clip) after a rename. map(str) -> str | undefined.
-function retarget(map, label) {
+// keyMap (same shape) also renames breakpoint override keys (property paths such as 'behaviour:Spin.speed').
+function retarget(map, label, keyMap) {
   const files = [];
   const fix = (o, pk) => {
     let hit = 0;
@@ -92,12 +93,23 @@ function retarget(map, label) {
     return hit;
   };
   S.edit(label, () => {
-    for (const [name, tree] of Object.entries(S.S.P.pages)) if (fix(tree)) files.push(`pages/${name}.json`);
+    for (const [name, tree] of Object.entries(S.S.P.pages)) {
+      let hit = fix(tree);
+      if (keyMap) for (const [n] of S.walk(tree)) for (const [bp, o] of Object.entries(n.overrides ?? {})) {
+        if (!Object.keys(o).some(k => (keyMap(k) ?? k) !== k)) continue;
+        n.overrides[bp] = Object.fromEntries(Object.entries(o).map(([k, v]) => [keyMap(k) ?? k, v]));
+        hit++;
+      }
+      if (hit) files.push(`pages/${name}.json`);
+    }
     for (const [name, clip] of Object.entries(S.S.P.clips)) if (fix(clip)) files.push(`animations/${name}.anim.json`);
   }, { files: [] });
   files.forEach(f => S.S.dirty.add(f));
   if (files.length) { S.log(`Updated references in ${files.join(', ')} (unsaved)`); S.emit('anim'); }
 }
+
+// component type a -> b in a type, property path ('behaviour:Spin.speed', 'behaviour:Spin[1].speed') or event call
+const typeRef = (a, b) => v => (v === a ? b : v.startsWith(a + '.') || v.startsWith(a + '[') ? b + v.slice(a.length) : undefined);
 
 // from/to are project-relative paths; kind: 'asset' | 'folder' | 'component' | 'behaviour' | 'anim'
 export async function renamePath(from, to, kind) {
@@ -124,11 +136,11 @@ export async function renamePath(from, to, kind) {
         if (v.includes(`{{`)) return v.replace(/\{\{(\s*)([^{}:]+?):/g, (m, sp, p) => (p === a ? `{{${sp}${b}:` : kind === 'folder' && p.startsWith(a + '/') ? `{{${sp}${b}${p.slice(a.length)}:` : m));
       }, 'Rename asset');
     } else if (kind === 'component') {
-      const a = 'component:' + from.slice(11, -5), b = 'component:' + to.slice(11, -5);
-      retarget(v => (v === a ? b : undefined), 'Rename component');
+      const m = typeRef('component:' + from.slice(11, -5), 'component:' + to.slice(11, -5));
+      retarget(m, 'Rename component', m);
     } else if (kind === 'behaviour') {
-      const a = 'behaviour:' + from.slice(11, -3), b = 'behaviour:' + to.slice(11, -3);
-      retarget(v => (v === a ? b : v.startsWith(a + '.') ? b + v.slice(a.length) : undefined), 'Rename behaviour');
+      const m = typeRef('behaviour:' + from.slice(11, -3), 'behaviour:' + to.slice(11, -3));
+      retarget(m, 'Rename behaviour', m);
     }
     await S.reloadMeta();
   }

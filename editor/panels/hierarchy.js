@@ -35,7 +35,6 @@ function icon(n) {
 }
 const EXT = { image: /\.(png|jpe?g|gif|webp|svg|avif|ico)$/i, video: /\.(mp4|webm|ogv|mov)$/i, audio: /\.(mp3|wav|ogg|m4a|flac|aac)$/i, json: /\.json$/i };
 const assetType = p => S.S.P.assets.find(a => a.path === p)?.type ?? Object.keys(EXT).find(t => EXT[t].test(p));
-const reid = n => { for (const [x] of S.walk(n)) x.id = S.newId(); return n; };
 
 let el, tree, search, collapsed = new Set(), sceneOpen = true, order = [], anchor = null;
 let renaming = false, dragging = false, dragIds = null, clip = [];
@@ -116,7 +115,7 @@ function paste(asChild = false) {
   const a = S.active();
   let parent = a ?? S.root(), index;
   if (!asChild && a && a !== S.root()) { parent = S.parentOf(a.id); index = parent.children.indexOf(a) + 1; }
-  const nodes = clip.map(n => reid(S.clone(n)));
+  const nodes = clip.map(n => S.cloneTree(n));
   S.edit('Paste', () => { const p = S.node(parent.id); index == null ? p.children.push(...nodes) : p.children.splice(index, 0, ...nodes); });
   S.select(nodes.map(n => n.id));
 }

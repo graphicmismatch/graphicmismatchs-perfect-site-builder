@@ -125,8 +125,9 @@ PSB.node(id) PSB.parent(id) PSB.el(id) PSB.els(id)       // els: all elements (R
 PSB.find('Header/Logo' | 'Logo', fromNode?) -> node
 PSB.applyNode(node, parent?, els?)  // PURE: re-apply node data's style/attrs/patch to els (default: all elements
                                     // with that id). Never writes the tree. Runtime code mutates PSB.node(id) in
-                                    // place then calls it; editor preview passes clones.
-PSB.setActive(id, bool)
+                                    // place then calls it; editor preview passes clones. Attributes and Style classes
+                                    // a prop change no longer produces (disabled, inert, target...) are removed.
+PSB.setActive(id, bool | 'toggle')  // toggle is per element (Repeat clones toggle independently)
 PSB.nodeFor(el)              // node data for one element: canonical node, or a per-clone copy inside a Repeat ({{item}} resolved)
 PSB.effective(node)          // node with the active breakpoint overrides     PSB.breakpoints() -> active names
 PSB.assets.url(p) .json(p) .text(p)
@@ -261,11 +262,15 @@ Binds 127.0.0.1 only. Every project path is resolved and rejected (403) if outsi
 ```
 GET  /                         editor/hub.html (Project Hub)   GET /editor/  editor/index.html   GET /editor/* /lib/*  tool files
 GET  /project/psb/*            lib/*                      GET /project/components/<Name>.js|.script.js  compiled on the fly
-GET  /project/*                project files              GET /api/project  -> { root, project, pages, components, behaviours, clips, json, assets[{path,type,size}] }
-GET|PUT|DELETE /api/file?path= read / write (raw body, streamed) / delete a project file
-POST /api/rename?from=&to=     POST /api/build -> { out, pages }
+GET  /project/*                project files (Range requests supported)
+GET  /api/project  -> { root, project, pages, components, behaviours, clips, json, assets[{path,type,size}], errors[{file,error}] }
+                   (unparseable pages/clips are left out, a bad JSON asset is null, project.json falls back to defaults)
+GET|PUT|DELETE /api/file?path= read / write (raw body, streamed) / delete a project file (never the project folder itself)
+POST /api/rename?from=&to=     POST /api/build -> { out, pages, warnings[] }
 GET  /api/events               SSE { file } on external changes (editor hot-reloads components/behaviours/assets)
 ```
+`build()` refuses an output folder that contains the project, sits inside a source folder, or is non-empty without
+being a previous build (`psb/runtime.js`); it fails on broken pages/clips/project.json and skips broken components (warning).
 Requests with a Host other than `127.0.0.1:PORT`/`localhost:PORT` get 403; non-GET requests need header `x-psb: 1`
 (`S.api` sends it).
 
@@ -291,7 +296,8 @@ edit(label, fn, { kind, ids, merge, files })   undo() redo()
 setProp(id, path, value, opts)     // ALWAYS use this for property edits (record mode hooks in);
                                    // opts.label groups many setProps into one undo step (drags, presets)
 select(ids, additive) setTool(t) PRESETS create(preset, parentId) addNode(node, parentId, index)
-deleteNodes(ids) duplicate(ids) reparent(id, newParentId, index) addComponent(id, type) removeComponent(id, i) moveComponent(id, i, to)
+deleteNodes(ids) duplicate(ids) cloneTree(node) reparent(id, newParentId, index) addComponent(id, type) removeComponent(id, i) moveComponent(id, i, to)
+// cloneTree: fresh ids, internal references remapped; remove/moveComponent keep <Type>[n] override/track paths on the same component
 setPage(name) newPage(name) previewHTML(editor) generatedCode() setPlaying(bool)
 api.get/put/del/rename/build   save() build() upload(file, dir) load() reloadMeta()
 ```

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { rectStyle, rectPixels, reanchor, defaultRect } from '../lib/rect.js';
 import { newNode, getProp, setProp, nodeAtPath, setOverride, clearOverride, isOverridden, withOverrides, effectiveTree, activeBreakpoints, componentPath } from '../lib/node.js';
-import { renderPage, makeCtx, bind } from '../lib/render.js';
+import { renderPage, makeCtx, bind, nodeStyle } from '../lib/render.js';
 
 const rt = o => ({ ...defaultRect(), ...o });
 
@@ -116,5 +116,40 @@ assert.match(css, /@media \(max-width: 1024px\) \{\n  \.still \{\n    left: calc
 assert.match(css, /@media \(max-width: 600px\) \{\n  \.row \{\n    gap: 2px;\n  \}\n\}/);
 assert.ok(!/@media[^}]*\.cell/.test(css));
 assert.equal(renderPage(page, makeCtx({ breakpoints: [] })).css.includes('@media'), false);
+
+// ---- regressions (bugs.md) ----
+const canvasNode = () => newNode('Canvas', [{ type: 'Canvas', props: {} }]);
+// reversed layout groups keep their alignment
+let pg = canvasNode();
+const rev = newNode('Rev', [{ type: 'HorizontalLayoutGroup', props: { reverse: true, childAlignment: 'upper-left' } }]);
+assert.deepEqual([nodeStyle(rev, pg, makeCtx())['flex-direction'], nodeStyle(rev, pg, makeCtx())['justify-content']], ['row-reverse', 'flex-end']);
+rev.components[0] = { type: 'VerticalLayoutGroup', props: { reverse: true, childAlignment: 'lower-center' } };
+assert.deepEqual([nodeStyle(rev, pg, makeCtx())['justify-content'], nodeStyle(rev, pg, makeCtx())['align-items']], ['flex-start', 'center']);
+// tinted Button over a sprite: no background box, tint layer masked to the sprite
+const sb = newNode('Sb', [{ type: 'Image', props: { sprite: 'img/b.png' } }, { type: 'Button', props: {} }]);
+const sbs = nodeStyle(sb, pg, makeCtx());
+assert.equal(sbs['background-color'], 'transparent');
+assert.equal(sbs['--psb-tint'], '#ffffff');
+pg.children.push(sb);
+const sbCss = renderPage(pg, makeCtx()).css;
+assert.match(sbCss, /\.sb::before \{[^}]*mask: var\(--psb-sprite\)/);
+assert.match(sbCss, /\.sb:hover \{ --psb-tint: #f5f5f5 !important; \}/);
+assert.ok(!/\.sb:hover \{ background-color/.test(sbCss));
+// a font used only in an override still gets @font-face
+pg = canvasNode();
+const ft = newNode('Ft', [{ type: 'Text', props: {} }]);
+setOverride(ft, 'Phone', 'Text.font', 'fonts/X.ttf');
+pg.children.push(ft);
+assert.match(renderPage(pg, makeCtx()).css, /@font-face \{\n {2}font-family: "psb-fonts-x-ttf"/);
+// overrides under an empty Repeat: no .undefined rule
+pg = canvasNode();
+const emptyRep = newNode('List', [{ type: 'Repeat', props: { source: 'none.json' } }]), ghost = newNode('Ghost');
+setOverride(ghost, 'Phone', 'rect.size.x', 1);
+emptyRep.children.push(ghost); pg.children.push(emptyRep);
+assert.ok(!renderPage(pg, makeCtx()).css.includes('.undefined'));
+// Style.className is escaped
+pg = canvasNode();
+pg.children.push(newNode('Cls', [{ type: 'Style', props: { className: 'a" data-x="1' } }]));
+assert.ok(renderPage(pg, makeCtx()).body.includes('class="cls a&#34; data-x=&#34;1"'));
 
 console.log('core ok');

@@ -4,26 +4,29 @@ Found by reading `lib/`, `cli.js` and the editor (`editor/state.js`, `editor/fil
 each one. Every bug below was confirmed with a script, a throwaway project in `.tmp/`, or the real editor in headless
 Chromium. The "Repro" lines show what was run. Ordered by severity.
 
-| # | Severity | Area | Summary |
-|---|---|---|---|
-| 1 | Critical | dev server | `DELETE /api/file` with an empty `path` deletes the whole project |
-| 2 | Critical | build | `build --out <project dir>` deletes the project's source files and still reports success |
-| 3 | High | editor save | Edits made while a save is in progress are lost and no longer marked unsaved |
-| 4 | High | runtime | `applyNode` never removes attributes (`disabled`, `inert`, `target`, …) |
-| 5 | High | dev server | One invalid JSON asset stops the whole project from loading in the editor |
-| 6 | Medium | runtime | `setActive` `toggle` never works on nodes inside a `Repeat` |
-| 7 | Medium | build | One broken component file fails the whole build, even if no page uses it |
-| 8 | Medium | layout | `reverse` on Horizontal/Vertical Layout Group also flips the child alignment |
-| 9 | Medium | components | A tinted Button draws a solid box behind transparent sprites |
-| 10 | Medium | editor rename | Renaming a behaviour or component leaves overrides (and component animation tracks) pointing at the old name |
-| 11 | Medium | editor | Removing or reordering components moves indexed overrides and tracks onto a different component |
-| 12 | Low | build | A font used only in a breakpoint override gets no `@font-face` |
-| 13 | Low | build | Overrides inside an empty `Repeat` produce a `.undefined { … }` CSS rule |
-| 14 | Low | editor | Duplicate/paste keep event targets pointing at the original nodes |
-| 15 | Low | dev server | No HTTP Range support (video seeking, Safari playback) |
-| 16 | Low | build | `Style.className` is not escaped in the HTML output |
-| 17 | Low | editor undo | Undo can switch the page without firing the `page` event |
-| 18 | Low | tests | `test/browser.js` sometimes crashes during cleanup with `ENOTEMPTY` |
+**Status: all 18 are fixed.** Each fix was checked by re-running the original repro. Lib-level regressions are covered in
+`test/core.test.js`, and `npm test` (core, anim, e2e) passes. The "How it was fixed" section at the end explains each fix.
+
+| # | Severity | Area | Summary | Status |
+|---|---|---|---|---|
+| 1 | Critical | dev server | `DELETE /api/file` with an empty `path` deletes the whole project | Fixed |
+| 2 | Critical | build | `build --out <project dir>` deletes the project's source files and still reports success | Fixed |
+| 3 | High | editor save | Edits made while a save is in progress are lost and no longer marked unsaved | Fixed |
+| 4 | High | runtime | `applyNode` never removes attributes (`disabled`, `inert`, `target`, …) | Fixed |
+| 5 | High | dev server | One invalid JSON asset stops the whole project from loading in the editor | Fixed |
+| 6 | Medium | runtime | `setActive` `toggle` never works on nodes inside a `Repeat` | Fixed |
+| 7 | Medium | build | One broken component file fails the whole build, even if no page uses it | Fixed |
+| 8 | Medium | layout | `reverse` on Horizontal/Vertical Layout Group also flips the child alignment | Fixed |
+| 9 | Medium | components | A tinted Button draws a solid box behind transparent sprites | Fixed |
+| 10 | Medium | editor rename | Renaming a behaviour or component leaves overrides (and component animation tracks) pointing at the old name | Fixed |
+| 11 | Medium | editor | Removing or reordering components moves indexed overrides and tracks onto a different component | Fixed |
+| 12 | Low | build | A font used only in a breakpoint override gets no `@font-face` | Fixed |
+| 13 | Low | build | Overrides inside an empty `Repeat` produce a `.undefined { … }` CSS rule | Fixed |
+| 14 | Low | editor | Duplicate/paste keep event targets pointing at the original nodes | Fixed |
+| 15 | Low | dev server | No HTTP Range support (video seeking, Safari playback) | Fixed |
+| 16 | Low | build | `Style.className` is not escaped in the HTML output | Fixed |
+| 17 | Low | editor undo | Undo can switch the page without firing the `page` event | Fixed |
+| 18 | Low | tests | `test/browser.js` sometimes crashes during cleanup with `ENOTEMPTY` | Fixed |
 
 ---
 
@@ -222,3 +225,45 @@ writing, so `rmSync` sometimes throws `ENOTEMPTY` and the script crashes with a 
 this list), even when the page had no errors.
 
 Fix: wait for the process `exit` event before removing the profile, or wrap `rmSync` in try/catch (or use `maxRetries`).
+
+---
+
+## How it was fixed
+
+1. `safe(rel, write)` (`cli.js`) refuses to write, delete or rename the project folder itself (403). PUT, DELETE and
+   both ends of `/api/rename` use it.
+2. `build()` resolves both paths and refuses an output folder that contains the project, sits inside a source folder,
+   or isn't empty and doesn't contain `psb/runtime.js` from a previous build. This check runs before anything is deleted.
+3. `save()` writes the text it serialized, and clears the dirty flag only if the file still serializes to that same
+   text afterwards. The message now says how many files failed. `api.del`/`api.rename` now reject on HTTP errors.
+4. The runtime remembers which attributes (`role`, `aria-label`, `disabled`, `inert`, `target`, `rel`, plus whatever it
+   last set) and `Style` classes it owns on each element. `applyNode` removes the ones the new props no longer produce.
+   Classes added by user code are kept.
+5. `loadProject` collects parse errors in `errors[{file, error}]` instead of throwing. Broken pages and clips are left
+   out, a broken JSON asset becomes `null`, and a broken `project.json` falls back to defaults. The editor logs them,
+   and `newPage` won't reuse the name of a page that failed to load. The build fails on broken pages, clips or
+   `project.json`, and only warns for assets and components.
+6. `PSB.setActive(id, 'toggle')` toggles each element's own node data. `invoke('setActive', 'toggle')` uses it.
+7. The build skips components that failed to parse, and reports them in `warnings` (printed by the CLI, logged by the editor).
+8. `alignFlex` flips the main axis when `reverse` is on.
+9. `Image` exposes its sprite as `--psb-sprite` / `--psb-sprite-size`. A tinted `Button` over a sprite no longer fills
+   its background. Instead it draws a `::before` layer masked to the sprite and blended with `multiply`, and
+   `:hover`/`:active` change `--psb-tint`. Sprite swaps keep working because the mask reads the variable.
+   `rules()` now also receives the node (`rules(p, sel, ctx, node)`).
+10. `retarget` can also rename override keys. Component and behaviour renames use one matcher that handles
+    `Type`, `Type.prop` and `Type[n].prop` in values, tracks, event calls and override keys.
+11. `removeComponent`/`moveComponent` go through `changeComponents`. It maps each component's old `<Type>[n]` path to
+    its new one and rewrites the node's override keys and the tracks that target the node in this page's Animators.
+    Overrides of a removed component are dropped. Its tracks are dropped only if another component would otherwise
+    take over their path. The change is a single undo step, and changed clips are marked dirty.
+12. `@font-face` collection also scans override values.
+13. The breakpoint diff skips nodes that were never rendered.
+14. New `S.cloneTree(node)` gives the copy new ids and points references inside the copied subtree (event targets,
+    node props, overrides) at the copies. Used by duplicate and paste. Duplicate also skips selected nodes whose
+    ancestor is selected too, so a child isn't copied twice.
+15. `sendFile` supports single byte ranges (`206`, `416`, `Accept-Ranges`) and no longer crashes the server if a read
+    fails partway through.
+16. The `class` and `data-psb` attribute values are escaped.
+17. `restore` fires `page` when undo/redo switches pages.
+18. Removing the Chrome profile retries (`maxRetries`) and can't crash `test/browser.js` any more (the same retry is
+    used in `test/e2e.js`).

@@ -47,37 +47,67 @@ async function files(dir, base = dir) {
   return out;
 }
 const readJSON = async (f, d) => JSON.parse(await fsp.readFile(f, 'utf8').catch(() => JSON.stringify(d)));
+// like readJSON, but a parse error is recorded in `errors` ({ file, error }) and yields `bad` instead of throwing
+const tryJSON = async (root, rel, d, bad, errors) => {
+  try { return await readJSON(path.join(root, rel), d); } catch (e) { errors.push({ file: rel, error: e.message }); return bad; }
+};
 
 export async function loadProject(root) {
   const p = n => path.join(root, n);
-  const project = await readJSON(p('project.json'), { name: path.basename(root) });
+  const errors = [], dflt = { name: path.basename(root) };
+  const project = await tryJSON(root, 'project.json', dflt, dflt, errors);
   const pages = {}, components = {}, behaviours = {}, clips = {}, json = {}, assets = [];
-  for (const f of await files(p('pages'))) if (f.endsWith('.json')) pages[f.slice(0, -5)] = await readJSON(p('pages/' + f));
+  for (const f of await files(p('pages'))) if (f.endsWith('.json')) {
+    const t = await tryJSON(root, 'pages/' + f, null, null, errors);
+    if (t) pages[f.slice(0, -5)] = t;
+  }
   for (const f of await files(p('components'))) if (f.endsWith('.html')) {
     const name = f.slice(0, -5);
     try { components[name] = parseComponent(name, await fsp.readFile(p('components/' + f), 'utf8')); }
     catch (e) { components[name] = { name, tag: 'psb-error', props: {}, error: String(e) }; }
   }
   for (const f of await files(p('behaviours'))) if (f.endsWith('.js')) behaviours[f.slice(0, -3)] = { path: 'behaviours/' + f };
-  for (const f of await files(p('animations'))) if (f.endsWith('.anim.json')) clips[f.slice(0, -10)] = await readJSON(p('animations/' + f));
+  for (const f of await files(p('animations'))) if (f.endsWith('.anim.json')) {
+    const c = await tryJSON(root, 'animations/' + f, null, null, errors);
+    if (c) clips[f.slice(0, -10)] = c;
+  }
   for (const f of await files(p('assets'))) {
     const st = await fsp.stat(p('assets/' + f));
     assets.push({ path: f, type: assetType(f), size: st.size });
-    if (ext(f) === 'json') json[f] = await readJSON(p('assets/' + f), null);
+    if (ext(f) === 'json') json[f] = await tryJSON(root, 'assets/' + f, null, null, errors);
   }
-  return { project, pages, components, behaviours, clips, json, assets };
+  for (const c of Object.values(components)) if (c.error) errors.push({ file: `components/${c.name}.html`, error: c.error });
+  return { project, pages, components, behaviours, clips, json, assets, errors };
 }
 
 const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, clips: P.clips, breakpoints: P.project.breakpoints, ...extra });
 
+// The output folder is deleted before every build: refuse anything that is not a previous build or a fresh folder.
+async function checkOut(root, out) {
+  const inside = (a, b) => a === b || a.startsWith(b + path.sep);
+  if (inside(root, out)) throw new Error(`refusing to build into ${out}: it contains the project`);
+  for (const d of ['pages', 'assets', 'components', 'behaviours', 'animations'])
+    if (inside(out, path.join(root, d))) throw new Error(`refusing to build into ${out}: it is inside the project's ${d}/ folder`);
+  const ents = await fsp.readdir(out).catch(() => []);
+  if (ents.length && !fs.existsSync(path.join(out, 'psb', 'runtime.js')))
+    throw new Error(`refusing to build into ${out}: it is not empty and does not look like a previous build`);
+}
+
 export async function build(root, out = path.join(root, 'dist')) {
+  root = path.resolve(root); out = path.resolve(out);
+  await checkOut(root, out);
   const P = await loadProject(root);
+  // a broken page/clip/project.json would silently drop content from the site: fail. Bad components/assets: warn.
+  const fatal = P.errors.filter(e => !/^(components|assets)\//.test(e.file));
+  if (fatal.length) throw new Error('cannot build:\n' + fatal.map(e => `  ${e.file}: ${e.error}`).join('\n'));
+  const warnings = P.errors.map(e => `${e.file}: ${e.error}`);
   await fsp.rm(out, { recursive: true, force: true });
   await fsp.mkdir(path.join(out, 'psb'), { recursive: true });
   for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f !== 'compile.js') await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'psb', f));
   for (const d of ['assets', 'behaviours']) if (fs.existsSync(path.join(root, d))) await fsp.cp(path.join(root, d), path.join(out, d), { recursive: true });
   await fsp.mkdir(path.join(out, 'components'), { recursive: true });
   for (const name of Object.keys(P.components)) {
+    if (P.components[name].error) continue; // reported in warnings
     const src = await fsp.readFile(path.join(root, 'components', name + '.html'), 'utf8');
     for (const [f, code] of Object.entries(compileComponent(name, src))) await fsp.writeFile(path.join(out, 'components', f), code);
   }
@@ -87,7 +117,7 @@ export async function build(root, out = path.join(root, 'dist')) {
     await fsp.writeFile(path.join(out, name + '.html'), html);
     await fsp.writeFile(path.join(out, name + '.css'), css);
   }
-  return { out, pages: Object.keys(P.pages) };
+  return { out, pages: Object.keys(P.pages), warnings };
 }
 
 export async function create(root) {
@@ -130,10 +160,11 @@ async function projectList() {
 // ---------- dev server (hub + editor) ----------
 let root = null, watcher = null; // project currently open in the editor
 const notOpen = () => Object.assign(new Error('no project open'), { code: 409 });
-function safe(rel) {
+function safe(rel, write = false) {
   if (!root) throw notOpen();
   const p = path.resolve(root, String(rel ?? ''));
   if (p !== root && !p.startsWith(root + path.sep)) throw Object.assign(new Error('path outside project'), { code: 403 });
+  if (write && p === root) throw Object.assign(new Error('refusing to modify the project folder itself'), { code: 403 }); // e.g. an empty path
   return p;
 }
 const send = (res, code, body, type = 'text/plain') => { res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' }); res.end(body); };
@@ -145,8 +176,17 @@ const absDir = p => { if (!p || !path.isAbsolute(String(p))) throw Object.assign
 async function sendFile(res, file) {
   const st = await fsp.stat(file).catch(() => null);
   if (!st?.isFile()) return send(res, 404, 'not found');
-  res.writeHead(200, { 'content-type': MIME[ext(file)] ?? 'application/octet-stream', 'content-length': st.size, 'cache-control': 'no-store' });
-  fs.createReadStream(file).pipe(res);
+  const head = { 'content-type': MIME[ext(file)] ?? 'application/octet-stream', 'accept-ranges': 'bytes', 'cache-control': 'no-store' };
+  // single byte range (media seeking; Safari needs it to play video at all)
+  const m = /^bytes=(\d*)-(\d*)$/.exec(res.req.headers.range ?? '');
+  let start = 0, end = st.size - 1;
+  if (m && (m[1] || m[2])) {
+    if (m[1]) { start = +m[1]; if (m[2]) end = Math.min(+m[2], end); } else start = Math.max(0, st.size - +m[2]);
+    if (start > end) { res.writeHead(416, { 'content-range': `bytes */${st.size}` }); return res.end(); }
+    res.writeHead(206, { ...head, 'content-length': end - start + 1, 'content-range': `bytes ${start}-${end}/${st.size}` });
+  } else res.writeHead(200, { ...head, 'content-length': st.size });
+  if (!st.size) return res.end();
+  fs.createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res);
 }
 
 async function openProject(dir) {
@@ -240,7 +280,7 @@ function serve(initial) {
       if (p.startsWith('/project/')) return sendFile(res, safe(p.slice(9)));
       if (p === '/api/project') { if (!root) throw notOpen(); return sendJSON(res, { root, ...await loadProject(root) }); }
       if (p === '/api/file') {
-        const f = safe(q.get('path'));
+        const f = safe(q.get('path'), req.method !== 'GET');
         if (req.method === 'PUT') {
           await fsp.mkdir(path.dirname(f), { recursive: true });
           await new Promise((ok, err) => req.pipe(fs.createWriteStream(f)).on('finish', ok).on('error', err));
@@ -250,9 +290,9 @@ function serve(initial) {
         return sendFile(res, f);
       }
       if (p === '/api/rename' && req.method === 'POST') {
-        const to = safe(q.get('to'));
+        const to = safe(q.get('to'), true), from = safe(q.get('from'), true);
         await fsp.mkdir(path.dirname(to), { recursive: true });
-        await fsp.rename(safe(q.get('from')), to);
+        await fsp.rename(from, to);
         return sendJSON(res, { ok: true });
       }
       if (p === '/api/build' && req.method === 'POST') { if (!root) throw notOpen(); return sendJSON(res, await build(root, OUT && path.resolve(OUT))); }
@@ -276,7 +316,7 @@ function serve(initial) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (cmd === 'new') create(ROOT).then(() => console.log(`created ${ROOT}\nnext: psb serve ${dir}`), e => { console.error(e.message); process.exit(1); });
-  else if (cmd === 'build') build(ROOT, OUT && path.resolve(OUT)).then(r => console.log(`built ${r.pages.length} page(s) -> ${r.out}`), e => { console.error(e); process.exit(1); });
+  else if (cmd === 'build') build(ROOT, OUT && path.resolve(OUT)).then(r => { for (const w of r.warnings) console.warn('warning: ' + w); console.log(`built ${r.pages.length} page(s) -> ${r.out}`); }, e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'serve' || cmd === 'hub') {
     if (cmd === 'serve' && !isProject(ROOT)) { console.error(`no project.json in ${ROOT} (run: psb new ${dir})`); process.exit(1); }
     serve(cmd === 'serve' ? ROOT : null);
