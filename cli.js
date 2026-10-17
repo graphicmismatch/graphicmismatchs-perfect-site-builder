@@ -285,6 +285,11 @@ function serve(initial) {
         const out = compileComponent(comp[1], src);
         return send(res, 200, out[comp[1] + (comp[2] ?? '') + '.js'] ?? '', MIME.js);
       }
+      const page = p.match(/^\/project\/([\w-]+)\.html$/)?.[1];
+      if (page && fs.existsSync(safe(`pages/${page}.json`))) { // a page rendered on the fly (Links / IFrames in the editor preview)
+        const P = await loadProject(root);
+        if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P), { name: page, cssHref: null }).html, MIME.html);
+      }
       if (p.startsWith('/project/')) return sendFile(res, safe(p.slice(9)));
       if (p === '/api/project') { if (!root) throw notOpen(); return sendJSON(res, { root, ...await loadProject(root) }); }
       if (p === '/api/file') {

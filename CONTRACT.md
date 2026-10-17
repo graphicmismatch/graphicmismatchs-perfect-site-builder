@@ -69,7 +69,7 @@ animations/<Name>.anim.json  animation clips (inlined into pages that use them)
 | `asset:image|video|audio|json|font|anim|any` | path relative to `assets/` (anim: clip name) | object field, drop target, picker |
 | `href` | page name, URL, or `#anchor` | text + page dropdown |
 | `node` | node id | object field, drop a hierarchy node |
-| `event` | `[{ target: nodeId, call: string, arg: string }]` | Unity UnityEvent list |
+| `event` | `[{ target: nodeId, call: string, arg: string }]` (opt `on`: DOM event, default `click`; on a form control an empty `arg` passes its value) | Unity UnityEvent list |
 | `list` | array of `of` type | reorderable list |
 
 Strings may contain JSON bindings resolved at build time: `{{data/site.json:hero.title}}` (asset path `:` dot path,
@@ -100,8 +100,13 @@ Tablet and Phone apply, Phone last. `lib/node.js`: `sortBreakpoints`, `activeBre
 
 ## Built-in components (`lib/components.js`)
 
-Canvas, CanvasScaler, Image, Text, Button, Link, Video, Audio, HTML, Style, HorizontalLayoutGroup, VerticalLayoutGroup,
-GridLayoutGroup, LayoutElement, ContentSizeFitter, ScrollRect, Mask, CanvasGroup, Shadow, Animator, Repeat.
+Canvas, CanvasScaler, Image, RawImage, Text, Button, Toggle, Slider, InputField, Dropdown, Link, Video, Audio, IFrame,
+Element, HTML, Style, HorizontalLayoutGroup, VerticalLayoutGroup, GridLayoutGroup, LayoutElement, ContentSizeFitter,
+AspectRatioFitter, ScrollRect, Mask, CanvasGroup, Shadow, Outline, Animator, Repeat.
+- Toggle / Slider / InputField / Dropdown render the native control (`<input>`, `<select>`, `<textarea>`) inside the
+  node element, filling its rect, with browser default styling. User edits are written back into the element's node
+  data (`def.state`), so `GPSB.nodeFor(el)` reads the current value and re-applies keep it.
+- `Element` sets the HTML tag (section, nav, …), id, title, role and ARIA attributes. `Shadow` and `Outline` filters stack.
 Definition shape is documented at the top of that file. `componentDef(type, customs, behaviourMeta)` resolves any type;
 `withDefaults(def, props)` fills defaults.
 
@@ -263,6 +268,7 @@ Binds 127.0.0.1 only. Every project path is resolved and rejected (403) if outsi
 ```
 GET  /                         editor/hub.html (Project Hub)   GET /editor/  editor/index.html   GET /editor/* /lib/*  tool files
 GET  /project/gpsb/*            lib/*                      GET /project/components/<Name>.js|.script.js  compiled on the fly
+GET  /project/<page>.html      that page rendered on the fly (Links / IFrames inside the editor preview)
 GET  /project/*                project files (Range requests supported)
 GET  /api/project  -> { root, project, pages, components, behaviours, clips, json, assets[{path,type,size}], errors[{file,error}] }
                    (unparseable pages/clips are left out, a bad JSON asset is null, project.json falls back to defaults)

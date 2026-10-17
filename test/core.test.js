@@ -152,4 +152,30 @@ pg = canvasNode();
 pg.children.push(newNode('Cls', [{ type: 'Style', props: { className: 'a" data-x="1' } }]));
 assert.ok(renderPage(pg, makeCtx()).body.includes('class="cls a&#34; data-x=&#34;1"'));
 
+// ---- added built-ins ----
+pg = canvasNode();
+const add = (name, comps) => { const n = newNode(name, comps); pg.children.push(n); return n; };
+add('Tog', [{ type: 'Toggle', props: { isOn: false } }]);
+add('Sl', [{ type: 'Slider', props: { maxValue: 10, wholeNumbers: true, value: 4 } }]);
+add('In', [{ type: 'InputField', props: { text: 'a"<', placeholder: 'p', characterLimit: 3 } }]);
+add('Ta', [{ type: 'InputField', props: { lineType: 'multi', text: '<b>' } }]);
+add('Dd', [{ type: 'Dropdown', props: { options: ['A', '<B>'], value: 1 } }]);
+add('Fr', [{ type: 'IFrame', props: { src: 'about', title: 'T' } }]);
+const sect = add('Sect', [{ type: 'Element', props: { tag: 'nav', id: 'top', ariaHidden: true } }]);
+const raw = add('Raw', [{ type: 'RawImage', props: { texture: 'img/a.png', uvRect: [0.25, 0, 0.5, 1] } }]);
+const asp = add('Asp', [{ type: 'AspectRatioFitter', props: { aspectMode: 'height-controls-width', aspectRatio: 1.5 } }]);
+const fx = add('Fx', [{ type: 'Shadow', props: {} }, { type: 'Outline', props: { distance: [2, 3] } }]);
+const html = renderPage(pg, makeCtx({ pages: ['about'] })).body;
+assert.match(html, /<input type="checkbox" style=/);
+assert.match(html, /<input type="range" min="0" max="10" step="1" value="4" style=/);
+assert.match(html, /<input type="text" value="a&#34;&#60;" placeholder="p" maxlength="3"/);
+assert.match(html, /<textarea style="[^"]*">&#60;b&#62;<\/textarea>/);
+assert.match(html, /<option value="0">A<\/option><option value="1" selected>&#60;B&#62;<\/option>/);
+assert.match(html, /<iframe src="about.html" title="T" loading="lazy"/);
+assert.match(html, /<nav class="sect" data-gpsb="[^"]+" id="top" aria-hidden="true">/);
+const rs = nodeStyle(raw, pg, makeCtx());
+assert.deepEqual([rs['background-size'], rs['background-position']], ['200% 100%', '50% 0%']);
+assert.deepEqual([nodeStyle(asp, pg, makeCtx()).width, nodeStyle(asp, pg, makeCtx())['aspect-ratio']], ['auto', '1.5']);
+assert.equal(nodeStyle(fx, pg, makeCtx()).filter.match(/drop-shadow/g).length, 5); // Shadow + 4 Outline copies stack
+
 console.log('core ok');

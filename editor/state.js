@@ -125,6 +125,7 @@ export const PRESETS = {
   'Create Empty': () => newNode('WebObject'),
   Panel: () => Object.assign(newNode('Panel', [{ type: 'Image', props: { color: '#ffffffc0' } }]), { rect: rect(stretch) }),
   Image: () => newNode('Image', [{ type: 'Image', props: {} }]),
+  'Raw Image': () => newNode('Raw Image', [{ type: 'RawImage', props: {} }]),
   Text: () => Object.assign(newNode('Text', [{ type: 'Text', props: {} }]), { rect: rect({ size: [200, 50] }) }),
   Button: () => {
     const b = Object.assign(newNode('Button', [{ type: 'Image', props: { color: '#ffffff', radius: 4 } }, { type: 'Button', props: {} }]), { rect: rect({ size: [160, 30] }) });
@@ -132,8 +133,13 @@ export const PRESETS = {
     return b;
   },
   Link: () => Object.assign(newNode('Link', [{ type: 'Text', props: { text: 'Link', color: '#2060ff' } }, { type: 'Link', props: {} }]), { rect: rect({ size: [160, 30] }) }),
+  Toggle: () => Object.assign(newNode('Toggle', [{ type: 'Toggle', props: {} }]), { rect: rect({ size: [20, 20] }) }),
+  Slider: () => Object.assign(newNode('Slider', [{ type: 'Slider', props: {} }]), { rect: rect({ size: [160, 20] }) }),
+  'Input Field': () => Object.assign(newNode('Input Field', [{ type: 'InputField', props: {} }]), { rect: rect({ size: [160, 30] }) }),
+  Dropdown: () => Object.assign(newNode('Dropdown', [{ type: 'Dropdown', props: {} }]), { rect: rect({ size: [160, 30] }) }),
   Video: () => Object.assign(newNode('Video', [{ type: 'Video', props: {} }]), { rect: rect({ size: [320, 180] }) }),
   Audio: () => Object.assign(newNode('Audio', [{ type: 'Audio', props: {} }]), { rect: rect({ size: [300, 54] }) }),
+  IFrame: () => Object.assign(newNode('IFrame', [{ type: 'IFrame', props: {} }]), { rect: rect({ size: [400, 300] }) }),
   'Horizontal Layout': () => Object.assign(newNode('Horizontal Layout', [{ type: 'HorizontalLayoutGroup', props: { spacing: 8 } }]), { rect: rect({ size: [400, 100] }) }),
   'Vertical Layout': () => Object.assign(newNode('Vertical Layout', [{ type: 'VerticalLayoutGroup', props: { spacing: 8 } }]), { rect: rect({ size: [200, 400] }) }),
   'Grid Layout': () => Object.assign(newNode('Grid Layout', [{ type: 'GridLayoutGroup', props: { spacing: [8, 8] } }]), { rect: rect({ size: [400, 400] }) }),

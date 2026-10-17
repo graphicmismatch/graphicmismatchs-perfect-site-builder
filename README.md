@@ -68,11 +68,13 @@ Shortcuts work as in Unity:
   - `scale-with-screen` uses a reference resolution and Unity's width/height match.
   - Set `Canvas.height` to make a long scrolling page.
 - **Built-in components:**
-  - UI: Image, Text, Button, Link
+  - UI: Image, Raw Image, Text, Button, Toggle, Slider, Input Field, Dropdown
+    (the form controls are the browser's native ones; what the user types or picks is kept in the node's data and
+    passed to their events)
   - Media: Video, Audio
-  - Raw: HTML, Style (raw CSS)
-  - Layout: Horizontal / Vertical / Grid Layout Group, Layout Element, Content Size Fitter, Scroll Rect, Mask
-  - Effects: Canvas Group, Shadow
+  - Web: Link, IFrame, Element (HTML tag, id, title, role, ARIA), HTML, Style (raw CSS)
+  - Layout: Horizontal / Vertical / Grid Layout Group, Layout Element, Content Size Fitter, Aspect Ratio Fitter, Scroll Rect, Mask
+  - Effects: Canvas Group, Shadow, Outline
   - Animation and data: Animator, Repeat
 - **Breakpoints** cover responsive layout. Defaults are Tablet ≤1024 px and Phone ≤600 px; edit them in the Scene toolbar.
   - Pick a breakpoint and every change you make in the Scene or Inspector is stored as an override, much like a Unity prefab override.
