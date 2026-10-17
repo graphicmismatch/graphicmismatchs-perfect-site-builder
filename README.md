@@ -1,0 +1,128 @@
+# graphicmismatch's perfect site builder
+
+A visual static site generator that works like Unity's uGUI. You lay out pages in a Unity-style editor using
+RectTransforms, anchors, pivots and layout groups, add components and keyframe animations, and it generates plain
+HTML/CSS/JS.
+
+Zero dependencies. You need Node ≥ 22.
+
+```sh
+node cli.js serve example          # open http://127.0.0.1:4000 — edit the demo project
+node cli.js build example          # -> example/dist (static, host anywhere)
+node cli.js new my-site            # start a new project
+```
+
+## The editor
+
+The layout follows Unity's default editor:
+
+| Panel | What it does |
+|---|---|
+| Toolbar | File / Edit / GameObject / Component / Window menus, the Q W E R T tools, Play, page switcher, Build. |
+| Hierarchy | The page tree. Drag nodes to reparent them. Sibling order is draw order. |
+| Scene / Game | The real page rendered live. Rect / move / rotate / scale tools, an anchor gizmo, snapping, and resolution presets. Play runs scripts and animations in the Game view. |
+| Inspector | RectTransform with anchor presets, plus every component's fields. Drag a label to scrub a number. Add Component. |
+| Project | Drag images, video, audio, JSON or fonts in from your desktop. Drag them out onto the Scene, Hierarchy or Inspector. |
+| Animation | Dopesheet and curves, record mode, sprite swap, events. |
+| Console / Generated Code | Logs from the editor and the page, and the exact HTML/CSS the build will write. |
+
+Shortcuts work as in Unity:
+- Q W E R T switch tools.
+- F frames the selection.
+- Ctrl+D duplicates.
+- Ctrl+Z / Ctrl+Shift+Z undo and redo.
+- Ctrl+S saves.
+- Ctrl+P plays.
+
+## Concepts
+
+- **Pages** are scenes. `pages/index.json` builds to `index.html` and `index.css`.
+- **RectTransform** behaves like Unity: anchorMin/anchorMax, pivot, anchored position, size delta, rotation and scale.
+  - The **Y axis points down**, as it does on the web.
+  - Nodes inside a Horizontal, Vertical or Grid Layout Group are laid out with flexbox or CSS grid.
+- **Canvas Scaler**:
+  - `constant` uses 1 unit = 1 CSS px.
+  - `scale-with-screen` uses a reference resolution and Unity's width/height match.
+  - Set `Canvas.height` to make a long scrolling page.
+- **Built-in components:**
+  - UI: Image, Text, Button, Link
+  - Media: Video, Audio
+  - Raw: HTML, Style (raw CSS)
+  - Layout: Horizontal / Vertical / Grid Layout Group, Layout Element, Content Size Fitter, Scroll Rect, Mask
+  - Effects: Canvas Group, Shadow
+  - Animation and data: Animator, Repeat
+- **Assets** live in `assets/` and are referenced by path.
+  - JSON can be bound into any text field, for example `{{data/site.json:hero.title}}`.
+  - A **Repeat** creates one copy of its children per item in a JSON array, with `{{item.name}}` and `{{index}}` available.
+  - Scripts can load data with `await PSB.assets.json('data/site.json')`.
+
+## Custom components (HTML + CSS + JS)
+
+`components/Card.html` turns into a native custom element. Its CSS is scoped with Shadow DOM. Its props appear in the Inspector.
+
+```html
+<template>
+  <article><img src="{{image}}"><h2>{{title}}</h2><slot></slot></article>
+</template>
+<style> article { padding: 16px; border-radius: 12px; background: #fff; } </style>
+<script type="application/json" props>
+  { "title": { "type": "string", "default": "Hello" }, "image": { "type": "asset:image", "default": "" } }
+</script>
+<script>
+  import { Component } from '../psb/component.js';
+  export default class extends Component {
+    rendered() { this.$('h2').onclick = () => this.emit('picked', this.props.title); }
+  }
+</script>
+```
+
+## Behaviours (MonoBehaviour-style scripts)
+
+```js
+// behaviours/Spin.js
+export const props = { speed: { type: 'number', default: 90 } };
+export default class Spin {
+  update(dt) { this.node.rect.rotation += this.props.speed * dt; this.apply(); }
+  faster() { this.props.speed *= 2; }   // callable from a Button's On Click ()
+}
+```
+
+The hooks are `start()`, `update(dt)` and `onClick(e)`. Inside a behaviour you can use:
+- `this.el` and `this.node`
+- `this.props`
+- `this.find('Path/To/Node')`
+- `this.animator.play('Clip')`
+- `this.setActive(false)`
+
+## Animation
+
+Clips (`animations/*.anim.json`) can animate **any property**:
+- position, size, anchors, pivot, rotation, scale and active state
+- every component field: colors, alpha, text, font size, layout spacing, custom component props, behaviour props
+- sprites, by swapping `Image.sprite` with constant keys
+
+Each key's easing can be linear, constant, ease-in/out, or a custom cubic-bezier that you edit in the Curves view. Clip events call behaviour methods or any other event action. An Animator can play its clip when the page starts, on hover, on click, when it scrolls into view, or only when called from a script.
+
+Record mode works as in Unity. Press the red button, then move things in the Scene or change Inspector fields, and keys are written at the playhead.
+
+## Project layout
+
+```
+project.json
+pages/*.json            animations/*.anim.json
+assets/**               components/*.html       behaviours/*.js
+```
+
+See [CONTRACT.md](CONTRACT.md) for the full file formats, the property-path syntax and the internal architecture.
+
+## Tests
+
+```sh
+node test/core.test.js     # RectTransform maths, property paths, bindings, Repeat
+node test/anim.test.js     # easing, sampling, events
+node test/e2e.js           # builds the example, checks it in headless Chrome, loads the editor
+```
+
+## License
+
+MIT © graphicmismatch

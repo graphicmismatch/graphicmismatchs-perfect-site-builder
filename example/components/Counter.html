@@ -1,0 +1,39 @@
+<template>
+  <div class="counter">
+    <span class="label">{{label}}</span>
+    <button class="dec" aria-label="decrement">−</button>
+    <output class="value">{{start}}</output>
+    <button class="inc" aria-label="increment">+</button>
+  </div>
+</template>
+<style>
+  .counter { display: inline-flex; align-items: center; gap: 12px; padding: 10px 12px 10px 20px; border-radius: 999px; background: #1b1e33; border: 1px solid #ffffff14; color: #e8e9f3; font-size: 15px; }
+  .label { color: #9aa0b8; margin-right: 6px; }
+  button { width: 36px; height: 36px; border: 0; border-radius: 50%; background: #7c5cff; color: #fff; font-family: inherit; font-size: 20px; font-weight: 600; line-height: 1; cursor: pointer; transition: transform .1s, background .2s; }
+  button:hover { background: #8f73ff; }
+  button:active { transform: scale(.9); }
+  .value { min-width: 3ch; text-align: center; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+</style>
+<script type="application/json" props>
+{
+  "label": { "type": "string", "default": "Clicks" },
+  "start": { "type": "int", "default": 0 },
+  "step": { "type": "int", "default": 1, "min": 1 }
+}
+</script>
+<script>
+import { Component } from '../psb/component.js';
+
+export default class Counter extends Component {
+  count = null;
+  rendered() {
+    this.count ??= this.props.start;
+    this.$('.inc').onclick = () => this.add(this.props.step);
+    this.$('.dec').onclick = () => this.add(-this.props.step);
+    this.show();
+  }
+  propChanged(name, v) { if (name === 'start') this.count = v; }
+  add(n) { this.count += n; this.show(); this.emit('change', this.count); }
+  show() { this.$('.value').textContent = this.count; }
+}
+</script>

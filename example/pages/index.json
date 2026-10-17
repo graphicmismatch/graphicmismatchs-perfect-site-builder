@@ -1,0 +1,4453 @@
+{
+  "id": "canvas",
+  "name": "Canvas",
+  "active": true,
+  "rect": {
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ],
+    "pos": [
+      0,
+      0
+    ],
+    "size": [
+      100,
+      100
+    ],
+    "rotation": 0,
+    "scale": [
+      1,
+      1
+    ]
+  },
+  "components": [
+    {
+      "type": "Canvas",
+      "props": {
+        "title": "graphicmismatch's perfect site builder",
+        "description": "{{data/site.json:hero.subtitle}}",
+        "background": "#0b0c16",
+        "height": 3360,
+        "font": "fonts/Lato-Regular.ttf"
+      }
+    },
+    {
+      "type": "CanvasScaler",
+      "props": {
+        "mode": "scale-with-screen",
+        "refWidth": 1440,
+        "refHeight": 900,
+        "match": 0
+      }
+    }
+  ],
+  "children": [
+    {
+      "id": "nav",
+      "name": "Nav",
+      "active": true,
+      "rect": {
+        "anchorMin": [
+          0,
+          0
+        ],
+        "anchorMax": [
+          1,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "pos": [
+          0,
+          0
+        ],
+        "size": [
+          0,
+          76
+        ],
+        "rotation": 0,
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "type": "Image",
+          "props": {
+            "color": "#0b0c16cc"
+          }
+        },
+        {
+          "type": "Style",
+          "props": {
+            "css": "backdrop-filter: blur(12px); border-bottom: 1px solid #ffffff10; z-index: 5;",
+            "hover": "",
+            "rules": ""
+          }
+        },
+        {
+          "type": "HorizontalLayoutGroup",
+          "props": {
+            "padding": [
+              64,
+              64,
+              0,
+              0
+            ],
+            "spacing": 8,
+            "childAlignment": "middle-left"
+          }
+        }
+      ],
+      "children": [
+        {
+          "id": "nav-logo",
+          "name": "Nav Logo",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              36,
+              36
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Link",
+              "props": {
+                "href": "index"
+              }
+            },
+            {
+              "type": "Image",
+              "props": {
+                "sprite": "img/logo.svg",
+                "alt": "Home"
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "brand",
+          "name": "Brand",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              340,
+              36
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Text",
+              "props": {
+                "text": "graphicmismatch's <b>perfect site builder</b>",
+                "size": 16,
+                "color": "#eef0fa",
+                "valign": "middle",
+                "wrap": false
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "spacer",
+          "name": "Spacer",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              10,
+              10
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "LayoutElement",
+              "props": {
+                "flexibleWidth": 1
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "nav-features",
+          "name": "Nav Features",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              100,
+              40
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Button",
+              "props": {
+                "normal": "#00000000",
+                "highlighted": "#ffffff12",
+                "pressed": "#ffffff22",
+                "onClick": [
+                  {
+                    "target": "features",
+                    "call": "scrollTo",
+                    "arg": ""
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "props": {
+                "text": "Features",
+                "size": 15,
+                "color": "#9aa0b8",
+                "align": "center",
+                "valign": "middle",
+                "wrap": false
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "border-radius: 10px;",
+                "hover": "color: #eef0fa;",
+                "rules": ""
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "nav-gallery",
+          "name": "Nav Gallery",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              100,
+              40
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Button",
+              "props": {
+                "normal": "#00000000",
+                "highlighted": "#ffffff12",
+                "pressed": "#ffffff22",
+                "onClick": [
+                  {
+                    "target": "gallery",
+                    "call": "scrollTo",
+                    "arg": ""
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Text",
+              "props": {
+                "text": "Gallery",
+                "size": 15,
+                "color": "#9aa0b8",
+                "align": "center",
+                "valign": "middle",
+                "wrap": false
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "border-radius: 10px;",
+                "hover": "color: #eef0fa;",
+                "rules": ""
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "nav-about",
+          "name": "Nav About",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              88,
+              40
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Link",
+              "props": {
+                "href": "about",
+                "newTab": false
+              }
+            },
+            {
+              "type": "Text",
+              "props": {
+                "text": "About",
+                "size": 15,
+                "color": "#9aa0b8",
+                "align": "center",
+                "valign": "middle",
+                "wrap": false
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "border-radius: 10px; transition: background-color .2s; ",
+                "hover": "background-color: #ffffff12; color: #eef0fa;",
+                "rules": ""
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "nav-github",
+          "name": "Nav GitHub",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              104,
+              40
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Link",
+              "props": {
+                "href": "https://github.com/graphicmismatch",
+                "newTab": true
+              }
+            },
+            {
+              "type": "Text",
+              "props": {
+                "text": "GitHub",
+                "size": 15,
+                "color": "#9aa0b8",
+                "align": "center",
+                "valign": "middle",
+                "wrap": false
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "border-radius: 10px; transition: background-color .2s; border: 1px solid #ffffff24; border-radius: 999px; margin-left: 8px;",
+                "hover": "background-color: #ffffff12; color: #eef0fa;",
+                "rules": ""
+              }
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "hero",
+      "name": "Hero",
+      "active": true,
+      "rect": {
+        "anchorMin": [
+          0,
+          0
+        ],
+        "anchorMax": [
+          1,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "pos": [
+          0,
+          76
+        ],
+        "size": [
+          0,
+          784
+        ],
+        "rotation": 0,
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "type": "CanvasGroup",
+          "props": {}
+        },
+        {
+          "type": "Animator",
+          "props": {
+            "clips": [
+              "HeroIntro"
+            ],
+            "playOn": "start"
+          }
+        },
+        {
+          "type": "behaviour:Typewriter",
+          "props": {
+            "target": "subtitle",
+            "autoplay": false,
+            "speed": 45
+          }
+        }
+      ],
+      "children": [
+        {
+          "id": "blob-violet",
+          "name": "Blob Violet",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.68,
+              0.38
+            ],
+            "anchorMax": [
+              0.68,
+              0.38
+            ],
+            "pivot": [
+              0.68,
+              0.38
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              560,
+              560
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Image",
+              "props": {
+                "color": "#7c5cff",
+                "radius": 300
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "filter: blur(100px); opacity: .42;",
+                "hover": "",
+                "rules": ""
+              }
+            },
+            {
+              "type": "behaviour:MouseParallax",
+              "props": {
+                "strength": 40
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "blob-mint",
+          "name": "Blob Mint",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.9,
+              0.8
+            ],
+            "anchorMax": [
+              0.9,
+              0.8
+            ],
+            "pivot": [
+              0.9,
+              0.8
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              380,
+              380
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Image",
+              "props": {
+                "color": "#3ee6c4",
+                "radius": 200
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "filter: blur(90px); opacity: .22;",
+                "hover": "",
+                "rules": ""
+              }
+            },
+            {
+              "type": "behaviour:MouseParallax",
+              "props": {
+                "strength": -28
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "blob-pink",
+          "name": "Blob Pink",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.12,
+              0.15
+            ],
+            "anchorMax": [
+              0.12,
+              0.15
+            ],
+            "pivot": [
+              0.12,
+              0.15
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              420,
+              420
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Image",
+              "props": {
+                "color": "#ff5c8a",
+                "radius": 200
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "filter: blur(110px); opacity: .18;",
+                "hover": "",
+                "rules": ""
+              }
+            },
+            {
+              "type": "behaviour:MouseParallax",
+              "props": {
+                "strength": 18
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "copy",
+          "name": "Copy",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0,
+              0.5
+            ],
+            "anchorMax": [
+              0,
+              0.5
+            ],
+            "pivot": [
+              0,
+              0.5
+            ],
+            "pos": [
+              112,
+              0
+            ],
+            "size": [
+              640,
+              560
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "VerticalLayoutGroup",
+              "props": {
+                "spacing": 22,
+                "childAlignment": "middle-left"
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "eyebrow",
+              "name": "Eyebrow",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  640,
+                  20
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "{{data/site.json:hero.eyebrow}}",
+                    "size": 13,
+                    "color": "#3ee6c4",
+                    "letterSpacing": 3,
+                    "weight": "bold",
+                    "wrap": false
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "title",
+              "name": "Title",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  640,
+                  160
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "{{data/site.json:hero.title}}",
+                    "size": 70,
+                    "color": "#eef0fa",
+                    "tag": "h1",
+                    "font": "fonts/Lato-Black.ttf",
+                    "lineHeight": 1.04
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "",
+                    "hover": "",
+                    "rules": "& em { font-style: normal; background: linear-gradient(90deg, #7c5cff, #ff5c8a 60%, #ffd166); -webkit-background-clip: text; background-clip: text; color: transparent; }"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "subtitle",
+              "name": "Subtitle",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  580,
+                  64
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "{{data/site.json:hero.subtitle}}",
+                    "size": 20,
+                    "color": "#9aa0b8",
+                    "tag": "p",
+                    "lineHeight": 1.55
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "",
+                    "hover": "",
+                    "rules": "& .caret { color: #3ee6c4; margin-left: 1px; animation: psb-blink 1s steps(1) infinite; }\n@keyframes psb-blink { 50% { opacity: 0; } }"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "buttons",
+              "name": "Buttons",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  640,
+                  56
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "HorizontalLayoutGroup",
+                  "props": {
+                    "spacing": 14,
+                    "childAlignment": "middle-left"
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "id": "cta-wrap",
+                  "name": "Cta Wrap",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      196,
+                      52
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Animator",
+                      "props": {
+                        "clips": [
+                          "ButtonPulse"
+                        ],
+                        "playOn": "hover"
+                      }
+                    }
+                  ],
+                  "children": [
+                    {
+                      "id": "replay-button",
+                      "name": "Replay Button",
+                      "active": true,
+                      "rect": {
+                        "anchorMin": [
+                          0,
+                          0
+                        ],
+                        "anchorMax": [
+                          1,
+                          1
+                        ],
+                        "pivot": [
+                          0.5,
+                          0.5
+                        ],
+                        "pos": [
+                          0,
+                          0
+                        ],
+                        "size": [
+                          0,
+                          0
+                        ],
+                        "rotation": 0,
+                        "scale": [
+                          1,
+                          1
+                        ]
+                      },
+                      "components": [
+                        {
+                          "type": "Button",
+                          "props": {
+                            "normal": "#7c5cff",
+                            "highlighted": "#8f73ff",
+                            "pressed": "#6a4be6",
+                            "onClick": [
+                              {
+                                "target": "hero",
+                                "call": "Animator.play",
+                                "arg": "HeroIntro"
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "type": "Text",
+                          "props": {
+                            "text": "▶  Replay intro",
+                            "size": 16,
+                            "color": "#ffffff",
+                            "align": "center",
+                            "valign": "middle",
+                            "weight": "bold",
+                            "wrap": false
+                          }
+                        },
+                        {
+                          "type": "Style",
+                          "props": {
+                            "css": "border-radius: 14px;",
+                            "hover": "",
+                            "rules": ""
+                          }
+                        },
+                        {
+                          "type": "Shadow",
+                          "props": {
+                            "color": "#7c5cff66",
+                            "distance": [
+                              0,
+                              8
+                            ],
+                            "blur": 22
+                          }
+                        }
+                      ],
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "panel-button",
+                  "name": "Panel Button",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      186,
+                      52
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Button",
+                      "props": {
+                        "normal": "#ffffff0d",
+                        "highlighted": "#ffffff1c",
+                        "pressed": "#ffffff2a",
+                        "onClick": [
+                          {
+                            "target": "inspector-panel",
+                            "call": "setActive",
+                            "arg": "toggle"
+                          },
+                          {
+                            "target": "inspector-panel",
+                            "call": "Animator.play",
+                            "arg": "PanelSlide"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "Text",
+                      "props": {
+                        "text": "Toggle inspector",
+                        "size": 16,
+                        "color": "#eef0fa",
+                        "align": "center",
+                        "valign": "middle",
+                        "weight": "normal",
+                        "wrap": false
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "border-radius: 14px; border: 1px solid #ffffff1f;",
+                        "hover": "",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                },
+                {
+                  "id": "spin-button",
+                  "name": "Spin Button",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      150,
+                      52
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Button",
+                      "props": {
+                        "normal": "#ffffff0d",
+                        "highlighted": "#ffffff1c",
+                        "pressed": "#ffffff2a",
+                        "onClick": [
+                          {
+                            "target": "ring",
+                            "call": "behaviour:Spin.spinFaster",
+                            "arg": ""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "Text",
+                      "props": {
+                        "text": "Spin faster",
+                        "size": 16,
+                        "color": "#eef0fa",
+                        "align": "center",
+                        "valign": "middle",
+                        "weight": "normal",
+                        "wrap": false
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "border-radius: 14px; border: 1px solid #ffffff1f;",
+                        "hover": "",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "hint",
+              "name": "Hint",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  600,
+                  22
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "Click the logo · hover the purple button · move your mouse",
+                    "size": 14,
+                    "color": "#6b7090"
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "stage",
+          "name": "Stage",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              1,
+              0.5
+            ],
+            "anchorMax": [
+              1,
+              0.5
+            ],
+            "pivot": [
+              1,
+              0.5
+            ],
+            "pos": [
+              -112,
+              10
+            ],
+            "size": [
+              520,
+              520
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [],
+          "children": [
+            {
+              "id": "ring",
+              "name": "Ring",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  470,
+                  470
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Image",
+                  "props": {
+                    "sprite": "img/ring.svg"
+                  }
+                },
+                {
+                  "type": "behaviour:Spin",
+                  "props": {
+                    "speed": 24
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "orbiter",
+              "name": "Orbiter",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  13
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  18,
+                  18
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Image",
+                  "props": {
+                    "color": "#3ee6c4",
+                    "radius": 9
+                  }
+                },
+                {
+                  "type": "Shadow",
+                  "props": {
+                    "color": "#3ee6c4aa",
+                    "distance": [
+                      0,
+                      0
+                    ],
+                    "blur": 10
+                  }
+                },
+                {
+                  "type": "Animator",
+                  "props": {
+                    "clips": [
+                      "Orbit"
+                    ],
+                    "playOn": "start"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "logo-big",
+              "name": "Logo Big",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  170,
+                  170
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Image",
+                  "props": {
+                    "sprite": "img/logo.svg",
+                    "alt": "perfect site builder logo"
+                  }
+                },
+                {
+                  "type": "Shadow",
+                  "props": {
+                    "color": "#7c5cff88",
+                    "distance": [
+                      0,
+                      18
+                    ],
+                    "blur": 40
+                  }
+                },
+                {
+                  "type": "Animator",
+                  "props": {
+                    "clips": [
+                      "LogoWobble"
+                    ],
+                    "playOn": "click"
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "cursor: pointer;",
+                    "hover": "",
+                    "rules": ""
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "chomper",
+              "name": "Chomper",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  1
+                ],
+                "anchorMax": [
+                  0.5,
+                  1
+                ],
+                "pivot": [
+                  0.5,
+                  1
+                ],
+                "pos": [
+                  -170,
+                  -6
+                ],
+                "size": [
+                  64,
+                  64
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Image",
+                  "props": {
+                    "sprite": "img/sprite/chomp-0.png",
+                    "alt": "sprite swap demo"
+                  }
+                },
+                {
+                  "type": "Animator",
+                  "props": {
+                    "clips": [
+                      "SpriteRun"
+                    ],
+                    "playOn": "start"
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "inspector-panel",
+          "name": "Inspector Panel",
+          "active": false,
+          "rect": {
+            "anchorMin": [
+              0.7,
+              0.2
+            ],
+            "anchorMax": [
+              0.97,
+              0.8
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              0,
+              0
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Image",
+              "props": {
+                "color": "#151729f0",
+                "radius": 18
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "border: 1px solid #ffffff1f; backdrop-filter: blur(16px); z-index: 4;",
+                "hover": "",
+                "rules": ""
+              }
+            },
+            {
+              "type": "Shadow",
+              "props": {
+                "color": "#000000aa",
+                "distance": [
+                  0,
+                  24
+                ],
+                "blur": 48
+              }
+            },
+            {
+              "type": "CanvasGroup",
+              "props": {}
+            },
+            {
+              "type": "Animator",
+              "props": {
+                "clips": [
+                  "PanelSlide"
+                ],
+                "playOn": "manual"
+              }
+            },
+            {
+              "type": "VerticalLayoutGroup",
+              "props": {
+                "padding": [
+                  26,
+                  26,
+                  24,
+                  24
+                ],
+                "spacing": 14,
+                "controlWidth": true,
+                "expandWidth": true
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "panel-kicker",
+              "name": "Panel Kicker",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  0,
+                  16
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "INSPECTOR",
+                    "size": 12,
+                    "color": "#6b7090",
+                    "letterSpacing": 3,
+                    "weight": "bold"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "panel-name",
+              "name": "Panel Name",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  0,
+                  30
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "Inspector Panel",
+                    "size": 22,
+                    "color": "#eef0fa",
+                    "font": "fonts/Lato-Black.ttf"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "panel-fields",
+              "name": "Panel Fields",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  0,
+                  232
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "HTML",
+                  "props": {
+                    "html": "<div class=\"rt\"><h4>Rect Transform</h4>\n<div class=\"row\"><span>Anchor Min</span><b>X 0.7</b><b>Y 0.2</b></div>\n<div class=\"row\"><span>Anchor Max</span><b>X 0.97</b><b>Y 0.8</b></div>\n<div class=\"row\"><span>Pivot</span><b>X 0.5</b><b>Y 0.5</b></div>\n<h4>Animator</h4>\n<div class=\"row\"><span>Clip</span><b class=\"w\">PanelSlide.anim</b></div>\n<p>This panel slid in by animating <i>rect.anchorMin.x</i> and <i>rect.anchorMax.x</i> with a custom bezier.</p></div>"
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "",
+                    "hover": "",
+                    "rules": "& h4 { margin: 4px 0 8px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #3ee6c4; }\n& .row { display: grid; grid-template-columns: 1fr 72px 72px; gap: 6px; margin-bottom: 6px; font-size: 13px; color: #9aa0b8; align-items: center; }\n& .row b { font-weight: normal; color: #eef0fa; background: #ffffff0d; border-radius: 6px; padding: 4px 8px; font-family: ui-monospace, monospace; font-size: 12px; }\n& .row b.w { grid-column: span 2; }\n& p { font-size: 13px; line-height: 1.55; color: #9aa0b8; margin: 14px 0 0; }\n& i { font-style: normal; color: #eef0fa; font-family: ui-monospace, monospace; font-size: 12px; }"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "panel-close",
+              "name": "Panel Close",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  0,
+                  42
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Button",
+                  "props": {
+                    "normal": "#ffffff0d",
+                    "highlighted": "#ffffff1c",
+                    "pressed": "#ffffff2a",
+                    "onClick": [
+                      {
+                        "target": "inspector-panel",
+                        "call": "setActive",
+                        "arg": "false"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "Close",
+                    "size": 15,
+                    "color": "#eef0fa",
+                    "align": "center",
+                    "valign": "middle"
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "border-radius: 12px;",
+                    "hover": "",
+                    "rules": ""
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stats",
+      "name": "Stats",
+      "active": true,
+      "rect": {
+        "anchorMin": [
+          0,
+          0
+        ],
+        "anchorMax": [
+          1,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "pos": [
+          0,
+          880
+        ],
+        "size": [
+          0,
+          160
+        ],
+        "rotation": 0,
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "type": "Repeat",
+          "props": {
+            "source": "data/site.json",
+            "path": "stats"
+          }
+        },
+        {
+          "type": "HorizontalLayoutGroup",
+          "props": {
+            "childAlignment": "middle-center",
+            "spacing": 40
+          }
+        },
+        {
+          "type": "Style",
+          "props": {
+            "css": "border-top: 1px solid #ffffff0d; border-bottom: 1px solid #ffffff0d; background: linear-gradient(90deg, transparent, #7c5cff0d, transparent);",
+            "hover": "",
+            "rules": ""
+          }
+        }
+      ],
+      "children": [
+        {
+          "id": "stat",
+          "name": "Stat",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              320,
+              100
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "component:Stat",
+              "props": {
+                "value": "{{item.value}}",
+                "suffix": "{{item.suffix}}",
+                "label": "{{item.label}}"
+              }
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "features",
+      "name": "Features",
+      "active": true,
+      "rect": {
+        "anchorMin": [
+          0,
+          0
+        ],
+        "anchorMax": [
+          1,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "pos": [
+          0,
+          1120
+        ],
+        "size": [
+          0,
+          760
+        ],
+        "rotation": 0,
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "type": "CanvasGroup",
+          "props": {}
+        },
+        {
+          "type": "Animator",
+          "props": {
+            "clips": [
+              "Reveal"
+            ],
+            "playOn": "visible"
+          }
+        }
+      ],
+      "children": [
+        {
+          "id": "heading",
+          "name": "Heading",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              900,
+              140
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "VerticalLayoutGroup",
+              "props": {
+                "spacing": 12,
+                "childAlignment": "upper-center"
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "heading-kicker",
+              "name": "Heading Kicker",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  900,
+                  20
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "FEATURES",
+                    "size": 13,
+                    "color": "#3ee6c4",
+                    "letterSpacing": 3,
+                    "weight": "bold",
+                    "align": "center"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "heading-title",
+              "name": "Heading Title",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  900,
+                  56
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "Everything you love about uGUI, for the web.",
+                    "size": 44,
+                    "color": "#eef0fa",
+                    "tag": "h2",
+                    "font": "fonts/Lato-Black.ttf",
+                    "align": "center",
+                    "lineHeight": 1.15
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "heading-sub",
+              "name": "Heading Sub",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  900,
+                  30
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "Six cards from <code>site.json</code>, through a Repeat, into a custom <code>Card</code> component.",
+                    "size": 18,
+                    "color": "#9aa0b8",
+                    "align": "center",
+                    "lineHeight": 1.5
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "",
+                    "hover": "",
+                    "rules": "& code { font-family: ui-monospace, monospace; font-size: .9em; color: #3ee6c4; background: #3ee6c414; padding: 1px 6px; border-radius: 6px; }"
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "grid",
+          "name": "Grid",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0
+            ],
+            "pos": [
+              0,
+              200
+            ],
+            "size": [
+              1200,
+              500
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Repeat",
+              "props": {
+                "source": "data/site.json",
+                "path": "features"
+              }
+            },
+            {
+              "type": "GridLayoutGroup",
+              "props": {
+                "cellSize": [
+                  384,
+                  236
+                ],
+                "spacing": [
+                  24,
+                  24
+                ],
+                "constraint": "fixedColumns",
+                "count": 3,
+                "childAlignment": "upper-center"
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "feature-card",
+              "name": "Feature Card",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  384,
+                  236
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "component:Card",
+                  "props": {
+                    "title": "{{item.title}}",
+                    "body": "{{item.body}}",
+                    "image": "{{item.icon}}"
+                  }
+                },
+                {
+                  "type": "Shadow",
+                  "props": {
+                    "color": "#00000066",
+                    "distance": [
+                      0,
+                      10
+                    ],
+                    "blur": 24
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "transition: transform .25s ease;",
+                    "hover": "transform: translateY(-6px);",
+                    "rules": ""
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gallery",
+      "name": "Gallery",
+      "active": true,
+      "rect": {
+        "anchorMin": [
+          0,
+          0
+        ],
+        "anchorMax": [
+          1,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "pos": [
+          0,
+          1920
+        ],
+        "size": [
+          0,
+          740
+        ],
+        "rotation": 0,
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "components": [],
+      "children": [
+        {
+          "id": "gallery-heading",
+          "name": "Gallery Heading",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0
+            ],
+            "anchorMax": [
+              0.5,
+              0
+            ],
+            "pivot": [
+              0.5,
+              0
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              900,
+              140
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "VerticalLayoutGroup",
+              "props": {
+                "spacing": 12,
+                "childAlignment": "upper-center"
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "gallery-heading-kicker",
+              "name": "Gallery Heading Kicker",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  900,
+                  20
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "ASSETS",
+                    "size": 13,
+                    "color": "#3ee6c4",
+                    "letterSpacing": 3,
+                    "weight": "bold",
+                    "align": "center"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "gallery-heading-title",
+              "name": "Gallery Heading Title",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  900,
+                  56
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "Images, video, audio, fonts and JSON.",
+                    "size": 44,
+                    "color": "#eef0fa",
+                    "tag": "h2",
+                    "font": "fonts/Lato-Black.ttf",
+                    "align": "center",
+                    "lineHeight": 1.15
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "gallery-heading-sub",
+              "name": "Gallery Heading Sub",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  900,
+                  30
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "Drag anything from the Project window onto a component. It is copied to <code>dist/assets/</code> on build.",
+                    "size": 18,
+                    "color": "#9aa0b8",
+                    "align": "center",
+                    "lineHeight": 1.5
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "",
+                    "hover": "",
+                    "rules": "& code { font-family: ui-monospace, monospace; font-size: .9em; color: #3ee6c4; background: #3ee6c414; padding: 1px 6px; border-radius: 6px; }"
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "gallery-mask",
+          "name": "Gallery Mask",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              0,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "pos": [
+              120,
+              190
+            ],
+            "size": [
+              664,
+              420
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Image",
+              "props": {
+                "color": "#151729",
+                "radius": 20
+              }
+            },
+            {
+              "type": "Mask",
+              "props": {}
+            },
+            {
+              "type": "ScrollRect",
+              "props": {
+                "vertical": true
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "scrollbar-width: thin; scrollbar-color: #ffffff30 transparent; border: 1px solid #ffffff10;",
+                "hover": "",
+                "rules": ""
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "gallery-grid",
+              "name": "Gallery Grid",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0,
+                  0
+                ],
+                "anchorMax": [
+                  1,
+                  0
+                ],
+                "pivot": [
+                  0.5,
+                  0
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  0,
+                  458
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "GridLayoutGroup",
+                  "props": {
+                    "cellSize": [
+                      200,
+                      134
+                    ],
+                    "spacing": [
+                      12,
+                      12
+                    ],
+                    "constraint": "fixedColumns",
+                    "count": 3,
+                    "padding": [
+                      16,
+                      16,
+                      16,
+                      16
+                    ]
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "id": "shot-1",
+                  "name": "Shot 1",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      200,
+                      134
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Image",
+                      "props": {
+                        "sprite": "img/gallery/shot-1.jpg",
+                        "fit": "cover",
+                        "radius": 12,
+                        "alt": "Gallery image 1"
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "transition: transform .3s, filter .3s;",
+                        "hover": "transform: scale(1.04); filter: brightness(1.15);",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                },
+                {
+                  "id": "shot-2",
+                  "name": "Shot 2",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      200,
+                      134
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Image",
+                      "props": {
+                        "sprite": "img/gallery/shot-2.jpg",
+                        "fit": "cover",
+                        "radius": 12,
+                        "alt": "Gallery image 2"
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "transition: transform .3s, filter .3s;",
+                        "hover": "transform: scale(1.04); filter: brightness(1.15);",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                },
+                {
+                  "id": "shot-3",
+                  "name": "Shot 3",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      200,
+                      134
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Image",
+                      "props": {
+                        "sprite": "img/gallery/shot-3.jpg",
+                        "fit": "cover",
+                        "radius": 12,
+                        "alt": "Gallery image 3"
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "transition: transform .3s, filter .3s;",
+                        "hover": "transform: scale(1.04); filter: brightness(1.15);",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                },
+                {
+                  "id": "shot-4",
+                  "name": "Shot 4",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      200,
+                      134
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Image",
+                      "props": {
+                        "sprite": "img/gallery/shot-4.jpg",
+                        "fit": "cover",
+                        "radius": 12,
+                        "alt": "Gallery image 4"
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "transition: transform .3s, filter .3s;",
+                        "hover": "transform: scale(1.04); filter: brightness(1.15);",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                },
+                {
+                  "id": "shot-5",
+                  "name": "Shot 5",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      200,
+                      134
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Image",
+                      "props": {
+                        "sprite": "img/gallery/shot-5.jpg",
+                        "fit": "cover",
+                        "radius": 12,
+                        "alt": "Gallery image 5"
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "transition: transform .3s, filter .3s;",
+                        "hover": "transform: scale(1.04); filter: brightness(1.15);",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                },
+                {
+                  "id": "shot-6",
+                  "name": "Shot 6",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      200,
+                      134
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Image",
+                      "props": {
+                        "sprite": "img/gallery/shot-6.jpg",
+                        "fit": "cover",
+                        "radius": 12,
+                        "alt": "Gallery image 6"
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "transition: transform .3s, filter .3s;",
+                        "hover": "transform: scale(1.04); filter: brightness(1.15);",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                },
+                {
+                  "id": "shot-7",
+                  "name": "Shot 7",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      200,
+                      134
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Image",
+                      "props": {
+                        "sprite": "img/gallery/shot-7.jpg",
+                        "fit": "cover",
+                        "radius": 12,
+                        "alt": "Gallery image 7"
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "transition: transform .3s, filter .3s;",
+                        "hover": "transform: scale(1.04); filter: brightness(1.15);",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                },
+                {
+                  "id": "shot-8",
+                  "name": "Shot 8",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      200,
+                      134
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Image",
+                      "props": {
+                        "sprite": "img/gallery/shot-8.jpg",
+                        "fit": "cover",
+                        "radius": 12,
+                        "alt": "Gallery image 8"
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "transition: transform .3s, filter .3s;",
+                        "hover": "transform: scale(1.04); filter: brightness(1.15);",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "media-column",
+          "name": "Media Column",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              1,
+              0
+            ],
+            "anchorMax": [
+              1,
+              0
+            ],
+            "pivot": [
+              1,
+              0
+            ],
+            "pos": [
+              -120,
+              190
+            ],
+            "size": [
+              500,
+              420
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "VerticalLayoutGroup",
+              "props": {
+                "spacing": 16,
+                "controlWidth": true,
+                "expandWidth": true
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "video-frame",
+              "name": "Video Frame",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  500,
+                  282
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Image",
+                  "props": {
+                    "color": "#000000",
+                    "radius": 20
+                  }
+                },
+                {
+                  "type": "Mask",
+                  "props": {}
+                },
+                {
+                  "type": "Shadow",
+                  "props": {
+                    "color": "#00000088",
+                    "distance": [
+                      0,
+                      14
+                    ],
+                    "blur": 30
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "id": "flow-video",
+                  "name": "Flow Video",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0,
+                      0
+                    ],
+                    "anchorMax": [
+                      1,
+                      1
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      0,
+                      0
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Video",
+                      "props": {
+                        "src": "media/flow.mp4"
+                      }
+                    }
+                  ],
+                  "children": []
+                },
+                {
+                  "id": "video-label",
+                  "name": "Video Label",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0,
+                      1
+                    ],
+                    "anchorMax": [
+                      0,
+                      1
+                    ],
+                    "pivot": [
+                      0,
+                      1
+                    ],
+                    "pos": [
+                      14,
+                      -14
+                    ],
+                    "size": [
+                      200,
+                      28
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Text",
+                      "props": {
+                        "text": "flow.mp4 · Video component",
+                        "size": 13,
+                        "color": "#eef0fa",
+                        "valign": "middle",
+                        "align": "center",
+                        "wrap": false
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "background: #0b0c16aa; border-radius: 8px; backdrop-filter: blur(6px); padding: 0 12px;",
+                        "hover": "",
+                        "rules": ""
+                      }
+                    },
+                    {
+                      "type": "ContentSizeFitter",
+                      "props": {
+                        "horizontal": "preferred"
+                      }
+                    }
+                  ],
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "audio-row",
+              "name": "Audio Row",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  500,
+                  54
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "HorizontalLayoutGroup",
+                  "props": {
+                    "spacing": 12,
+                    "childAlignment": "middle-left"
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "id": "chime-button",
+                  "name": "Chime Button",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      140,
+                      52
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Button",
+                      "props": {
+                        "normal": "#7c5cff",
+                        "highlighted": "#8f73ff",
+                        "pressed": "#6a4be6",
+                        "onClick": [
+                          {
+                            "target": "chime",
+                            "call": "Media.toggle",
+                            "arg": ""
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "Text",
+                      "props": {
+                        "text": "Play chime",
+                        "size": 16,
+                        "color": "#ffffff",
+                        "align": "center",
+                        "valign": "middle",
+                        "weight": "bold",
+                        "wrap": false
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "border-radius: 14px;",
+                        "hover": "",
+                        "rules": ""
+                      }
+                    },
+                    {
+                      "type": "Shadow",
+                      "props": {
+                        "color": "#7c5cff66",
+                        "distance": [
+                          0,
+                          8
+                        ],
+                        "blur": 22
+                      }
+                    }
+                  ],
+                  "children": []
+                },
+                {
+                  "id": "chime",
+                  "name": "Chime",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0.5,
+                      0.5
+                    ],
+                    "anchorMax": [
+                      0.5,
+                      0.5
+                    ],
+                    "pivot": [
+                      0.5,
+                      0.5
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      340,
+                      48
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Audio",
+                      "props": {
+                        "src": "media/chime.mp3",
+                        "controls": true
+                      }
+                    },
+                    {
+                      "type": "Style",
+                      "props": {
+                        "css": "color-scheme: dark;",
+                        "hover": "",
+                        "rules": ""
+                      }
+                    }
+                  ],
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "media-note",
+              "name": "Media Note",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  500,
+                  48
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "The button calls <code>Media.toggle</code> on the Audio component, the same UnityEvent list every Button has.",
+                    "size": 15,
+                    "color": "#9aa0b8",
+                    "lineHeight": 1.5
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "",
+                    "hover": "",
+                    "rules": "& code { font-family: ui-monospace, monospace; font-size: .9em; color: #3ee6c4; background: #3ee6c414; padding: 1px 6px; border-radius: 6px; }"
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "components",
+      "name": "Components",
+      "active": true,
+      "rect": {
+        "anchorMin": [
+          0,
+          0
+        ],
+        "anchorMax": [
+          1,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "pos": [
+          0,
+          2620
+        ],
+        "size": [
+          0,
+          540
+        ],
+        "rotation": 0,
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "components": [],
+      "children": [
+        {
+          "id": "comp-column",
+          "name": "Comp Column",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0,
+              0
+            ],
+            "anchorMax": [
+              0,
+              0
+            ],
+            "pivot": [
+              0,
+              0
+            ],
+            "pos": [
+              120,
+              0
+            ],
+            "size": [
+              600,
+              540
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "VerticalLayoutGroup",
+              "props": {
+                "spacing": 18
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "comp-kicker",
+              "name": "Comp Kicker",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  600,
+                  20
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "COMPONENTS & BEHAVIOURS",
+                    "size": 13,
+                    "color": "#3ee6c4",
+                    "letterSpacing": 3,
+                    "weight": "bold",
+                    "align": "left"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "comp-title",
+              "name": "Comp Title",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  600,
+                  96
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "Write your own in HTML, CSS and JS.",
+                    "size": 40,
+                    "color": "#eef0fa",
+                    "tag": "h2",
+                    "font": "fonts/Lato-Black.ttf",
+                    "lineHeight": 1.15
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "comp-body",
+              "name": "Comp Body",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  600,
+                  80
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "This counter is <code>components/Counter.html</code>: a template, a style and a script, compiled to a native custom element. The ring up top runs this behaviour:",
+                    "size": 17,
+                    "color": "#9aa0b8",
+                    "lineHeight": 1.55
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "",
+                    "hover": "",
+                    "rules": "& code { font-family: ui-monospace, monospace; font-size: .9em; color: #3ee6c4; background: #3ee6c414; padding: 1px 6px; border-radius: 6px; }"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "counter",
+              "name": "Counter",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  260,
+                  58
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "component:Counter",
+                  "props": {
+                    "label": "Clicks",
+                    "start": 0,
+                    "step": 1
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "spin-source",
+              "name": "Spin Source",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  600,
+                  190
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "HTML",
+                  "props": {
+                    "html": "<pre><code><span class=\"k\">export default class</span> Spin {\n  update(dt) {\n    <span class=\"k\">this</span>.node.rect.rotation += <span class=\"k\">this</span>.props.speed * dt;\n    <span class=\"k\">this</span>.apply();\n  }\n  spinFaster() { <span class=\"k\">this</span>.props.speed *= 2; }\n}</code></pre>"
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "",
+                    "hover": "",
+                    "rules": "& pre { margin: 0; padding: 18px 22px; border-radius: 16px; background: #151729; border: 1px solid #ffffff10; color: #eef0fa; font: 14px/1.6 ui-monospace, monospace; overflow: auto; }\n& .k { color: #ff5c8a; }"
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "posts",
+          "name": "Posts",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              1,
+              0
+            ],
+            "anchorMax": [
+              1,
+              0
+            ],
+            "pivot": [
+              1,
+              0
+            ],
+            "pos": [
+              -120,
+              0
+            ],
+            "size": [
+              500,
+              460
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Image",
+              "props": {
+                "color": "#151729",
+                "radius": 20
+              }
+            },
+            {
+              "type": "Mask",
+              "props": {}
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "border: 1px solid #ffffff10;",
+                "hover": "",
+                "rules": ""
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "posts-title",
+              "name": "Posts Title",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0,
+                  0
+                ],
+                "anchorMax": [
+                  0,
+                  0
+                ],
+                "pivot": [
+                  0,
+                  0
+                ],
+                "pos": [
+                  26,
+                  18
+                ],
+                "size": [
+                  300,
+                  32
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "From the blog",
+                    "size": 20,
+                    "color": "#eef0fa",
+                    "font": "fonts/Lato-Black.ttf",
+                    "valign": "middle"
+                  }
+                }
+              ],
+              "children": []
+            },
+            {
+              "id": "posts-scroll",
+              "name": "Posts Scroll",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0,
+                  0
+                ],
+                "anchorMax": [
+                  1,
+                  1
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  32
+                ],
+                "size": [
+                  0,
+                  -64
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "ScrollRect",
+                  "props": {
+                    "vertical": true
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "scrollbar-width: thin; scrollbar-color: #ffffff30 transparent;",
+                    "hover": "",
+                    "rules": ""
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "id": "posts-list",
+                  "name": "Posts List",
+                  "active": true,
+                  "rect": {
+                    "anchorMin": [
+                      0,
+                      0
+                    ],
+                    "anchorMax": [
+                      1,
+                      0
+                    ],
+                    "pivot": [
+                      0.5,
+                      0
+                    ],
+                    "pos": [
+                      0,
+                      0
+                    ],
+                    "size": [
+                      0,
+                      560
+                    ],
+                    "rotation": 0,
+                    "scale": [
+                      1,
+                      1
+                    ]
+                  },
+                  "components": [
+                    {
+                      "type": "Repeat",
+                      "props": {
+                        "source": "data/site.json",
+                        "path": "posts"
+                      }
+                    },
+                    {
+                      "type": "VerticalLayoutGroup",
+                      "props": {
+                        "padding": [
+                          20,
+                          20,
+                          0,
+                          40
+                        ],
+                        "spacing": 12,
+                        "controlWidth": true,
+                        "expandWidth": true
+                      }
+                    }
+                  ],
+                  "children": [
+                    {
+                      "id": "post",
+                      "name": "Post",
+                      "active": true,
+                      "rect": {
+                        "anchorMin": [
+                          0.5,
+                          0.5
+                        ],
+                        "anchorMax": [
+                          0.5,
+                          0.5
+                        ],
+                        "pivot": [
+                          0.5,
+                          0.5
+                        ],
+                        "pos": [
+                          0,
+                          0
+                        ],
+                        "size": [
+                          0,
+                          92
+                        ],
+                        "rotation": 0,
+                        "scale": [
+                          1,
+                          1
+                        ]
+                      },
+                      "components": [
+                        {
+                          "type": "Image",
+                          "props": {
+                            "color": "#1b1e33",
+                            "radius": 14
+                          }
+                        },
+                        {
+                          "type": "VerticalLayoutGroup",
+                          "props": {
+                            "padding": [
+                              18,
+                              18,
+                              14,
+                              14
+                            ],
+                            "spacing": 4,
+                            "controlWidth": true,
+                            "expandWidth": true
+                          }
+                        },
+                        {
+                          "type": "Style",
+                          "props": {
+                            "css": "transition: background-color .2s; cursor: default;",
+                            "hover": "background-color: #23274a;",
+                            "rules": ""
+                          }
+                        }
+                      ],
+                      "children": [
+                        {
+                          "id": "post-date",
+                          "name": "Post Date",
+                          "active": true,
+                          "rect": {
+                            "anchorMin": [
+                              0.5,
+                              0.5
+                            ],
+                            "anchorMax": [
+                              0.5,
+                              0.5
+                            ],
+                            "pivot": [
+                              0.5,
+                              0.5
+                            ],
+                            "pos": [
+                              0,
+                              0
+                            ],
+                            "size": [
+                              0,
+                              16
+                            ],
+                            "rotation": 0,
+                            "scale": [
+                              1,
+                              1
+                            ]
+                          },
+                          "components": [
+                            {
+                              "type": "Text",
+                              "props": {
+                                "text": "{{item.date}}",
+                                "size": 12,
+                                "color": "#3ee6c4",
+                                "letterSpacing": 1,
+                                "weight": "bold"
+                              }
+                            }
+                          ],
+                          "children": []
+                        },
+                        {
+                          "id": "post-title",
+                          "name": "Post Title",
+                          "active": true,
+                          "rect": {
+                            "anchorMin": [
+                              0.5,
+                              0.5
+                            ],
+                            "anchorMax": [
+                              0.5,
+                              0.5
+                            ],
+                            "pivot": [
+                              0.5,
+                              0.5
+                            ],
+                            "pos": [
+                              0,
+                              0
+                            ],
+                            "size": [
+                              0,
+                              22
+                            ],
+                            "rotation": 0,
+                            "scale": [
+                              1,
+                              1
+                            ]
+                          },
+                          "components": [
+                            {
+                              "type": "Text",
+                              "props": {
+                                "text": "{{item.title}}",
+                                "size": 17,
+                                "color": "#eef0fa",
+                                "weight": "bold"
+                              }
+                            }
+                          ],
+                          "children": []
+                        },
+                        {
+                          "id": "post-summary",
+                          "name": "Post Summary",
+                          "active": true,
+                          "rect": {
+                            "anchorMin": [
+                              0.5,
+                              0.5
+                            ],
+                            "anchorMax": [
+                              0.5,
+                              0.5
+                            ],
+                            "pivot": [
+                              0.5,
+                              0.5
+                            ],
+                            "pos": [
+                              0,
+                              0
+                            ],
+                            "size": [
+                              0,
+                              20
+                            ],
+                            "rotation": 0,
+                            "scale": [
+                              1,
+                              1
+                            ]
+                          },
+                          "components": [
+                            {
+                              "type": "Text",
+                              "props": {
+                                "text": "{{item.summary}}",
+                                "size": 14,
+                                "color": "#9aa0b8",
+                                "wrap": false
+                              }
+                            },
+                            {
+                              "type": "Style",
+                              "props": {
+                                "css": "overflow: hidden; text-overflow: ellipsis;",
+                                "hover": "",
+                                "rules": ""
+                              }
+                            }
+                          ],
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "posts-fade",
+              "name": "Posts Fade",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0,
+                  1
+                ],
+                "anchorMax": [
+                  1,
+                  1
+                ],
+                "pivot": [
+                  0.5,
+                  1
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  0,
+                  60
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "background: linear-gradient(transparent, #151729); pointer-events: none;",
+                    "hover": "",
+                    "rules": ""
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "footer",
+      "name": "Footer",
+      "active": true,
+      "rect": {
+        "anchorMin": [
+          0,
+          0
+        ],
+        "anchorMax": [
+          1,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "pos": [
+          0,
+          3220
+        ],
+        "size": [
+          0,
+          140
+        ],
+        "rotation": 0,
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "type": "Style",
+          "props": {
+            "css": "border-top: 1px solid #ffffff10;",
+            "hover": "",
+            "rules": ""
+          }
+        }
+      ],
+      "children": [
+        {
+          "id": "footer-logo",
+          "name": "Footer Logo",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0,
+              0.5
+            ],
+            "anchorMax": [
+              0,
+              0.5
+            ],
+            "pivot": [
+              0,
+              0.5
+            ],
+            "pos": [
+              120,
+              0
+            ],
+            "size": [
+              28,
+              28
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Image",
+              "props": {
+                "sprite": "img/logo.svg"
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "footer-text",
+          "name": "Footer Text",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0,
+              0.5
+            ],
+            "anchorMax": [
+              0,
+              0.5
+            ],
+            "pivot": [
+              0,
+              0.5
+            ],
+            "pos": [
+              164,
+              0
+            ],
+            "size": [
+              720,
+              24
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Text",
+              "props": {
+                "text": "Built with graphicmismatch's perfect site builder. This page is <code>example/pages/index.json</code>.",
+                "size": 14,
+                "color": "#9aa0b8",
+                "valign": "middle",
+                "wrap": false
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "",
+                "hover": "",
+                "rules": "& code { font-family: ui-monospace, monospace; font-size: .9em; color: #3ee6c4; background: #3ee6c414; padding: 1px 6px; border-radius: 6px; }"
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "footer-credit",
+          "name": "Footer Credit",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              1,
+              0.5
+            ],
+            "anchorMax": [
+              1,
+              0.5
+            ],
+            "pivot": [
+              1,
+              0.5
+            ],
+            "pos": [
+              -120,
+              0
+            ],
+            "size": [
+              360,
+              24
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "HTML",
+              "props": {
+                "html": "<span>Made with <svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\"><path fill=\"#ff5c8a\" d=\"M12 21s-8-5.3-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.7-8 11-8 11z\"/></svg> by <b>graphicmismatch</b> · MIT</span>"
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "display: flex; align-items: center; justify-content: flex-end;",
+                "hover": "",
+                "rules": "& span { font-size: 14px; color: #9aa0b8; display: inline-flex; gap: 6px; align-items: center; }\n& b { color: #eef0fa; }"
+              }
+            }
+          ],
+          "children": []
+        }
+      ]
+    }
+  ]
+}

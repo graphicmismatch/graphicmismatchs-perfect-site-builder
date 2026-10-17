@@ -13,21 +13,29 @@ body {
   background: var(--bg); color: var(--text); font: var(--font); overflow: hidden; user-select: none;
   display: grid;
   grid-template-columns: var(--left-w) 4px 1fr 4px var(--right-w);
-  grid-template-rows: 34px 1fr 4px var(--bottom-h) 22px;
+  grid-template-rows: 56px 1fr 4px var(--bottom-h) 22px;
 }
 #toolbar { grid-column: 1 / -1; grid-row: 1; background: var(--header); border-bottom: 1px solid var(--border); }
 #area-left { grid-column: 1; grid-row: 2; }
 #area-center { grid-column: 3; grid-row: 2; }
 #area-right { grid-column: 5; grid-row: 2 / 5; }
 #area-bottom { grid-column: 1 / 4; grid-row: 4; }
-#status { grid-column: 1 / -1; grid-row: 5; background: var(--header); border-top: 1px solid var(--border); padding: 0 8px; line-height: 22px; color: var(--text-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#status { grid-column: 1 / -1; grid-row: 5; background: var(--header); border-top: 1px solid var(--border); padding: 0 8px; line-height: 21px; color: var(--text-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: default; }
+#status.warn { color: var(--warn); } #status.error { color: #ff7b7b; }
+#status.warn::before, #status.error::before, #status.info::before { display: inline-block; width: 14px; height: 14px; line-height: 14px; border-radius: 50%; text-align: center; font-size: 10px; font-weight: bold; margin-right: 6px; vertical-align: -2px; color: #222; }
+#status.info::before { content: 'i'; background: #bbb; } #status.warn::before { content: '!'; background: var(--warn); border-radius: 2px; } #status.error::before { content: '!'; background: #e05555; color: #fff; }
+body.playing #status { background: #2e4a66; }
 .area { background: var(--panel); display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .panel { flex: 1; min-height: 0; overflow: auto; position: relative; }
 .panel[hidden] { display: none; }
-.tabs { display: flex; background: var(--bg); flex: none; height: 24px; }
-.tabs button { background: none; border: 0; color: var(--text-dim); font: inherit; padding: 0 12px; border-top: 2px solid transparent; cursor: default; }
+.tabs { display: flex; background: var(--bg); flex: none; height: 24px; padding: 2px 0 0 2px; gap: 1px; }
+.tabs button { background: #232323; border: 0; color: var(--text-dim); font: inherit; padding: 0 12px; border-top: 2px solid transparent; border-radius: 3px 3px 0 0; cursor: default; white-space: nowrap; }
+.tabs button:hover:not(.on) { background: #2c2c2c; color: var(--text); }
 .tabs button.on { background: var(--panel); color: var(--text); border-top-color: var(--accent-hi); }
-.split { background: var(--border); }
+.split { background: var(--border); transition: background .1s; }
+.split:hover, .split.drag { background: var(--accent-hi); }
+body.resizing-v, body.resizing-v * { cursor: col-resize !important; } body.resizing-h, body.resizing-h * { cursor: row-resize !important; }
+body.resizing-v iframe, body.resizing-h iframe { pointer-events: none; }
 .split.v { grid-row: 2; cursor: col-resize; }
 .split.v[data-var="--left-w"] { grid-column: 2; }
 .split.v[data-var="--right-w"] { grid-column: 4; }
@@ -41,8 +49,15 @@ input, textarea { user-select: text; }
 .btn.on { background: var(--accent); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: #4a4a4a; border-radius: 5px; border: 2px solid var(--panel); }
-::-webkit-scrollbar-track { background: transparent; }
-.menu { position: fixed; z-index: 1000; background: #2b2b2b; border: 1px solid #111; box-shadow: 0 4px 16px #0008; padding: 4px 0; min-width: 180px; }
-.menu > div { padding: 3px 20px; white-space: nowrap; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+.menu { position: fixed; z-index: 1000; background: #2b2b2b; border: 1px solid #111; box-shadow: 0 4px 16px #0008; padding: 4px 0; min-width: 180px; max-height: calc(100vh - 8px); overflow-y: auto; border-radius: 2px; }
+.menu > div { padding: 3px 20px; white-space: nowrap; display: flex; align-items: center; position: relative; }
 .menu > div:hover { background: var(--accent); }
+.menu > div.off { color: #6d6d6d; }
+.menu > div.off:hover { background: none; }
+.menu > div > i { position: absolute; left: 6px; font-style: normal; font-size: 11px; }
+.menu > div > span { flex: 1; }
+.menu > div > kbd { font: inherit; color: var(--text-dim); margin-left: 24px; }
+.menu > div:hover > kbd { color: var(--text); }
+.menu > div.sub::after { content: '▸'; margin-left: 16px; color: var(--text-dim); }
 .menu > hr { border: 0; border-top: 1px solid #444; margin: 4px 0; }

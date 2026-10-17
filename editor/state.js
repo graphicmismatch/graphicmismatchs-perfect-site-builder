@@ -30,8 +30,8 @@ export function log(msg, level = 'info', extra = {}) { emit('log', { msg: String
 
 // ---------- lookups ----------
 export const root = () => S.P?.pages[S.page];
-export const node = id => findNode(root(), id)?.node ?? null;
-export const parentOf = id => findNode(root(), id)?.parent ?? null;
+export const node = id => (root() && id ? findNode(root(), id)?.node ?? null : null);
+export const parentOf = id => (root() && id ? findNode(root(), id)?.parent ?? null : null);
 export const selected = () => S.selection.map(node).filter(Boolean);
 export const active = () => node(S.selection.at(-1));
 export const def = type => componentDef(type, S.P?.components, S.behaviourMeta);
@@ -74,7 +74,7 @@ export function edit(label, fn, { kind = 'structure', ids = [], merge = false, f
 // Central property setter (Inspector, Scene gizmos, ...). Record mode may intercept it.
 export function setProp(id, path, value, opts = {}) {
   if (S.hooks.setProp?.(id, path, value)) return;
-  edit(`Set ${path} ${id}`, () => setPath(node(id), path, value), { kind: 'props', ids: [id], merge: true, ...opts });
+  edit(opts.label ?? `Set ${path} ${id}`, () => setPath(node(id), path, value), { kind: 'props', ids: [id], merge: true, ...opts });
 }
 
 // ---------- selection / tools ----------

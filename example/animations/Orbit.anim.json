@@ -1,0 +1,63 @@
+{
+  "name": "Orbit",
+  "length": 6,
+  "loop": true,
+  "fps": 60,
+  "tracks": [
+    {
+      "path": "",
+      "prop": "rect.rotation",
+      "keys": [
+        {
+          "t": 0,
+          "v": 0
+        },
+        {
+          "t": 6,
+          "v": 360
+        }
+      ]
+    },
+    {
+      "path": "",
+      "prop": "rect.pivot.y",
+      "keys": [
+        {
+          "t": 0,
+          "v": 13,
+          "ease": "ease-in-out"
+        },
+        {
+          "t": 3,
+          "v": 10,
+          "ease": "ease-in-out"
+        },
+        {
+          "t": 6,
+          "v": 13
+        }
+      ]
+    },
+    {
+      "path": "",
+      "prop": "Image.color",
+      "keys": [
+        {
+          "t": 0,
+          "v": "#3ee6c4",
+          "ease": "ease-in-out"
+        },
+        {
+          "t": 3,
+          "v": "#ff5c8a",
+          "ease": "ease-in-out"
+        },
+        {
+          "t": 6,
+          "v": "#3ee6c4"
+        }
+      ]
+    }
+  ],
+  "events": []
+}

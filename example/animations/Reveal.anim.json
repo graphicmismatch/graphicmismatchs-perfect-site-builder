@@ -1,0 +1,91 @@
+{
+  "name": "Reveal",
+  "length": 1.2,
+  "loop": false,
+  "fps": 60,
+  "tracks": [
+    {
+      "path": "",
+      "prop": "CanvasGroup.alpha",
+      "keys": [
+        {
+          "t": 0,
+          "v": 0,
+          "ease": "ease-out"
+        },
+        {
+          "t": 0.6,
+          "v": 1
+        }
+      ]
+    },
+    {
+      "path": "Heading",
+      "prop": "rect.pos",
+      "keys": [
+        {
+          "t": 0,
+          "v": [
+            0,
+            40
+          ],
+          "ease": [
+            0.16,
+            1,
+            0.3,
+            1
+          ]
+        },
+        {
+          "t": 0.8,
+          "v": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Grid",
+      "prop": "rect.pos",
+      "keys": [
+        {
+          "t": 0,
+          "v": [
+            0,
+            280
+          ],
+          "ease": [
+            0.16,
+            1,
+            0.3,
+            1
+          ]
+        },
+        {
+          "t": 1.2,
+          "v": [
+            0,
+            200
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Heading/Heading Title",
+      "prop": "Text.color",
+      "keys": [
+        {
+          "t": 0,
+          "v": "#7c5cff",
+          "ease": "ease-in-out"
+        },
+        {
+          "t": 1.2,
+          "v": "#eef0fa"
+        }
+      ]
+    }
+  ],
+  "events": []
+}

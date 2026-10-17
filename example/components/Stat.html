@@ -1,0 +1,39 @@
+<template>
+  <div class="stat"><b>0</b><span>{{label}}</span></div>
+</template>
+<style>
+  .stat { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  b { font-size: 56px; line-height: 1; font-weight: 900; background: linear-gradient(90deg, #7c5cff, #3ee6c4); -webkit-background-clip: text; background-clip: text; color: transparent; font-variant-numeric: tabular-nums; }
+  span { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: #9aa0b8; }
+</style>
+<script type="application/json" props>
+{
+  "value": { "type": "number", "default": 100 },
+  "suffix": { "type": "string", "default": "" },
+  "label": { "type": "string", "default": "Label" },
+  "duration": { "type": "number", "default": 1.4, "help": "count-up seconds" }
+}
+</script>
+<script>
+import { Component } from '../psb/component.js';
+
+// Counts up to `value` the first time it scrolls into view.
+export default class Stat extends Component {
+  connected() {
+    this.io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { this.io.disconnect(); this.countUp(); } });
+    this.io.observe(this);
+  }
+  disconnected() { this.io?.disconnect(); }
+  rendered() { this.set(this.done ? this.props.value : 0); }
+  set(v) { this.$('b').textContent = Math.round(v) + this.props.suffix; }
+  countUp() {
+    const t0 = performance.now(), { value, duration } = this.props;
+    const step = now => {
+      const u = Math.min(1, (now - t0) / 1000 / duration);
+      this.set(value * (1 - (1 - u) ** 3));
+      if (u < 1) requestAnimationFrame(step); else this.done = true;
+    };
+    requestAnimationFrame(step);
+  }
+}
+</script>

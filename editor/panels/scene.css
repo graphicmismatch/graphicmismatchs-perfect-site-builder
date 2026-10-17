@@ -1,1 +1,40 @@
-/* scene */
+/* scene / game view */
+.panel[data-panel="scene"] { display: flex; flex-direction: column; overflow: hidden; }
+.sc-bar { flex: none; display: flex; align-items: center; gap: 4px; height: 26px; padding: 0 6px; background: var(--header); border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; }
+.sc-bar > span { display: inline-flex; align-items: center; gap: 4px; }
+.sc-bar > span[hidden] { display: none; }
+.sc-bar input[type="number"] { width: 56px; }
+.sc-bar .sc-inc { width: 48px; }
+.sc-bar .sc-scale { width: 110px; }
+.sc-bar output { min-width: 30px; color: var(--text-dim); }
+.sc[data-mode="scene"] .sc-game, .sc[data-mode="game"] .sc-scene { display: none; }
+.sc-view { flex: 1; min-height: 0; position: relative; overflow: hidden; background-color: #474747; outline: none; }
+.sc[data-mode="game"] .sc-view { overflow: auto; background-color: #1e1e1e; }
+.sc-sizer { position: absolute; left: 0; top: 0; }
+.sc-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.sc-world iframe { position: absolute; left: 0; top: 0; border: 0; background: #fff; color-scheme: light; visibility: hidden; pointer-events: none; box-shadow: 0 0 0 1px #0006; }
+.sc-world iframe.on { visibility: visible; }
+.sc[data-mode="game"] .sc-world iframe.on { pointer-events: auto; box-shadow: none; }
+.sc-ov { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.sc[data-mode="game"] .sc-ov { display: none; }
+.sc-ov * { vector-effect: non-scaling-stroke; }
+.sc-ov .cv { fill: none; stroke: #ffffff70; stroke-width: 1; }
+.sc-ov .fold { stroke: #ffffff50; stroke-dasharray: 6 4; }
+.sc-ov .hov { fill: none; stroke: #8cc4ffa0; stroke-width: 1; }
+.sc-ov .sel { fill: none; stroke: #4aa3ff; stroke-width: 1.5; }
+.sc-ov .par { fill: none; stroke: #ffffffa0; stroke-dasharray: 4 3; }
+.sc-ov .arect { fill: none; stroke: #ffffffb0; stroke-dasharray: 3 3; }
+.sc-ov .anc { fill: #fff; stroke: #222; stroke-width: 1; }
+.sc-ov .piv { fill: none; stroke: #4aa3ff; stroke-width: 2.5; }
+.sc-ov .hnd { fill: #4aa3ff; stroke: #fff; stroke-width: 1; }
+.sc-ov .ax { stroke: #e2433a; stroke-width: 2.5; } .sc-ov .axf { fill: #e2433a; }
+.sc-ov .ay { stroke: #86d03c; stroke-width: 2.5; } .sc-ov .ayf { fill: #86d03c; }
+.sc-ov .mc { fill: #4aa3ff60; stroke: #4aa3ff; }
+.sc-ov .scc { fill: #c8c8c8; stroke: #333; }
+.sc-ov .ring { fill: none; stroke: #3d7ff0; stroke-width: 2.5; }
+.sc-ov .marq { fill: #4aa3ff22; stroke: #4aa3ff; }
+.sc-ov .hot { stroke: #ffe14d; }
+.sc-ov .hot.anc, .sc-ov .hot.hnd, .sc-ov .hot.axf, .sc-ov .hot.ayf, .sc-ov .hot.scc, .sc-ov .hot.mc { fill: #ffe14d; }
+/* play mode tint (Unity tints the editor chrome, not the game) */
+.sc.playing .tabs, .sc.playing .sc-bar { box-shadow: inset 0 0 0 999px #ff50281c; }
+.sc.playing .sc-view { background-color: #2a2220; }

@@ -1,0 +1,170 @@
+// End-to-end: build example/, serve it, drive headless Chrome over CDP; then the editor.
+//   node test/e2e.js        exit 0 only if every assertion passes
+import { spawn, spawnSync } from 'node:child_process';
+import http from 'node:http';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const DIST = path.join(ROOT, '.tmp/e2e-dist'), SITE_PORT = 4208, EDITOR_PORT = 4209;
+const site = JSON.parse(fs.readFileSync(path.join(ROOT, 'example/assets/data/site.json'), 'utf8'));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const MIME = { html: 'text/html', css: 'text/css', js: 'text/javascript', json: 'application/json', svg: 'image/svg+xml', png: 'image/png',
+  jpg: 'image/jpeg', mp4: 'video/mp4', mp3: 'audio/mpeg', ttf: 'font/ttf' };
+
+let failed = 0;
+const check = (name, ok, info = '') => { if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && info ? `  (${info})` : ''}`); };
+
+const cleanups = [];
+async function main() {
+  // ---- build + static server ----
+  const b = spawnSync(process.execPath, ['cli.js', 'build', 'example', '--out', DIST], { cwd: ROOT, encoding: 'utf8' });
+  check('build succeeds', b.status === 0, (b.stderr || b.stdout).trim());
+  const server = http.createServer((req, res) => {
+    const f = path.join(DIST, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+    if (!f.startsWith(DIST + path.sep) || !fs.existsSync(f) || !fs.statSync(f).isFile()) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { 'content-type': MIME[path.extname(f).slice(1)] ?? 'application/octet-stream' });
+    fs.createReadStream(f).pipe(res);
+  });
+  await new Promise(r => server.listen(SITE_PORT, '127.0.0.1', r));
+  cleanups.push(() => server.close());
+
+  const page = await chrome();
+  const id = name => page.eval(`PSB.find(${JSON.stringify(name)})?.id`);
+  const style = (name, prop) => page.eval(`getComputedStyle(PSB.el(PSB.find(${JSON.stringify(name)}).id))[${JSON.stringify(prop)}]`);
+
+  // ---- built site: index ----
+  await page.open(`http://127.0.0.1:${SITE_PORT}/index.html`);
+  const ready = await page.until(`window.PSB?.behaviour && PSB.behaviour(PSB.find('Ring')?.id, 'Spin')`);
+  check('index: runtime + behaviours boot', !!ready);
+  check('index: Repeat renders one Card per site.json feature', await page.eval(`PSB.els(PSB.find('Feature Card').id).length`) === site.features.length);
+  check('index: Repeat renders one Post per site.json post', await page.eval(`PSB.els(PSB.find('Post').id).length`) === site.posts.length);
+  check('index: {{data/site.json:...}} binding resolved', (await page.eval(`PSB.el(PSB.find('Eyebrow').id).textContent`)) === site.hero.eyebrow);
+  const card = await page.eval(`(() => { const c = document.querySelector('psb-card'); return c?.shadowRoot ? { h3: c.shadowRoot.querySelector('h3')?.textContent, img: c.shadowRoot.querySelector('img')?.getAttribute('src') } : null; })()`);
+  check('index: custom element has a populated shadowRoot', card?.h3 === site.features[0].title && card?.img?.endsWith(site.features[0].icon), JSON.stringify(card));
+
+  const ring1 = await style('Ring', 'transform'), orb1 = await style('Orbiter', 'transform');
+  await sleep(700);
+  const ring2 = await style('Ring', 'transform'), orb2 = await style('Orbiter', 'transform');
+  check('index: behaviour (Spin) changes the Ring over time', ring1 !== ring2 && ring2 !== 'none', `${ring1} -> ${ring2}`);
+  check('index: Animator (Orbit clip) changes computed style over time', orb1 !== orb2, `${orb1} -> ${orb2}`);
+  const sprites = new Set();
+  for (let i = 0; i < 6; i++) { sprites.add(await style('Chomper', 'backgroundImage')); await sleep(70); }
+  check('index: sprite swap animation changes Image.sprite', sprites.size > 1, `${sprites.size} distinct`);
+
+  const typed = await page.eval(`(() => { const e = PSB.el(PSB.find('Subtitle').id); return e.querySelector('.caret') ? e.textContent : null; })()`);
+  check('index: Typewriter (started by a clip event) typed the subtitle', typed?.startsWith(site.hero.subtitle.slice(0, 20)), typed);
+
+  const speed0 = await page.eval(`PSB.behaviour(PSB.find('Ring').id, 'Spin').props.speed`);
+  await page.eval(`PSB.el(PSB.find('Spin Button').id).click()`);
+  check('index: Button.onClick calls a behaviour method', await page.eval(`PSB.behaviour(PSB.find('Ring').id, 'Spin').props.speed`) === speed0 * 2);
+  const panelId = await id('Inspector Panel');
+  const shown0 = await page.eval(`getComputedStyle(PSB.el('${panelId}')).display`);
+  await page.eval(`PSB.el(PSB.find('Panel Button').id).click()`);
+  await sleep(100);
+  const shown1 = await page.eval(`getComputedStyle(PSB.el('${panelId}')).display`);
+  check('index: Button.onClick setActive toggles a panel', shown0 === 'none' && shown1 !== 'none', `${shown0} -> ${shown1}`);
+  const c = await page.eval(`(() => { const c = document.querySelector('psb-counter'); c.shadowRoot.querySelector('.inc').click(); c.shadowRoot.querySelector('.inc').click(); return c.shadowRoot.querySelector('.value').textContent; })()`);
+  check('index: Counter component script is interactive', c === '2', c);
+  const unit = await page.eval(`(async () => {
+    const { define } = await import('./psb/component.js');
+    const host = document.createElement('div');
+    document.body.append(host);
+    // parsed before define -> upgrade path
+    host.innerHTML = '<psb-e2e-t n="4" on items="[1,2]" label="a&lt;b" html="&lt;i&gt;x&lt;/i&gt;"></psb-e2e-t>';
+    const changes = [];
+    define('psb-e2e-t', { template: '<p title="{{label}}">{{label}} {{n}} {{items.1}}</p><div>{{{html}}}</div>', style: 'p{color:red}',
+      props: { n: { type: 'int', default: 1 }, on: { type: 'bool', default: false }, off: { type: 'bool', default: true }, items: { type: 'list', default: [] },
+        label: { type: 'string', default: '' }, html: { type: 'text', default: '' }, bad: { type: 'vec2', default: [0, 0] } } },
+      class extends (await import('./psb/component.js')).Component { propChanged(k, v) { changes.push(k + '=' + v); } });
+    const el = host.firstChild, p = () => el.shadowRoot.querySelector('p');
+    const a = { props: { ...el.props }, text: p().textContent, title: p().title, raw: el.shadowRoot.querySelector('i')?.textContent, style: el.shadowRoot.querySelector('style').textContent };
+    el.setAttribute('n', '7'); el.setAttribute('bad', '{oops');
+    await Promise.resolve();
+    // created after define
+    const el2 = document.createElement('psb-e2e-t'); el2.setAttribute('off', 'false'); host.append(el2);
+    const r = { ...a, after: p().textContent, bad: el.props.bad, changes, off: el2.props.off, def: el2.shadowRoot.querySelector('p').textContent };
+    host.remove();
+    return r;
+  })()`);
+  check('component.js: typed props from attributes', JSON.stringify(unit.props) === JSON.stringify({ n: 4, on: true, off: true, items: [1, 2], label: 'a<b', html: '<i>x</i>', bad: [0, 0] }), JSON.stringify(unit.props));
+  check('component.js: {{x}} escaped in text + attributes, {{{x}}} raw, :host default', unit.text === 'a<b 4 2' && unit.title === 'a<b' && unit.raw === 'x' && unit.style.startsWith(':host{display:block}'), JSON.stringify(unit));
+  check('component.js: re-render on attribute change, bad JSON -> default', unit.after === 'a<b 7 2' && JSON.stringify(unit.bad) === '[0,0]' && unit.changes.includes('n=7'), JSON.stringify(unit));
+  check('component.js: element created after define', unit.off === false && unit.def === ' 1 ', JSON.stringify(unit));
+  check('index: zero console errors / exceptions', page.errors.length === 0, page.errors.join(' | '));
+
+  // ---- built site: about ----
+  await page.open(`http://127.0.0.1:${SITE_PORT}/about.html`);
+  await page.until(`window.PSB?.behaviour`);
+  await sleep(500);
+  check('about: Card child node projected into its <slot>', await page.eval(`document.querySelector('psb-card').shadowRoot.querySelector('slot').assignedElements().length`) === 1);
+  check('about: zero console errors / exceptions', page.errors.length === 0, page.errors.join(' | '));
+
+  // ---- editor ----
+  const ed = spawn(process.execPath, ['cli.js', 'serve', 'example', '--port', String(EDITOR_PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+  cleanups.push(() => ed.kill());
+  await new Promise((ok, err) => { ed.stdout.on('data', d => /editor:/.test(d) && ok()); ed.on('exit', c => err(new Error(`editor server exited ${c}`))); });
+  await page.open(`http://127.0.0.1:${EDITOR_PORT}/`);
+  const names = ['Canvas', 'Hero', 'Ring', 'Orbiter', 'Feature Card', 'Inspector Panel', 'Gallery Grid'];
+  await page.until(`document.querySelector('[data-panel=hierarchy]')?.innerText.includes('Inspector Panel')`, 5000);
+  const tree = await page.eval(`document.querySelector('[data-panel=hierarchy]')?.innerText ?? ''`);
+  const missing = names.filter(n => !tree.includes(n));
+  check('editor: Hierarchy lists the example node names', !missing.length, missing.length ? `missing ${missing.join(', ')}` : '');
+  await sleep(1000);
+  check('editor: zero console errors / exceptions', page.errors.length === 0, page.errors.join(' | '));
+}
+
+// minimal CDP client (same approach as test/browser.js)
+async function chrome(W = 1440, H = 900) {
+  const bin = ['/usr/bin/google-chrome', '/snap/bin/chromium', '/usr/bin/chromium'].find(f => fs.existsSync(f));
+  if (!bin) throw new Error('no chrome found');
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'psb-e2e-'));
+  const port = 9300 + Math.floor(Math.random() * 500);
+  const proc = spawn(bin, ['--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--mute-audio', '--autoplay-policy=no-user-gesture-required',
+    `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, `--window-size=${W},${H}`, 'about:blank'], { stdio: 'ignore' });
+  cleanups.push(() => { proc.kill('SIGKILL'); fs.rmSync(profile, { recursive: true, force: true }); });
+  let target;
+  for (let i = 0; i < 50 && !target; i++) {
+    await sleep(100);
+    target = await fetch(`http://127.0.0.1:${port}/json/list`).then(r => r.json()).then(l => l.find(t => t.type === 'page')).catch(() => null);
+  }
+  if (!target) throw new Error('chrome did not start');
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  await new Promise(r => ws.addEventListener('open', r, { once: true }));
+  let n = 0;
+  const pending = new Map(), page = { errors: [] };
+  ws.addEventListener('message', e => {
+    const m = JSON.parse(e.data);
+    if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); return; }
+    if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error')
+      page.errors.push('console.error: ' + m.params.args.map(a => a.value ?? a.description ?? '').join(' '));
+    else if (m.method === 'Runtime.exceptionThrown') page.errors.push('exception: ' + (m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text));
+    else if (m.method === 'Log.entryAdded' && m.params.entry.level === 'error' && !/favicon\.ico/.test(m.params.entry.url ?? ''))
+      page.errors.push(`log: ${m.params.entry.text} ${m.params.entry.url ?? ''}`);
+  });
+  const send = (method, params = {}) => new Promise(r => { const i = ++n; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+  await send('Runtime.enable'); await send('Log.enable'); await send('Page.enable');
+  await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
+  page.eval = async expr => {
+    const r = (await send('Runtime.evaluate', { expression: `(async () => (${expr}))()`, awaitPromise: true, returnByValue: true })).result;
+    if (r?.exceptionDetails) throw new Error(`eval failed: ${expr}\n${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
+    return r?.result?.value;
+  };
+  page.open = async url => {
+    page.errors = [];
+    const loaded = new Promise(r => { const f = e => { if (JSON.parse(e.data).method === 'Page.loadEventFired') { ws.removeEventListener('message', f); r(); } }; ws.addEventListener('message', f); });
+    await send('Page.navigate', { url });
+    await Promise.race([loaded, sleep(10000)]);
+  };
+  page.until = async (expr, ms = 8000) => {
+    for (const t0 = Date.now(); Date.now() - t0 < ms; await sleep(100)) { const v = await page.eval(expr).catch(() => null); if (v) return v; }
+    return null;
+  };
+  return page;
+}
+
+try { await main(); } catch (e) { failed++; console.log('FAIL', e.stack ?? e); } finally { for (const f of cleanups.reverse()) try { f(); } catch {} }
+console.log(failed ? `\n${failed} assertion(s) failed` : '\nall e2e assertions passed');
+process.exit(failed ? 1 : 0);

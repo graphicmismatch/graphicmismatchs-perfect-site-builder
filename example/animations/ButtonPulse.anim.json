@@ -1,0 +1,63 @@
+{
+  "name": "ButtonPulse",
+  "length": 0.45,
+  "loop": false,
+  "fps": 60,
+  "tracks": [
+    {
+      "path": "",
+      "prop": "rect.scale",
+      "keys": [
+        {
+          "t": 0,
+          "v": [
+            1,
+            1
+          ],
+          "ease": "ease-out"
+        },
+        {
+          "t": 0.15,
+          "v": [
+            1.06,
+            1.06
+          ],
+          "ease": "ease-in-out"
+        },
+        {
+          "t": 0.45,
+          "v": [
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "path": "",
+      "prop": "rect.rotation",
+      "keys": [
+        {
+          "t": 0,
+          "v": 0,
+          "ease": "ease-in-out"
+        },
+        {
+          "t": 0.1,
+          "v": -2,
+          "ease": "ease-in-out"
+        },
+        {
+          "t": 0.25,
+          "v": 2,
+          "ease": "ease-in-out"
+        },
+        {
+          "t": 0.45,
+          "v": 0
+        }
+      ]
+    }
+  ],
+  "events": []
+}

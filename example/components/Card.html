@@ -1,0 +1,24 @@
+<template>
+  <article class="card" title="" style="--accent: {{accent}}">
+    <div class="icon"><img src="{{image}}" alt=""></div>
+    <h3>{{title}}</h3>
+    <p>{{body}}</p>
+    <slot></slot>
+  </article>
+</template>
+<style>
+  .card { box-sizing: border-box; height: 100%; padding: 28px; border-radius: 20px; background: linear-gradient(160deg, #1b1e33, #14162a); border: 1px solid #ffffff14; transition: border-color .25s; }
+  :host(:hover) .card { border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+  .icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: #3ee6c414; margin-bottom: 18px; }
+  .icon img { width: 28px; height: 28px; }
+  h3 { margin: 0 0 8px; font-size: 20px; line-height: 1.25; font-weight: 700; color: #f4f4fb; }
+  p { margin: 0; font-size: 15px; line-height: 1.55; color: #9aa0b8; }
+</style>
+<script type="application/json" props>
+{
+  "title": { "type": "string", "default": "Card title" },
+  "body": { "type": "text", "default": "Card body text." },
+  "image": { "type": "asset:image", "default": "" },
+  "accent": { "type": "color", "default": "#7c5cff" }
+}
+</script>

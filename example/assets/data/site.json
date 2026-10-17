@@ -1,0 +1,28 @@
+{
+  "hero": {
+    "eyebrow": "STATIC SITE GENERATOR · UGUI-STYLE EDITOR",
+    "title": "Build websites like you build <em>game UI.</em>",
+    "subtitle": "Anchors, pivots, layout groups and keyframes. Drag it together, hit Build, ship plain HTML.",
+    "cta": "Get started"
+  },
+  "features": [
+    { "title": "RectTransform layout", "body": "Anchors, pivots and offsets exactly like uGUI, plus Horizontal, Vertical and Grid layout groups.", "icon": "img/icons/layout.svg" },
+    { "title": "Keyframe animation", "body": "Dopesheet, curves and record mode. Animate position, anchors, colors, sprites and any property.", "icon": "img/icons/anim.svg" },
+    { "title": "Data binding", "body": "Drop a JSON file in assets and bind it anywhere with {{file:path}}. Repeat over arrays.", "icon": "img/icons/data.svg" },
+    { "title": "Your own components", "body": "Write components in HTML, CSS and JS, and MonoBehaviour-style scripts with start() and update().", "icon": "img/icons/code.svg" },
+    { "title": "Assets that just work", "body": "Images, video, audio, fonts and JSON. Drag them from the Project window onto anything.", "icon": "img/icons/assets.svg" },
+    { "title": "Plain static output", "body": "One HTML and CSS file per page with a tiny runtime. Host it anywhere, no build server needed.", "icon": "img/icons/static.svg" }
+  ],
+  "posts": [
+    { "title": "Anchors, explained", "date": "Oct 2026", "summary": "Why stretch anchors beat media queries for most layouts." },
+    { "title": "Sprite swaps on the web", "date": "Sep 2026", "summary": "Step keys and background images: flipbooks without canvas." },
+    { "title": "Bindings all the way down", "date": "Sep 2026", "summary": "One JSON file drives the hero, the cards and this list." },
+    { "title": "Behaviours 101", "date": "Aug 2026", "summary": "start(), update(dt), onClick and calling methods from buttons." },
+    { "title": "Shipping zero dependencies", "date": "Jul 2026", "summary": "Native ES modules, custom elements and nothing else." }
+  ],
+  "stats": [
+    { "value": 21, "label": "built-in components", "suffix": "" },
+    { "value": 0, "label": "dependencies", "suffix": "" },
+    { "value": 100, "label": "static HTML", "suffix": "%" }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "name": "HeroIntro",
+  "length": 1.4,
+  "loop": false,
+  "fps": 60,
+  "tracks": [
+    {
+      "path": "",
+      "prop": "CanvasGroup.alpha",
+      "keys": [
+        {
+          "t": 0,
+          "v": 0,
+          "ease": "ease-out"
+        },
+        {
+          "t": 0.8,
+          "v": 1
+        }
+      ]
+    },
+    {
+      "path": "Copy",
+      "prop": "rect.pos.x",
+      "keys": [
+        {
+          "t": 0,
+          "v": 64,
+          "ease": [
+            0.16,
+            1,
+            0.3,
+            1
+          ]
+        },
+        {
+          "t": 1,
+          "v": 112
+        }
+      ]
+    },
+    {
+      "path": "Stage",
+      "prop": "rect.scale",
+      "keys": [
+        {
+          "t": 0,
+          "v": [
+            0.8,
+            0.8
+          ],
+          "ease": [
+            0.34,
+            1.56,
+            0.64,
+            1
+          ]
+        },
+        {
+          "t": 1.1,
+          "v": [
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Stage",
+      "prop": "rect.rotation",
+      "keys": [
+        {
+          "t": 0,
+          "v": -10,
+          "ease": "ease-out"
+        },
+        {
+          "t": 1.4,
+          "v": 0
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "t": 0.5,
+      "call": "behaviour:Typewriter.play",
+      "arg": ""
+    }
+  ]
+}

@@ -1,0 +1,1091 @@
+{
+  "id": "about-canvas",
+  "name": "Canvas",
+  "active": true,
+  "rect": {
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ],
+    "pos": [
+      0,
+      0
+    ],
+    "size": [
+      100,
+      100
+    ],
+    "rotation": 0,
+    "scale": [
+      1,
+      1
+    ]
+  },
+  "components": [
+    {
+      "type": "Canvas",
+      "props": {
+        "title": "About · perfect site builder",
+        "description": "What graphicmismatch's perfect site builder is and how it works.",
+        "background": "#0b0c16",
+        "height": 1300,
+        "font": "fonts/Lato-Regular.ttf"
+      }
+    },
+    {
+      "type": "CanvasScaler",
+      "props": {
+        "mode": "constant"
+      }
+    }
+  ],
+  "children": [
+    {
+      "id": "about-nav",
+      "name": "Nav",
+      "active": true,
+      "rect": {
+        "anchorMin": [
+          0,
+          0
+        ],
+        "anchorMax": [
+          1,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "pos": [
+          0,
+          0
+        ],
+        "size": [
+          0,
+          76
+        ],
+        "rotation": 0,
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "type": "Image",
+          "props": {
+            "color": "#0b0c16cc"
+          }
+        },
+        {
+          "type": "Style",
+          "props": {
+            "css": "backdrop-filter: blur(12px); border-bottom: 1px solid #ffffff10; z-index: 5;",
+            "hover": "",
+            "rules": ""
+          }
+        },
+        {
+          "type": "HorizontalLayoutGroup",
+          "props": {
+            "padding": [
+              64,
+              64,
+              0,
+              0
+            ],
+            "spacing": 8,
+            "childAlignment": "middle-left"
+          }
+        }
+      ],
+      "children": [
+        {
+          "id": "about-nav-logo",
+          "name": "Nav Logo",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              36,
+              36
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Link",
+              "props": {
+                "href": "index"
+              }
+            },
+            {
+              "type": "Image",
+              "props": {
+                "sprite": "img/logo.svg",
+                "alt": "Home"
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-brand",
+          "name": "Brand",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              340,
+              36
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Text",
+              "props": {
+                "text": "graphicmismatch's <b>perfect site builder</b>",
+                "size": 16,
+                "color": "#eef0fa",
+                "valign": "middle",
+                "wrap": false
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-spacer",
+          "name": "Spacer",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              10,
+              10
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "LayoutElement",
+              "props": {
+                "flexibleWidth": 1
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-nav-home",
+          "name": "Nav Home",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              88,
+              40
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Link",
+              "props": {
+                "href": "index",
+                "newTab": false
+              }
+            },
+            {
+              "type": "Text",
+              "props": {
+                "text": "Home",
+                "size": 15,
+                "color": "#9aa0b8",
+                "align": "center",
+                "valign": "middle",
+                "wrap": false
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "border-radius: 10px; transition: background-color .2s; ",
+                "hover": "background-color: #ffffff12; color: #eef0fa;",
+                "rules": ""
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-nav-about",
+          "name": "Nav About",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              88,
+              40
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Link",
+              "props": {
+                "href": "about",
+                "newTab": false
+              }
+            },
+            {
+              "type": "Text",
+              "props": {
+                "text": "About",
+                "size": 15,
+                "color": "#eef0fa",
+                "align": "center",
+                "valign": "middle",
+                "wrap": false
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "border-radius: 10px; transition: background-color .2s; ",
+                "hover": "background-color: #ffffff12; color: #eef0fa;",
+                "rules": ""
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-nav-github",
+          "name": "Nav GitHub",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              104,
+              40
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Link",
+              "props": {
+                "href": "https://github.com/graphicmismatch",
+                "newTab": true
+              }
+            },
+            {
+              "type": "Text",
+              "props": {
+                "text": "GitHub",
+                "size": 15,
+                "color": "#9aa0b8",
+                "align": "center",
+                "valign": "middle",
+                "wrap": false
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "border-radius: 10px; transition: background-color .2s; border: 1px solid #ffffff24; border-radius: 999px; margin-left: 8px;",
+                "hover": "background-color: #ffffff12; color: #eef0fa;",
+                "rules": ""
+              }
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "about-about-glow",
+      "name": "About Glow",
+      "active": true,
+      "rect": {
+        "anchorMin": [
+          0.5,
+          0
+        ],
+        "anchorMax": [
+          0.5,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "pos": [
+          0,
+          40
+        ],
+        "size": [
+          700,
+          360
+        ],
+        "rotation": 0,
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "type": "Image",
+          "props": {
+            "color": "#7c5cff",
+            "radius": 300
+          }
+        },
+        {
+          "type": "Style",
+          "props": {
+            "css": "filter: blur(120px); opacity: .25;",
+            "hover": "",
+            "rules": ""
+          }
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "about-about-column",
+      "name": "About Column",
+      "active": true,
+      "rect": {
+        "anchorMin": [
+          0.5,
+          0
+        ],
+        "anchorMax": [
+          0.5,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "pos": [
+          0,
+          140
+        ],
+        "size": [
+          760,
+          1360
+        ],
+        "rotation": 0,
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "components": [
+        {
+          "type": "VerticalLayoutGroup",
+          "props": {
+            "spacing": 22,
+            "controlWidth": true,
+            "expandWidth": true,
+            "controlHeight": true
+          }
+        }
+      ],
+      "children": [
+        {
+          "id": "about-about-kicker",
+          "name": "About Kicker",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              760,
+              20
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Text",
+              "props": {
+                "text": "ABOUT",
+                "size": 13,
+                "color": "#3ee6c4",
+                "letterSpacing": 3,
+                "weight": "bold",
+                "align": "left"
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-about-title",
+          "name": "About Title",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              760,
+              120
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Text",
+              "props": {
+                "text": "A static site generator that thinks in RectTransforms.",
+                "size": 52,
+                "color": "#eef0fa",
+                "tag": "h1",
+                "font": "fonts/Lato-Black.ttf",
+                "lineHeight": 1.08
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-about-intro",
+          "name": "About Intro",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              760,
+              90
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Text",
+              "props": {
+                "text": "If you have built a menu in Unity, you already know this tool. Pages are scenes, elements are GameObjects with a <b>RectTransform</b>, and everything else is a component you add in the Inspector.",
+                "size": 19,
+                "color": "#9aa0b8",
+                "tag": "p",
+                "lineHeight": 1.65
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "",
+                "hover": "",
+                "rules": "& b { color: #eef0fa; }"
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-about-card",
+          "name": "About Card",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              760,
+              250
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "component:Card",
+              "props": {
+                "title": "The Unity-style workflow",
+                "body": "Hierarchy on the left, Scene in the middle, Inspector on the right, Project, Console and Animation at the bottom. Hit Build and get plain HTML, CSS and a tiny runtime.",
+                "image": "img/icons/layout.svg",
+                "accent": "#3ee6c4"
+              }
+            },
+            {
+              "type": "LayoutElement",
+              "props": {
+                "preferredHeight": 250
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "transition: transform .25s;",
+                "hover": "transform: translateY(-4px);",
+                "rules": ""
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "about-card-slot-text",
+              "name": "Card Slot Text",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0,
+                  1
+                ],
+                "anchorMax": [
+                  0,
+                  1
+                ],
+                "pivot": [
+                  0,
+                  1
+                ],
+                "pos": [
+                  28,
+                  -22
+                ],
+                "size": [
+                  600,
+                  20
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "↳ this line is a child node, rendered into the Card's &lt;slot&gt;",
+                    "size": 13,
+                    "color": "#3ee6c4",
+                    "wrap": false
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "about-about-body",
+          "name": "About Body",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              760,
+              60
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Text",
+              "props": {
+                "text": "This page uses a <b>constant</b> Canvas Scaler, so it renders at 1:1 pixels. The home page uses <b>scale with screen size</b> against a 1440×900 reference, like a game HUD.",
+                "size": 17,
+                "color": "#9aa0b8",
+                "tag": "p",
+                "lineHeight": 1.65
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "",
+                "hover": "",
+                "rules": "& b { color: #eef0fa; }"
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-about-posts-title",
+          "name": "About Posts Title",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              760,
+              34
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Text",
+              "props": {
+                "text": "Recent posts",
+                "size": 26,
+                "color": "#eef0fa",
+                "tag": "h3",
+                "font": "fonts/Lato-Black.ttf"
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-about-posts",
+          "name": "About Posts",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              760,
+              300
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Repeat",
+              "props": {
+                "source": "data/site.json",
+                "path": "posts",
+                "limit": 4
+              }
+            },
+            {
+              "type": "VerticalLayoutGroup",
+              "props": {
+                "spacing": 10,
+                "controlWidth": true,
+                "expandWidth": true
+              }
+            }
+          ],
+          "children": [
+            {
+              "id": "about-about-post",
+              "name": "About Post",
+              "active": true,
+              "rect": {
+                "anchorMin": [
+                  0.5,
+                  0.5
+                ],
+                "anchorMax": [
+                  0.5,
+                  0.5
+                ],
+                "pivot": [
+                  0.5,
+                  0.5
+                ],
+                "pos": [
+                  0,
+                  0
+                ],
+                "size": [
+                  760,
+                  56
+                ],
+                "rotation": 0,
+                "scale": [
+                  1,
+                  1
+                ]
+              },
+              "components": [
+                {
+                  "type": "Text",
+                  "props": {
+                    "text": "<b>{{item.title}}</b><span>{{item.date}}</span>",
+                    "size": 17,
+                    "color": "#eef0fa",
+                    "valign": "middle"
+                  }
+                },
+                {
+                  "type": "Image",
+                  "props": {
+                    "color": "#151729",
+                    "radius": 12
+                  }
+                },
+                {
+                  "type": "Style",
+                  "props": {
+                    "css": "padding: 0 20px;",
+                    "hover": "",
+                    "rules": "& .psb-text { display: flex; justify-content: space-between; }\n& .psb-text span { color: #6b7090; font-size: 14px; }"
+                  }
+                }
+              ],
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "about-about-counter",
+          "name": "About Counter",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              300,
+              58
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "component:Counter",
+              "props": {
+                "label": "Did this help?",
+                "start": 3,
+                "step": 1
+              }
+            },
+            {
+              "type": "LayoutElement",
+              "props": {
+                "preferredHeight": 58
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "about-about-back",
+          "name": "About Back",
+          "active": true,
+          "rect": {
+            "anchorMin": [
+              0.5,
+              0.5
+            ],
+            "anchorMax": [
+              0.5,
+              0.5
+            ],
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "pos": [
+              0,
+              0
+            ],
+            "size": [
+              760,
+              24
+            ],
+            "rotation": 0,
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "components": [
+            {
+              "type": "Link",
+              "props": {
+                "href": "index"
+              }
+            },
+            {
+              "type": "Text",
+              "props": {
+                "text": "← Back to the demo",
+                "size": 16,
+                "color": "#7c5cff",
+                "weight": "bold"
+              }
+            },
+            {
+              "type": "Style",
+              "props": {
+                "css": "transition: color .2s;",
+                "hover": "color: #ff5c8a;",
+                "rules": ""
+              }
+            }
+          ],
+          "children": []
+        }
+      ]
+    }
+  ]
+}
