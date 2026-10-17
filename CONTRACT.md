@@ -100,12 +100,21 @@ Tablet and Phone apply, Phone last. `lib/node.js`: `sortBreakpoints`, `activeBre
 
 ## Built-in components (`lib/components.js`)
 
-Canvas, CanvasScaler, Image, RawImage, Text, Button, Toggle, Slider, InputField, Dropdown, Link, Video, Audio, IFrame,
-Element, HTML, Style, HorizontalLayoutGroup, VerticalLayoutGroup, GridLayoutGroup, LayoutElement, ContentSizeFitter,
-AspectRatioFitter, ScrollRect, Mask, CanvasGroup, Shadow, Outline, Animator, Repeat.
+Canvas, CanvasScaler, PageMeta, Image, RawImage, Text, Button, Toggle, ToggleGroup, Slider, Scrollbar, InputField, Dropdown,
+Link, Video, Audio, IFrame, Form, Element, HTML, Style, HorizontalLayoutGroup, VerticalLayoutGroup, GridLayoutGroup,
+LayoutElement, ContentSizeFitter, AspectRatioFitter, ScrollRect, Mask, RectMask2D, CanvasGroup, Shadow, Outline, Animator, Repeat.
+- Scroll views follow Unity: `Scroll View > Viewport (ScrollRect, native scrolling; its first child is the content) >
+  Content`, with Scrollbars outside the viewport (`ScrollRect.horizontalScrollbar/verticalScrollbar` = node ids). A
+  Scrollbar positions its `handle` node inside the handle's parent via `--gpsb-bar-start/size`; the runtime keeps
+  scroll position and scrollbars in sync both ways. Scrollbar value 1 = top for `bottomToTop` (Unity's default).
+- `Toggle.group` = a node with `ToggleGroup`: the toggles render as radios sharing a name (`allowSwitchOff` handled at runtime).
+- `Mask` clips to the rect, or to the node's Image sprite shape when it has one; `RectMask2D` = `clip-path: inset(padding)`.
+- `Form` makes the node a `<form>`; Button `type` submit/reset, control `name`s. Empty `action` = not sent (onSubmit only).
+- `PageMeta` (root only): `<html lang>`, favicon, canonical URL, og:title/description/image/url.
 - Toggle / Slider / InputField / Dropdown render the native control (`<input>`, `<select>`, `<textarea>`) inside the
   node element, filling its rect, with browser default styling. User edits are written back into the element's node
-  data (`def.state`), so `GPSB.nodeFor(el)` reads the current value and re-applies keep it.
+  data (`def.state`), so `GPSB.nodeFor(el)` reads the current value and re-applies keep it. Interactive runtime set-up
+  lives in `def.init({ el, GPSB, ci })` (run by `behaviours.js#boot`, not in the editor).
 - `Element` sets the HTML tag (section, nav, …), id, title, role and ARIA attributes. `Shadow` and `Outline` filters stack.
 Definition shape is documented at the top of that file. `componentDef(type, customs, behaviourMeta)` resolves any type;
 `withDefaults(def, props)` fills defaults.

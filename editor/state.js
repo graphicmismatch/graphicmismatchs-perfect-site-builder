@@ -120,6 +120,15 @@ export function setTool(t) { S.tool = t; emit('tool'); }
 // ---------- node operations ----------
 const rect = (o = {}) => ({ anchorMin: [0.5, 0.5], anchorMax: [0.5, 0.5], pivot: [0.5, 0.5], pos: [0, 0], size: [100, 100], rotation: 0, scale: [1, 1], zIndex: 0, ...o });
 const stretch = { anchorMin: [0, 0], anchorMax: [1, 1], size: [0, 0] };
+// Scrollbar > Sliding Area > Handle (the Scrollbar positions the handle along the sliding area)
+function scrollbar(name, vertical, r) {
+  const handle = Object.assign(newNode('Handle', [{ type: 'Image', props: { color: '#00000059' } }]), { rect: rect(stretch) });
+  const area = Object.assign(newNode('Sliding Area'), { rect: rect(stretch) });
+  area.children.push(handle);
+  const bar = Object.assign(newNode(name, [{ type: 'Image', props: { color: '#0000001a' } }, { type: 'Scrollbar', props: { handle: handle.id, direction: vertical ? 'bottomToTop' : 'leftToRight', value: vertical ? 1 : 0 } }]), { rect: r });
+  bar.children.push(area);
+  return bar;
+}
 // WebObject > UI menu. Each returns a node.
 export const PRESETS = {
   'Create Empty': () => newNode('WebObject'),
@@ -143,11 +152,17 @@ export const PRESETS = {
   'Horizontal Layout': () => Object.assign(newNode('Horizontal Layout', [{ type: 'HorizontalLayoutGroup', props: { spacing: 8 } }]), { rect: rect({ size: [400, 100] }) }),
   'Vertical Layout': () => Object.assign(newNode('Vertical Layout', [{ type: 'VerticalLayoutGroup', props: { spacing: 8 } }]), { rect: rect({ size: [200, 400] }) }),
   'Grid Layout': () => Object.assign(newNode('Grid Layout', [{ type: 'GridLayoutGroup', props: { spacing: [8, 8] } }]), { rect: rect({ size: [400, 400] }) }),
+  // Unity's layout: Scroll View > Viewport (scrolls) > Content, plus a Scrollbar outside the viewport
   'Scroll View': () => {
-    const s = Object.assign(newNode('Scroll View', [{ type: 'Image', props: { color: '#ffffff80' } }, { type: 'ScrollRect', props: {} }]), { rect: rect({ size: [300, 300] }) });
-    s.children.push(Object.assign(newNode('Content', [{ type: 'VerticalLayoutGroup', props: { spacing: 8, padding: [8, 8, 8, 8], controlWidth: true, expandWidth: true } }, { type: 'ContentSizeFitter', props: { vertical: 'preferred' } }]), { rect: rect({ anchorMin: [0, 0], anchorMax: [1, 0], pivot: [0.5, 0], size: [0, 300] }) }));
+    const s = Object.assign(newNode('Scroll View', [{ type: 'Image', props: { color: '#ffffff80' } }]), { rect: rect({ size: [300, 300] }) });
+    const bar = scrollbar('Scrollbar Vertical', true, rect({ anchorMin: [1, 0], anchorMax: [1, 1], pivot: [1, 0], size: [20, 0] }));
+    const view = Object.assign(newNode('Viewport', [{ type: 'ScrollRect', props: { verticalScrollbar: bar.id, nativeScrollbars: 'hidden' } }]),
+      { rect: rect({ anchorMin: [0, 0], anchorMax: [1, 1], pivot: [0, 0], size: [-20, 0] }) });
+    view.children.push(Object.assign(newNode('Content', [{ type: 'VerticalLayoutGroup', props: { spacing: 8, padding: [8, 8, 8, 8], controlWidth: true, expandWidth: true } }, { type: 'ContentSizeFitter', props: { vertical: 'preferred' } }]), { rect: rect({ anchorMin: [0, 0], anchorMax: [1, 0], pivot: [0.5, 0], size: [0, 300] }) }));
+    s.children.push(view, bar);
     return s;
   },
+  Scrollbar: () => scrollbar('Scrollbar', false, rect({ size: [160, 20] })),
   Repeat: () => {
     const r = Object.assign(newNode('Repeat', [{ type: 'Repeat', props: {} }, { type: 'VerticalLayoutGroup', props: { spacing: 8 } }]), { rect: rect({ size: [300, 400] }) });
     r.children.push(Object.assign(newNode('Item', [{ type: 'Text', props: { text: '{{index}}: {{item}}' } }]), { rect: rect({ size: [300, 30] }) }));

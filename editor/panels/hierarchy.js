@@ -27,10 +27,12 @@ const ICON = {
   Slider: svg('M1.5 8h13', '<circle cx="6" cy="8" r="2.5" fill="currentColor"/>'),
   InputField: svg('M4 5.5v5', '<rect x="1.5" y="4" width="13" height="8" rx="1"/>'),
   Dropdown: svg('M10 7l1.5 1.5L13 7', '<rect x="1.5" y="4" width="13" height="8" rx="1"/>'),
+  Scrollbar: svg('', '<rect x="5.5" y="1.5" width="5" height="13" rx="2.5"/><rect x="6.5" y="3.5" width="3" height="5" rx="1.5" fill="currentColor"/>'),
+  Form: svg('M4 5h8M4 8h8M4 11h4', '<rect x="1.5" y="2" width="13" height="12" rx="1"/>'),
   IFrame: svg('M1.5 5.5h13M4 4h0M6 4h0', '<rect x="1.5" y="2.5" width="13" height="11" rx="1"/>'),
   scene: svg('M8 1.5l6 3.3v6.4L8 14.5l-6-3.3V4.8zM2 4.8l6 3.3 6-3.3M8 8.1v6.4'),
 };
-const PRIMARY = ['Canvas', 'Button', 'Toggle', 'Slider', 'InputField', 'Dropdown', 'Link', 'Video', 'Audio', 'IFrame', 'Text', 'Image', 'RawImage', 'Repeat', 'ScrollRect', 'HorizontalLayoutGroup', 'VerticalLayoutGroup', 'GridLayoutGroup', 'HTML', 'Animator'];
+const PRIMARY = ['Canvas', 'Button', 'Toggle', 'Slider', 'Scrollbar', 'InputField', 'Dropdown', 'Form', 'Link', 'Video', 'Audio', 'IFrame', 'Text', 'Image', 'RawImage', 'Repeat', 'ScrollRect', 'HorizontalLayoutGroup', 'VerticalLayoutGroup', 'GridLayoutGroup', 'HTML', 'Animator'];
 function icon(n) {
   const types = n.components.map(c => c.type);
   if (types.includes('Canvas')) return ['Canvas', ICON.Canvas];

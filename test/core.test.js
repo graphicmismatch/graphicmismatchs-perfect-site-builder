@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { rectStyle, rectPixels, reanchor, defaultRect } from '../lib/rect.js';
 import { newNode, getProp, setProp, nodeAtPath, setOverride, clearOverride, isOverridden, withOverrides, effectiveTree, activeBreakpoints, componentPath } from '../lib/node.js';
-import { renderPage, makeCtx, bind, nodeStyle } from '../lib/render.js';
+import { renderPage, renderDocument, makeCtx, bind, nodeStyle } from '../lib/render.js';
 
 const rt = o => ({ ...defaultRect(), ...o });
 
@@ -170,12 +170,41 @@ assert.match(html, /<input type="checkbox" style=/);
 assert.match(html, /<input type="range" min="0" max="10" step="1" value="4" style=/);
 assert.match(html, /<input type="text" value="a&#34;&#60;" placeholder="p" maxlength="3"/);
 assert.match(html, /<textarea style="[^"]*">&#60;b&#62;<\/textarea>/);
-assert.match(html, /<option value="0">A<\/option><option value="1" selected>&#60;B&#62;<\/option>/);
+assert.match(html, /<option value="A">A<\/option><option value="&#60;B&#62;" selected>&#60;B&#62;<\/option>/);
 assert.match(html, /<iframe src="about.html" title="T" loading="lazy"/);
 assert.match(html, /<nav class="sect" data-gpsb="[^"]+" id="top" aria-hidden="true">/);
 const rs = nodeStyle(raw, pg, makeCtx());
 assert.deepEqual([rs['background-size'], rs['background-position']], ['200% 100%', '50% 0%']);
 assert.deepEqual([nodeStyle(asp, pg, makeCtx()).width, nodeStyle(asp, pg, makeCtx())['aspect-ratio']], ['auto', '1.5']);
 assert.equal(nodeStyle(fx, pg, makeCtx()).filter.match(/drop-shadow/g).length, 5); // Shadow + 4 Outline copies stack
+
+// ---- scroll views, toggle groups, masks, forms, page meta ----
+pg = canvasNode();
+const vp = add('Viewport', [{ type: 'ScrollRect', props: { nativeScrollbars: 'hidden', snap: 'mandatory', snapAlign: 'center', smooth: true } }]);
+const vps = nodeStyle(vp, pg, makeCtx());
+assert.deepEqual([vps['overflow-y'], vps['scroll-snap-type'], vps['scroll-behavior'], vps['scrollbar-width']], ['auto', 'y mandatory', 'smooth', 'none']);
+const bar = add('Bar', [{ type: 'Scrollbar', props: { handle: 'hnd', direction: 'bottomToTop', value: 1, size: 0.25 } }]);
+assert.deepEqual([nodeStyle(bar, pg, makeCtx())['--gpsb-bar-start'], nodeStyle(bar, pg, makeCtx())['--gpsb-bar-size']], ['0', '0.25']); // value 1 = top
+const msk = add('Msk', [{ type: 'Image', props: { sprite: 'img/m.png' } }, { type: 'Mask', props: { showMaskGraphic: false } }]);
+assert.match(nodeStyle(msk, pg, makeCtx()).mask, /var\(--gpsb-sprite\)/);
+assert.equal(nodeStyle(add('Plain', [{ type: 'Mask', props: {} }]), pg, makeCtx()).mask, undefined);
+assert.equal(nodeStyle(add('R2d', [{ type: 'RectMask2D', props: { padding: [1, 2, 3, 4] } }]), pg, makeCtx())['clip-path'], 'inset(3px 2px 4px 1px)');
+add('Radio', [{ type: 'Toggle', props: { group: 'grp1' } }]);
+add('Fm', [{ type: 'Form', props: { action: 'https://x.test/f', method: 'post' } }]);
+add('Sub', [{ type: 'Button', props: { type: 'submit' } }]);
+const page2 = renderPage(pg, makeCtx());
+assert.match(page2.css, /\.viewport::-webkit-scrollbar \{ display: none; \}/);
+assert.match(page2.css, /\.viewport > \* > \* \{ scroll-snap-align: center; \}/);
+assert.match(page2.css, /\.bar \[data-gpsb="hnd"\] \{ top: calc\(var\(--gpsb-bar-start\) \* 100%\) !important; height: calc\(var\(--gpsb-bar-size\) \* 100%\) !important; \}/);
+assert.match(page2.css, /\.msk \{ background-image: none !important;/);
+assert.match(page2.body, /<input type="radio" name="gpsb-group-grp1" checked/);
+assert.match(page2.body, /<form class="fm" data-gpsb="[^"]+" action="https:\/\/x.test\/f" method="post">/);
+assert.match(page2.body, /<button class="sub" data-gpsb="[^"]+" type="submit">/);
+pg.components.push({ type: 'PageMeta', props: { language: 'de', favicon: 'img/f.png', socialImage: 'img/s.png', url: 'https://site.test/a/' } });
+const doc = renderDocument(pg, makeCtx()).html;
+assert.match(doc, /<html lang="de">/);
+assert.match(doc, /<link rel="icon" href="assets\/img\/f.png">/);
+assert.match(doc, /<meta property="og:image" content="https:\/\/site.test\/a\/assets\/img\/s.png">/);
+assert.match(doc, /<link rel="canonical" href="https:\/\/site.test\/a\/">/);
 
 console.log('core ok');

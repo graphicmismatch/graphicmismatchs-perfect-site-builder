@@ -68,12 +68,14 @@ Shortcuts work as in Unity:
   - `scale-with-screen` uses a reference resolution and Unity's width/height match.
   - Set `Canvas.height` to make a long scrolling page.
 - **Built-in components:**
-  - UI: Image, Raw Image, Text, Button, Toggle, Slider, Input Field, Dropdown
+  - UI: Image, Raw Image, Text, Button, Toggle, Toggle Group, Slider, Scrollbar, Input Field, Dropdown
     (the form controls are the browser's native ones; what the user types or picks is kept in the node's data and
     passed to their events)
   - Media: Video, Audio
-  - Web: Link, IFrame, Element (HTML tag, id, title, role, ARIA), HTML, Style (raw CSS)
-  - Layout: Horizontal / Vertical / Grid Layout Group, Layout Element, Content Size Fitter, Aspect Ratio Fitter, Scroll Rect, Mask
+  - Web: Link, IFrame, Form, Element (HTML tag, id, title, role, ARIA), Page Meta (language, favicon, link previews), HTML, Style (raw CSS)
+  - Layout: Horizontal / Vertical / Grid Layout Group, Layout Element, Content Size Fitter, Aspect Ratio Fitter,
+    Scroll Rect (scrollbars, snapping, smooth scrolling, hidden native bars), Mask (rect or sprite shape), Rect Mask 2D
+  - The **Scroll View** preset is built like Unity's: Viewport > Content plus a Scrollbar that tracks and drives it.
   - Effects: Canvas Group, Shadow, Outline
   - Animation and data: Animator, Repeat
 - **Breakpoints** cover responsive layout. Defaults are Tablet ≤1024 px and Phone ≤600 px; edit them in the Scene toolbar.
