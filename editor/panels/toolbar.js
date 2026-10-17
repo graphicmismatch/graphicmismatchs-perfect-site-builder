@@ -147,6 +147,13 @@ const MENUS = {
       '-',
       { label: 'Frame Selected', shortcut: 'F', action: () => S.emit('frame'), disabled: !sel },
       '-',
+      { label: 'Breakpoint', sub: [
+        { label: 'Base', shortcut: 'Alt+1', checked: !S.S.breakpoint, action: () => S.setBreakpoint(null) },
+        ...S.breakpoints().map((b, i) => ({ label: `${b.name} (≤${b.maxWidth}px)`, shortcut: i < 8 ? `Alt+${i + 2}` : '', checked: S.S.breakpoint === b.name, action: () => S.setBreakpoint(b.name) })),
+        '-',
+        { label: 'Edit Breakpoints…', action: () => S.emit('edit-breakpoints') },
+      ] },
+      '-',
       { label: S.S.playing ? 'Stop' : 'Play', shortcut: 'Ctrl+P', action: () => S.setPlaying(!S.S.playing) },
       { label: 'Pause', checked: paused, action: togglePause },
     ];

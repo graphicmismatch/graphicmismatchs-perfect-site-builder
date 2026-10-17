@@ -200,7 +200,13 @@
               }
             }
           ],
-          "children": []
+          "children": [],
+          "overrides": {
+            "Phone": {
+              "Text.text": "perfect site builder",
+              "rect.size.x": 170
+            }
+          }
         },
         {
           "id": "about-spacer",
@@ -363,7 +369,12 @@
               }
             }
           ],
-          "children": []
+          "children": [],
+          "overrides": {
+            "Phone": {
+              "active": false
+            }
+          }
         },
         {
           "id": "about-nav-github",
@@ -424,9 +435,32 @@
               }
             }
           ],
-          "children": []
+          "children": [],
+          "overrides": {
+            "Phone": {
+              "active": false
+            }
+          }
         }
-      ]
+      ],
+      "overrides": {
+        "Tablet": {
+          "HorizontalLayoutGroup.padding": [
+            32,
+            32,
+            0,
+            0
+          ]
+        },
+        "Phone": {
+          "HorizontalLayoutGroup.padding": [
+            16,
+            16,
+            0,
+            0
+          ]
+        }
+      }
     },
     {
       "id": "about-about-glow",
@@ -476,7 +510,15 @@
           }
         }
       ],
-      "children": []
+      "children": [],
+      "overrides": {
+        "Phone": {
+          "rect.size": [
+            360,
+            260
+          ]
+        }
+      }
     },
     {
       "id": "about-about-column",
@@ -617,7 +659,15 @@
               }
             }
           ],
-          "children": []
+          "children": [],
+          "overrides": {
+            "Tablet": {
+              "Text.size": 44
+            },
+            "Phone": {
+              "Text.size": 34
+            }
+          }
         },
         {
           "id": "about-about-intro",
@@ -771,9 +821,23 @@
                   }
                 }
               ],
-              "children": []
+              "children": [],
+              "overrides": {
+                "Phone": {
+                  "Text.wrap": true,
+                  "rect.size": [
+                    280,
+                    36
+                  ]
+                }
+              }
             }
-          ]
+          ],
+          "overrides": {
+            "Phone": {
+              "LayoutElement.preferredHeight": 330
+            }
+          }
         },
         {
           "id": "about-about-body",
@@ -798,7 +862,7 @@
             ],
             "size": [
               760,
-              60
+              90
             ],
             "rotation": 0,
             "scale": [
@@ -810,7 +874,7 @@
             {
               "type": "Text",
               "props": {
-                "text": "This page uses a <b>constant</b> Canvas Scaler, so it renders at 1:1 pixels. The home page uses <b>scale with screen size</b> against a 1440×900 reference, like a game HUD.",
+                "text": "This page uses a <b>constant</b> Canvas Scaler, so it renders at 1:1 pixels, and <b>Tablet</b> and <b>Phone</b> breakpoint overrides restack it on small screens. The home page uses <b>scale with screen size</b> against a 1440×900 reference, like a game HUD.",
                 "size": 17,
                 "color": "#9aa0b8",
                 "tag": "p",

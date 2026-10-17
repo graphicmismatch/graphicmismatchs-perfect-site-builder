@@ -40,6 +40,7 @@ async function main() {
   const ready = await page.until(`window.PSB?.behaviour && PSB.behaviour(PSB.find('Ring')?.id, 'Spin')`);
   check('index: runtime + behaviours boot', !!ready);
   check('index: Repeat renders one Card per site.json feature', await page.eval(`PSB.els(PSB.find('Feature Card').id).length`) === site.features.length);
+  check('index: Repeat clones get their own node data (PSB.nodeFor)', await page.eval(`(() => { const els = PSB.els(PSB.find('Feature Card').id); return new Set(els.map(e => JSON.stringify(PSB.nodeFor(e).components.map(c => c.props)))).size === els.length && PSB.nodeFor(els[0]) === PSB.nodeFor(els[0]); })()`));
   check('index: Repeat renders one Post per site.json post', await page.eval(`PSB.els(PSB.find('Post').id).length`) === site.posts.length);
   check('index: {{data/site.json:...}} binding resolved', (await page.eval(`PSB.el(PSB.find('Eyebrow').id).textContent`)) === site.hero.eyebrow);
   const card = await page.eval(`(() => { const c = document.querySelector('psb-card'); return c?.shadowRoot ? { h3: c.shadowRoot.querySelector('h3')?.textContent, img: c.shadowRoot.querySelector('img')?.getAttribute('src') } : null; })()`);
@@ -100,6 +101,14 @@ async function main() {
   await page.until(`window.PSB?.behaviour`);
   await sleep(500);
   check('about: Card child node projected into its <slot>', await page.eval(`document.querySelector('psb-card').shadowRoot.querySelector('slot').assignedElements().length`) === 1);
+  const bp = () => page.eval(`(() => { const q = n => PSB.el(PSB.find(n).id); return { brand: q('Brand').textContent.trim(), title: getComputedStyle(q('About Title')).fontSize, about: getComputedStyle(q('Nav About')).display, active: PSB.breakpoints().join() }; })()`);
+  const desk = await bp();
+  await page.resize(390, 844); await sleep(400);
+  const phone = await bp();
+  await page.resize(1440, 900); await sleep(400);
+  const back = await bp();
+  check('about: Phone breakpoint overrides (CSS size, text, active) apply at 390px', phone.title === '34px' && phone.brand === 'perfect site builder' && phone.about === 'none' && phone.active === 'Tablet,Phone', JSON.stringify(phone));
+  check('about: base values at desktop, restored after resizing back', desk.title === '52px' && desk.about !== 'none' && JSON.stringify(back) === JSON.stringify(desk), JSON.stringify({ desk, back }));
   check('about: zero console errors / exceptions', page.errors.length === 0, page.errors.join(' | '));
 
   // ---- editor ----
@@ -158,6 +167,7 @@ async function chrome(W = 1440, H = 900) {
     await send('Page.navigate', { url });
     await Promise.race([loaded, sleep(10000)]);
   };
+  page.resize = (width, height) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
   page.until = async (expr, ms = 8000) => {
     for (const t0 = Date.now(); Date.now() - t0 < ms; await sleep(100)) { const v = await page.eval(expr).catch(() => null); if (v) return v; }
     return null;

@@ -41,3 +41,6 @@ input.rename { height: 18px; padding: 0 3px; flex: 1; margin-right: 6px; border-
 .row.drop-above::after, .row.drop-below::after { content: ''; position: absolute; left: calc(var(--d) * 14px + 2px); right: 0; height: 2px; background: var(--accent-hi); pointer-events: none; }
 .row.drop-above::after { top: -1px; }
 .row.drop-below::after { bottom: -1px; }
+/* breakpoint override bar (like Unity's prefab override marker) */
+.hier-tree .row.ovr::before { content: ''; position: absolute; left: 0; top: 1px; bottom: 1px; width: 3px; background: #3d8ee6; border-radius: 0 2px 2px 0; }
+.hier-tree .row.ovr .name { font-weight: 600; }

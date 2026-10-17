@@ -56,6 +56,11 @@ export function onKey(e) {
     if (k === 'a') return act(() => S.select([...S.walk(S.root())].slice(1).map(([n]) => n.id)));
     return;
   }
+  if (e.altKey && !e.shiftKey && /^Digit[1-9]$/.test(e.code)) { // Alt+1 = base, Alt+2.. = breakpoints widest first
+    const i = +e.code.slice(5) - 2, bps = S.breakpoints();
+    if (i < bps.length) act(() => S.setBreakpoint(i < 0 ? null : bps[i].name));
+    return;
+  }
   if (e.altKey || e.shiftKey) return;
   if (TOOLS[k]) return act(() => S.setTool(TOOLS[k]));
   if (k === 'f') return act(() => S.emit('frame'));
@@ -84,10 +89,17 @@ const title = () => {
 for (const ev of ['load', 'page', 'structure', 'props', 'anim', 'saved']) S.on(ev, title);
 S.on('play', () => document.body.classList.toggle('playing', S.S.playing));
 const status = document.getElementById('status');
+status.innerHTML = '<span class="bp"></span><span class="msg"></span>';
+const [bpEl, msgEl] = status.children;
 S.on('log', e => {
-  status.className = e.level;
-  status.textContent = e.msg.split('\n')[0];
-  status.title = e.msg;
+  msgEl.className = 'msg ' + e.level;
+  msgEl.textContent = e.msg.split('\n')[0];
+  msgEl.title = e.msg;
+});
+S.on('breakpoint', () => {
+  const b = S.breakpoints().find(x => x.name === S.S.breakpoint);
+  status.classList.toggle('editing-bp', !!b);
+  bpEl.textContent = b ? `Editing ${b.name} overrides (≤${b.maxWidth}px)` : '';
 });
 status.onclick = () => S.emit('show-tab', 'console');
 addEventListener('beforeunload', e => { if (S.S.dirty.size) e.preventDefault(); });

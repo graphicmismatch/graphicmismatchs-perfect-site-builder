@@ -45,6 +45,7 @@ const ancestors = id => { const out = []; for (let p = S.parentOf(id); p; p = S.
 const topLevel = ids => ids.filter(id => !ancestors(id).some(a => ids.includes(a))).sort((a, b) => order.indexOf(a) - order.indexOf(b));
 
 function matches(n, q) {
+  if (q.startsWith('o:')) { const bp = q.slice(2).trim(); return Object.entries(n.overrides ?? {}).some(([k, o]) => Object.keys(o).length && (!bp || k.toLowerCase() === bp)); }
   if (q.startsWith('t:')) { const t = q.slice(2).trim(); return n.components.some(c => c.type.toLowerCase().includes(t)); }
   return n.name.toLowerCase().includes(q);
 }
@@ -54,9 +55,12 @@ function render() {
   const root = S.root(), q = search.value.trim().toLowerCase(), sel = new Set(S.S.selection), act = S.S.selection.at(-1);
   const dim = new Map(), out = [];
   for (const [n, p] of S.walk(root)) dim.set(n.id, !n.active || (p && dim.get(p.id)));
+  const bp = S.S.breakpoint;
   const row = (n, d) => {
     const [kind, ic] = icon(n), kids = n.children?.length > 0, open = !collapsed.has(n.id);
-    out.push(`<div class="row${sel.has(n.id) ? ' sel' : ''}${n.id === act ? ' act' : ''}${dim.get(n.id) ? ' dim' : ''}" data-id="${n.id}" draggable="true" style="--d:${d}">` +
+    const ov = bp ? Object.keys(n.overrides?.[bp] ?? {}) : [];
+    out.push(`<div class="row${sel.has(n.id) ? ' sel' : ''}${n.id === act ? ' act' : ''}${dim.get(n.id) ? ' dim' : ''}${ov.length ? ' ovr' : ''}" data-id="${n.id}" draggable="true" style="--d:${d}"` +
+      `${ov.length ? ` title="${esc(`${bp} overrides:\n${ov.join('\n')}`)}"` : ''}>` +
       `<span class="arrow${kids && !q ? (open ? ' open' : ' shut') : ''}"></span><span class="ico ico-${kind}">${ic}</span><span class="name">${esc(n.name)}</span></div>`);
     order.push(n.id);
     if (kids && open && !q) n.children.forEach(c => row(c, d + 1));
@@ -201,7 +205,7 @@ export function mount(root) {
   el.innerHTML = `
     <div class="hier-bar">
       <button class="hier-add" title="Create">+<b>▾</b></button>
-      <label class="hier-search"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10l4 4"/></svg><input type="search" placeholder="Search (t:Type)" spellcheck="false"></label>
+      <label class="hier-search"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10l4 4"/></svg><input type="search" placeholder="Search (t:Type, o:overrides)" spellcheck="false"></label>
     </div>
     <div class="hier-tree" tabindex="0"></div>`;
   tree = el.querySelector('.hier-tree');
@@ -312,6 +316,6 @@ export function mount(root) {
 
   S.on('rename', () => rename());
   S.on('selection', reveal);
-  for (const ev of ['structure', 'props', 'page', 'saved', 'assets']) S.on(ev, render);
+  for (const ev of ['structure', 'props', 'page', 'saved', 'assets', 'breakpoint']) S.on(ev, render);
   S.on('page', () => { collapsed.clear(); anchor = null; search.value = ''; });
 }

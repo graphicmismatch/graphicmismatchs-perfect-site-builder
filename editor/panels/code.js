@@ -13,11 +13,13 @@ export const highlightHTML = src => src.replace(HTML_RE, (m, com, open, name, at
   : name ? tok('pun', open) + tok('tag', name) + attrs.replace(ATTR_RE, (_, ws, a, eq, v) => esc(ws) + tok('att', a) + tok('pun', eq) + tok('str', v)) + tok('pun', close)
   : esc(text ?? lt));
 
-const CSS_RE = /(\/\*[\s\S]*?\*\/)|(@[\w-]+)|([^{};@]+)(?=\{)|([\w-]+)(\s*:\s*)([^;{}]*)|([\s\S])/g;
-const VAL_RE = /(#[\da-f]{3,8}\b)|("(?:[^"\\]|\\.)*"|'[^']*')|(-?(?:\d*\.)?\d+(?:%|[a-z]+)?)|([\w-]+(?=\())/gi;
-export const highlightCSS = src => src.replace(CSS_RE, (m, com, at, sel, prop, colon, val, ch) =>
-  com ? tok('com', com) : at ? tok('kw', at) : sel ? tok('sel', sel) : ch ? tok(/[{};]/.test(ch) ? 'pun' : '', ch)
-  : tok('prop', prop) + tok('pun', colon) + val.replace(VAL_RE, (v, hex, str, num, fn) => tok(hex ? 'num' : str ? 'str' : num ? 'num' : 'fn', v)));
+const CSS_RE = /(\/\*[\s\S]*?\*\/)|(@[\w-]+)([^{;]*)|([^{};@]+)(?=\{)|([\w-]+)(\s*:\s*)([^;{}]*)|([\s\S])/g;
+const VAL_RE = /(#[\da-f]{3,8}\b)|("(?:[^"\\]|\\.)*"|'[^']*')|(-?(?:\d*\.)?\d+(?:%|[a-z]+)?)|([\w-]+(?=\())|([\w-]+|[\s\S])/gi;
+const value = v => v.replace(VAL_RE, (m, hex, str, num, fn) => tok(hex || num ? 'num' : str ? 'str' : fn ? 'fn' : '', m));
+// @media prelude: keyword + highlighted params (feature names, px values)
+export const highlightCSS = src => src.replace(CSS_RE, (m, com, at, pre, sel, prop, colon, val, ch) =>
+  com ? tok('com', com) : at ? tok('kw', at) + pre.replace(/([\w-]+)(\s*:)|[^()\s:]+|[\s\S]/g, (x, f, c) => (f ? tok('prop', f) + tok('pun', c) : value(x))) : sel ? tok('sel', sel) : ch ? tok(/[{};]/.test(ch) ? 'pun' : '', ch)
+  : tok('prop', prop) + tok('pun', colon) + value(val));
 
 let el, view, tab = 'html', visible = false, timer, code = null;
 

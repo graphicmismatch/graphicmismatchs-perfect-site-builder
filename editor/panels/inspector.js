@@ -2,6 +2,7 @@
 import * as S from '../state.js';
 import { reanchor } from '/lib/rect.js';
 import { withDefaults } from '/lib/components.js';
+import { componentPath } from '/lib/node.js';
 import { h, nice, fmt, fmtSize, field, numInput, scrub, menu, popup, listNav, closePopup, accept, hidden } from '../fields.js';
 import { icon, compIcon } from '../icons.js';
 import { openCode, createScript, createComponent, validName } from '../files.js';
@@ -19,19 +20,23 @@ export function mount(root) {
   S.on('assets', () => (assetPath ? render() : nodeSig() !== sig ? render() : refresh()));
   S.on('props', ids => !assetPath && ids?.some(i => S.S.selection.includes(i)) && (nodeSig() !== sig ? render() : refresh()));
   S.on('anim', () => !assetPath && refresh());
+  S.on('breakpoint', () => !assetPath && render());
   // drop a component/behaviour from the Project panel to add it (like dropping a script in Unity)
   accept(el, 'application/x-psb-component', t => S.S.selection.length && S.addComponent(S.S.selection.at(-1), t), () => !assetPath && S.S.selection.length > 0);
   render();
 }
 
-const refresh = () => live.forEach(u => u());
+const refresh = () => {
+  live.forEach(u => u());
+  for (const s of el.querySelectorAll('.sec')) s.classList.toggle('has-ovr', !!s.querySelector('.sec-b .ovr'));
+};
 
 // Rebuild only when what we show changes shape; otherwise values update in place.
 function nodeSig() {
   const n = S.S.P && S.active();
   if (!n) return 'none';
-  const st = i => (n.rect.anchorMin[i] !== n.rect.anchorMax[i] ? 1 : 0);
-  return JSON.stringify([S.S.selection, n.id === S.root()?.id, st(0), st(1),
+  const rt = S.view(n.id).rect, st = i => (rt.anchorMin[i] !== rt.anchorMax[i] ? 1 : 0);
+  return JSON.stringify([S.S.selection, S.S.breakpoint, n.id === S.root()?.id, st(0), st(1),
     n.components.map(c => [c.type, Object.keys(S.def(c.type)?.props ?? {}), S.S.behaviourMeta[c.type.slice(10)]?.error])]);
 }
 
@@ -64,7 +69,17 @@ function stateOf(id, path) {
 }
 function val(id, path) {
   const st = stateOf(id, path);
-  return st ? st.value : S.getProp(S.node(id), path);
+  return st ? st.value : S.getProp(S.view(id), path);
+}
+// Prefab-style override marker: bold label + blue bar; right-click the label to revert. Animation tints win.
+function mark(row, id, paths, b) {
+  paths = [paths].flat();
+  live.push(() => row.classList.toggle('ovr', !b?.state?.() && paths.some(p => S.isOverridden(id, p))));
+  row.addEventListener('contextmenu', e => {
+    if (!e.target.closest('.f-lab, .rt-lab, .v-lab, .ev-head, .ls-head') || !paths.some(p => S.isOverridden(id, p))) return;
+    e.preventDefault(); e.stopPropagation();
+    menu([{ label: `Revert to Base (${S.S.breakpoint})`, action: () => { const label = `Revert ${paths} ${++presetN}`; paths.forEach(p => S.isOverridden(id, p) && S.edit(label, () => {}, { kind: 'props', ids: [id], merge: true }) && 0); paths.forEach(p => S.revertOverride(id, p)); } }], e.clientX, e.clientY);
+  });
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const sel = () => (S.S.P ? S.S.selection.filter(i => S.node(i)) : []);
@@ -85,22 +100,12 @@ function pb(ids, path, dflt) {
     sub: (k, d) => pb(ids, `${path}.${k}`, d ?? dflt?.[k]),
   };
 }
-// Direct binding for a component that isn't the first of its type (paths only address the first one).
-function db(id, ci, key, dflt) {
-  const props = () => S.node(id)?.components[ci]?.props;
-  const b = {
-    id,
-    get: () => props()?.[key] ?? dflt,
-    set: v => S.edit(`Set ${key} ${id}#${ci}`, () => { const c = S.node(id).components[ci]; (c.props ??= {})[key] = v; }, { kind: 'props', ids: [id], merge: true }),
-    sub: (k, d) => arrSub(b, k, d ?? dflt?.[k]),
-  };
-  return b;
-}
-function arrSub(b, k, d) {
-  const s = { id: b.id, get: () => b.get()?.[k] ?? d, set: v => { const a = structuredClone(b.get() ?? []); a[k] = v; b.set(a); }, sub: (j, dd) => arrSub(s, j, dd) };
-  return s;
-}
-const add = (parent, w, key) => { if (key) w.el.dataset.k = key; parent.append(w.el); live.push(w.update); return w; };
+const add = (parent, w, key, b) => {
+  if (key) w.el.dataset.k = key;
+  parent.append(w.el); live.push(w.update);
+  if (b?.path) mark(w.el, b.id, b.path, b);
+  return w;
+};
 
 // ---------- node mode ----------
 function renderNode() {
@@ -125,6 +130,7 @@ function renderNode() {
     act.classList.toggle('keyed', !!st?.keyed); act.classList.toggle('animated', !!st && !st.keyed);
   });
   el.append(head);
+  if (S.S.breakpoint) el.append(overridesRow(n.id));
   if (ids.length > 1) el.append(h('div', { class: 'in-multi' }, `${ids.length} objects selected · showing ${n.name}. RectTransform edits apply to all.`));
 
   el.append(isRoot
@@ -159,14 +165,14 @@ const AX = [[0, 0], [0.5, 0.5], [1, 1], [0, 1]]; // per-axis preset: min/start, 
 const axisOf = (rt, i) => AX.findIndex(([a, b]) => rt.anchorMin[i] === a && rt.anchorMax[i] === b);
 
 function rectSection(ids, n) {
-  const id = n.id, rt = n.rect;
+  const id = n.id, rt = S.view(id).rect;
   const stretch = [0, 1].map(i => rt.anchorMin[i] !== rt.anchorMax[i]);
   const pv = i => val(id, `rect.pivot.${i}`);
   // offsetMin / -offsetMax helpers (Unity Left/Top, Right/Bottom)
   const off = (i, nid = id) => { const p = val(nid, `rect.pos.${i}`), s = val(nid, `rect.size.${i}`), v = val(nid, `rect.pivot.${i}`); return [p - v * s, p + (1 - v) * s]; };
   const tintAny = i => () => stateOf(id, `rect.pos.${i}`) ?? stateOf(id, `rect.size.${i}`);
   const offB = (i, end) => ({
-    id,
+    id, paths: [`rect.pos.${i}`, `rect.size.${i}`],
     get: () => (end ? -off(i)[1] : off(i)[0]),
     state: tintAny(i),
     mixed: () => ids.length > 1 && ids.some(x => off(i, x)[end] !== off(i)[end]),
@@ -187,6 +193,7 @@ function rectSection(ids, n) {
     const c = h('div', { class: 'rt-cell' }, l, ni.el);
     c.dataset.k = key;
     live.push(ni.update);
+    mark(c, id, b.paths ?? b.path, b);
     return c;
   };
   const [x, y] = [0, 1];
@@ -197,21 +204,22 @@ function rectSection(ids, n) {
     stretch[y] ? cell('Bottom', offB(y, 1), 'rt-b') : cell('Height', pb(ids, 'rect.size.y', 0), 'rt-h'));
 
   const btn = h('button', { class: 'rt-preset', title: 'Anchor presets' });
-  const drawBtn = () => { const r = S.node(id)?.rect; if (r) btn.innerHTML = presetSvg(axisOf(r, 0), axisOf(r, 1)); };
+  const drawBtn = () => { const r = S.view(id)?.rect; if (r) btn.innerHTML = presetSvg(axisOf(r, 0), axisOf(r, 1)); };
   live.push(drawBtn);
   btn.onclick = () => presetPopup(ids, btn);
 
-  const v2 = (label, path, key, sc) => add(sub, field({ type: 'vec2', ...sc }, pb(ids, path, [0, 0]), label), key);
+  const v2 = (label, path, key, sc) => { const b = pb(ids, path, [0, 0]); add(sub, field({ type: 'vec2', ...sc }, b, label), key, b); };
+  const fb = (parent, sc, b, label, key) => add(parent, field(sc, b, label), key, b);
   const sub = h('div', { class: 'rt-sub' });
   const anchors = h('details', { class: 'rt-anchors' }, h('summary', {}, 'Anchors'));
   anchors.open = fold['rt-anchors'] ?? false;
   anchors.ontoggle = () => { fold['rt-anchors'] = anchors.open; saveFold(); };
   const sc01 = { step: 0.01 };
-  add(anchors, field({ type: 'vec2', ...sc01 }, anchorB(ids, 'anchorMin'), 'Min'), 'rt-amin');
-  add(anchors, field({ type: 'vec2', ...sc01 }, anchorB(ids, 'anchorMax'), 'Max'), 'rt-amax');
+  fb(anchors, { type: 'vec2', ...sc01 }, anchorB(ids, 'anchorMin'), 'Min', 'rt-amin');
+  fb(anchors, { type: 'vec2', ...sc01 }, anchorB(ids, 'anchorMax'), 'Max', 'rt-amax');
   sub.append(anchors);
-  add(sub, field({ type: 'vec2', ...sc01 }, anchorB(ids, 'pivot'), 'Pivot'), 'rt-pv');
-  add(sub, field({ type: 'number', step: 1 }, pb(ids, 'rect.rotation', 0), 'Rotation'), 'rt-rot');
+  fb(sub, { type: 'vec2', ...sc01 }, anchorB(ids, 'pivot'), 'Pivot', 'rt-pv');
+  fb(sub, { type: 'number', step: 1 }, pb(ids, 'rect.rotation', 0), 'Rotation', 'rt-rot');
   v2('Scale', 'rect.scale', 'rt-sc', sc01);
 
   const inLayout = S.parentOf(id)?.components.some(c => S.def(c.type)?.childStyle) && !n.components.find(c => c.type === 'LayoutElement')?.props?.ignoreLayout;
@@ -236,7 +244,7 @@ function applyPreset(ids, ax, ay, shift, alt) {
   const label = `Anchor preset ${++presetN}`;
   for (const id of ids) {
     const n = S.node(id); if (!n || id === S.root().id) continue;
-    const [W, H] = S.parentSize(id), rt = structuredClone(n.rect), next = { anchorMin: [...rt.anchorMin], anchorMax: [...rt.anchorMax], pivot: [...rt.pivot] };
+    const [W, H] = S.parentSize(id), rt = structuredClone(S.view(id).rect), next = { anchorMin: [...rt.anchorMin], anchorMax: [...rt.anchorMax], pivot: [...rt.pivot] };
     [ax, ay].forEach((a, i) => {
       if (a == null) return;
       [next.anchorMin[i], next.anchorMax[i]] = AX[a];
@@ -259,12 +267,12 @@ function anchorB(ids, key) {
   const apply = fn => {
     const label = `Set ${key} ${ids.join()}`;
     for (const x of ids) {
-      const rt = structuredClone(S.node(x).rect);
+      const rt = structuredClone(S.view(x).rect);
       writeRect(x, rt, reanchor(rt, ...S.parentSize(x), { [key]: fn(rt[key]) }), label);
     }
   };
   return {
-    id, get: () => val(id, path), state: () => stateOf(id, path),
+    id, path, get: () => val(id, path), state: () => stateOf(id, path),
     mixed: () => ids.length > 1 && ids.some(i => !same(val(i, path), val(id, path))),
     set: v => apply(() => v),
     sub: i => ({
@@ -276,7 +284,7 @@ function anchorB(ids, key) {
 }
 
 function presetPopup(ids, anchor) {
-  const rt = S.node(ids.at(-1)).rect, cur = [axisOf(rt, 0), axisOf(rt, 1)];
+  const rt = S.view(ids.at(-1)).rect, cur = [axisOf(rt, 0), axisOf(rt, 1)];
   const grid = h('div', { class: 'ap-grid' });
   const cells = [];
   const LX = ['left', 'center', 'right', 'stretch'], LY = ['top', 'middle', 'bottom', 'stretch'];
@@ -302,7 +310,7 @@ const compTitle = t => (t.startsWith('component:') ? `${t.slice(10)} (Component)
 
 function compSection(n, c, ci) {
   const id = n.id, t = c.type, d = S.def(t);
-  const first = n.components.findIndex(x => x.type === t) === ci;
+  const cp = componentPath(n, ci);
   const key = `${t}`;
   const body = [];
   const missing = !d || (d.custom && !S.S.P.components[t.slice(10)]) || (d.behaviour && !S.S.behaviourMeta[t.slice(10)]);
@@ -313,28 +321,51 @@ function compSection(n, c, ci) {
   if (!props.length && !missing && !err) body.push(h('div', { class: 'in-note' }, d?.behaviour ? 'No exposed props. Export `props` from the script to show fields here.' : 'No properties.'));
   const wrap = h('div');
   for (const [k, sc] of props) {
-    const b = first ? pb([id], `${t}.${k}`, sc.default) : db(id, ci, k, sc.default);
-    add(wrap, field(sc, b, nice(k)), `${ci}.${k}`);
+    const b = pb([id], `${cp}.${k}`, sc.default);
+    add(wrap, field(sc, b, nice(k)), `${ci}.${k}`, b);
   }
   body.push(wrap);
   if (d?.behaviour || d?.custom) body.push(h('div', { class: 'in-src' }, h('a', { onclick: () => openCode(d.behaviour ? S.S.P.behaviours[t.slice(10)]?.path : `components/${t.slice(10)}.html`) }, 'Edit Script')));
 
   const count = n.components.length;
   const onMenu = (x, y) => menu([
-    { label: 'Reset', disabled: !d, action: () => S.edit('Reset ' + t, () => { S.node(id).components[ci].props = withDefaults(d, {}); }) },
+    { label: 'Reset', disabled: !d, action: () => setProps(id, ci, withDefaults(d, {}), 'Reset') },
     '-',
     { label: 'Remove Component', action: () => S.removeComponent(id, ci) },
     { label: 'Move Up', disabled: ci === 0, action: () => S.moveComponent(id, ci, ci - 1) },
     { label: 'Move Down', disabled: ci === count - 1, action: () => S.moveComponent(id, ci, ci + 1) },
     '-',
     { label: 'Copy Component', action: () => { clipboard = structuredClone(S.node(id).components[ci]); S.log(`Copied ${compTitle(t)} values`); } },
-    { label: 'Paste Component Values', disabled: clipboard?.type !== t, action: () => S.edit('Paste ' + t, () => { S.node(id).components[ci].props = structuredClone(clipboard.props); }) },
+    { label: 'Paste Component Values', disabled: clipboard?.type !== t, action: () => setProps(id, ci, structuredClone(clipboard.props), 'Paste') },
     { label: 'Paste Component As New', disabled: !clipboard || (!clipboard.type.startsWith('behaviour:') && S.node(id).components.some(x => x.type === clipboard.type)), action: () => S.edit('Paste new ' + clipboard.type, () => S.node(id).components.splice(ci + 1, 0, structuredClone(clipboard))) },
     ...(d?.behaviour || d?.custom ? ['-', { label: 'Edit Script', action: () => openCode(d.behaviour ? S.S.P.behaviours[t.slice(10)]?.path : `components/${t.slice(10)}.html`) }] : []),
   ], x, y);
   const s = section(key, compTitle(t), compIcon(t, d), onMenu, ...body);
   if (missing) s.classList.add('broken');
   return s;
+}
+
+// Write a whole props object through S.setProp (record mode / breakpoint overrides apply) as one undo step.
+function setProps(id, ci, props, what) {
+  const n = S.node(id), cp = componentPath(n, ci), v = S.view(id), label = `${what} ${cp} ${++presetN}`;
+  for (const [k, val] of Object.entries(props)) if (!same(S.getProp(v, `${cp}.${k}`), val)) S.setProp(id, `${cp}.${k}`, val, { label });
+}
+
+// "Overrides: Phone ▾" (Revert All) + where else this node is overridden
+function overridesRow(id) {
+  const row = h('div', { class: 'in-bp' });
+  live.push(() => {
+    const o = S.node(id)?.overrides ?? {}, bp = S.S.breakpoint, mine = Object.keys(o[bp] ?? {});
+    const others = S.breakpoints().map(b => b.name).filter(b => b !== bp && o[b]);
+    const btn = mine.length ? h('button', { class: 'in-bp-btn', title: mine.join('\n') }, `Overrides: ${bp} (${mine.length}) ▾`) : null;
+    if (btn) btn.onclick = () => {
+      const r = btn.getBoundingClientRect();
+      menu([...mine.map(p => ({ label: `Revert ${p}`, action: () => S.revertOverride(id, p) })), '-', { label: 'Revert All', action: () => S.revertOverride(id) }], r.left, r.bottom);
+    };
+    row.replaceChildren(btn ?? h('span', { class: 'dim' }, `Editing ${bp}: changes become overrides`),
+      others.length ? h('span', { class: 'in-bp-also' }, `Also overridden at: ${others.join(', ')}`) : '');
+  });
+  return row;
 }
 
 // ---------- Add Component popup ----------
