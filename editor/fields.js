@@ -202,20 +202,41 @@ const parseColor = v => {
   return m ? ['#' + m[1].toLowerCase(), m[2] ? parseInt(m[2], 16) : 255] : ['#000000', 255];
 };
 const outColor = (rgb, a) => rgb + (a < 255 ? Math.round(a).toString(16).padStart(2, '0') : '');
+// design tokens (project.json tokens.colors / fonts / textStyles); a prop holding "$name" uses the token
+const tokensOf = kind => S.S.P?.project.tokens?.[kind] ?? {};
+const isToken = v => /^\$[\w-]+$/.test(v ?? '');
+// small dropdown listing a token group; picking one sets "$name" (or the name itself for text styles)
+function tokenSelect(kind, b, { prefix = '$', none = null } = {}) {
+  const sel = h('select', { class: 'f-pages f-tok', title: 'Use a design token (Project Settings ▸ Design Tokens)' });
+  const fill = () => sel.replaceChildren(h('option', { value: '' }, '◆'), ...(none ? [h('option', { value: '\0' }, none)] : []),
+    ...Object.keys(tokensOf(kind)).map(n => h('option', { value: prefix + n }, n)));
+  sel.onfocus = fill;
+  sel.onchange = () => { if (sel.value === '\0') b.set(''); else if (sel.value) b.set(sel.value); sel.value = ''; sel.blur(); };
+  fill();
+  return sel;
+}
 function colorW(b) {
   const pick = h('input', { type: 'color', tabindex: -1 });
   const sw = h('span', { class: 'sw-c' }), al = h('span', { class: 'sw-a' });
   const swatch = h('label', { class: 'swatch', title: 'Click to pick a color' }, sw, h('span', { class: 'sw-ab' }, al), pick);
   const alpha = h('input', { type: 'range', min: 0, max: 255, step: 1, class: 'alpha', title: 'Alpha' });
   const hex = h('input', { class: 'hex', spellcheck: 'false', title: '#rrggbb or #rrggbbaa' });
-  pick.oninput = () => b.set(outColor(pick.value, parseColor(b.get())[1]));
-  alpha.oninput = () => b.set(outColor(parseColor(b.get())[0], +alpha.value));
-  hex.onchange = () => { const s = hex.value.trim(); if (/^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(s)) b.set(outColor(...parseColor(s))); else w.update(); };
+  const shown = () => { const v = b.get(); return isToken(v) ? tokensOf('colors')[v.slice(1)] : v; }; // a token shows its colour
+  pick.oninput = () => b.set(outColor(pick.value, parseColor(shown())[1]));
+  alpha.oninput = () => b.set(outColor(parseColor(shown())[0], +alpha.value));
+  hex.onchange = () => {
+    const s = hex.value.trim();
+    if (isToken(s)) b.set(s);
+    else if (/^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(s)) b.set(outColor(...parseColor(s)));
+    else w.update();
+  };
   hex.onkeydown = e => e.key === 'Enter' && hex.blur();
+  const tok = tokenSelect('colors', b);
   const w = {
-    el: h('div', { class: 'f-color' }, swatch, alpha, hex),
+    el: h('div', { class: 'f-color' }, swatch, alpha, hex, tok),
     update() {
-      const v = b.get(), [rgb, a] = parseColor(v);
+      const v = b.get(), [rgb, a] = parseColor(shown());
+      hex.classList.toggle('is-token', isToken(v));
       sw.style.background = rgb; al.style.width = `${(a / 255) * 100}%`;
       if (!focused(w.el)) { pick.value = rgb; alpha.value = a; hex.value = v ?? ''; }
       tint(swatch, b); tint(hex, b);
@@ -451,7 +472,14 @@ function widget(sc, b, label) {
     const s = textW(b), kind = sc.asset;
     const pick = h('button', { class: 'obj-p', html: icon('target'), title: `Pick a ${kind} asset`, onclick: () => pickAsset(kind, b.get() ?? '', v => b.set(v), s.el) });
     acceptAsset(s.el, kind, v => b.set(v));
-    return { el: h('div', { class: 'f-href' }, s.el, pick), update: s.update };
+    const extra = kind === 'font' ? [tokenSelect('fonts', b)] : [];
+    return { el: h('div', { class: 'f-href' }, s.el, ...extra, pick), update: s.update };
+  }
+  if (t === 'string' && sc.tokens) { // a token name (Text.textStyle)
+    const sel = h('select', {});
+    const fill = () => sel.replaceChildren(h('option', { value: '' }, 'None'), ...Object.keys(tokensOf(sc.tokens)).map(n => h('option', { value: n }, n)));
+    sel.onfocus = fill; sel.onchange = () => b.set(sel.value);
+    return { el: sel, update() { if (!focused(sel)) { fill(); sel.value = b.get() ?? ''; } tint(sel, b); } };
   }
   if (t === 'string') return textW(b);
   if (t === 'text') return { ...textW(b, true), wide: true };

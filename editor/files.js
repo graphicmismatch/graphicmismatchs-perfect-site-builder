@@ -131,6 +131,22 @@ function retarget(map, label, keyMap) {
   if (files.length) { S.log(`Updated references in ${files.join(', ')} (unsaved)`); S.emit('anim'); }
 }
 
+// ---------- design tokens ----------
+// where a token is used: colours/fonts are "$name" values, text styles are Text.textStyle names
+const tokenMatch = (kind, name) => kind === 'textStyles' ? (v, o, k) => k === 'textStyle' && v === name : v => v === '$' + name;
+export function tokenUses(kind, name) {
+  let n = 0;
+  const m = tokenMatch(kind, name);
+  const count = (o, pk) => { for (const k in o) { const v = o[k]; if (typeof v === 'string') n += m(v, o, k, pk) ? 1 : 0; else if (v && typeof v === 'object') count(v, k); } };
+  for (const t of Object.values(S.S.P.pages)) count(t);
+  for (const c of Object.values(S.S.P.clips)) count(c);
+  return n;
+}
+export function renameToken(kind, from, to) {
+  const m = tokenMatch(kind, from), out = kind === 'textStyles' ? to : '$' + to;
+  retarget((v, o, k, pk) => (m(v, o, k, pk) ? out : undefined), `Rename token ${from}`);
+}
+
 // component type a -> b in a type, property path ('behaviour:Spin.speed', 'behaviour:Spin[1].speed') or event call
 const typeRef = (a, b) => v => (v === a ? b : v.startsWith(a + '.') || v.startsWith(a + '[') ? b + v.slice(a.length) : undefined);
 

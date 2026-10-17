@@ -112,7 +112,7 @@ async function hashFile(file) {
   return h.digest('hex').slice(0, 10);
 }
 
-const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, clips: P.clips, breakpoints: P.project.breakpoints, inject: P.project.inject, ...extra });
+const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, clips: P.clips, breakpoints: P.project.breakpoints, inject: P.project.inject, tokens: P.project.tokens, ...extra });
 
 // The output folder is deleted before every build: refuse anything that is not a previous build or a fresh folder.
 async function checkOut(root, out) {

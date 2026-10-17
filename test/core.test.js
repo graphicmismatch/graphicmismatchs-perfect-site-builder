@@ -263,4 +263,19 @@ s = rectStyle(moving);
 assert.deepEqual([s.left, s.top, s.transform], ['10px', '5px', 'translate(20px, 0px) rotate(45deg)']);
 assert.equal(rectStyle(moving, true).transform, 'rotate(45deg)'); // layout children: position comes from the layout
 
+// ---- design tokens ----
+const tokens = { colors: { brand: '#ff3366' }, fonts: { heading: 'fonts/H.ttf', body: 'Georgia, serif' }, textStyles: { h1: { font: '$heading', size: 48, weight: '800' } } };
+pg = canvasNode();
+const tt = newNode('Tt', [{ type: 'Text', props: { color: '$brand', font: '$body', size: 12, textStyle: 'h1' } }]);
+const btn = newNode('Bt', [{ type: 'Image', props: { color: '$brand' } }, { type: 'Button', props: { highlighted: '$brand' } }]);
+pg.children.push(tt, btn);
+const tc = makeCtx({ tokens }), tts = nodeStyle(tt, pg, tc);
+assert.deepEqual([tts.color, tts['font-size'], tts['font-weight'], tts['font-family']], ['var(--gpsb-color-brand)', '48px', '800', 'var(--gpsb-font-heading)']);
+const tokCss = renderPage(pg, tc).css;
+assert.match(tokCss, /^:root \{\n  --gpsb-color-brand: #ff3366;\n  --gpsb-font-heading: "gpsb-fonts-h-ttf", system-ui, sans-serif;\n  --gpsb-font-body: Georgia, serif;\n\}/);
+assert.match(tokCss, /@font-face \{\n  font-family: "gpsb-fonts-h-ttf"/); // font token assets get @font-face
+assert.match(tokCss, /\.bt:hover \{ background-color: var\(--gpsb-color-brand\) !important; \}/);
+assert.match(renderPage(pg, tc).body, /"textStyles"|data-gpsb/); // body renders
+assert.deepEqual(renderPage(pg, tc).data.tokens, { textStyles: tokens.textStyles });
+
 console.log('core ok');

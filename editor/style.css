@@ -128,6 +128,18 @@ input, textarea { user-select: text; }
 .prefs-note { color: var(--text-dim); margin: 16px 0 8px; }
 .prefs-in { height: 22px; background: var(--field); border: 1px solid var(--field-border); border-radius: 3px; color: var(--text); padding: 0 6px; font: inherit; }
 .prefs-in:focus, .prefs-code:focus { outline: 1px solid var(--accent-hi); border-color: var(--accent-hi); }
+.tk-h { margin: 18px 0 2px; font-size: 1em; }
+.tk-help { margin: 0 0 6px; }
+.tk-table { border-collapse: collapse; margin-bottom: 6px; }
+.tk-table td { padding: 2px 6px 2px 0; vertical-align: middle; }
+.tk-name { width: 130px; }
+.tk-val { width: 120px; }
+.tk-wide { width: 300px; }
+.tk-color { width: 30px; height: 22px; padding: 0 2px; vertical-align: middle; }
+.tk-ts { display: flex; gap: 4px; }
+.tk-ts [data-f=font] { width: 150px; } .tk-ts [type=number] { width: 64px; } .tk-ts select { width: 80px; }
+.tk-x { background: none; border: 0; color: var(--text-dim); width: 22px; height: 20px; border-radius: 3px; }
+.tk-x:hover { background: var(--hover-2); color: var(--text); }
 .prefs-col { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
 .prefs-code { min-height: 90px; resize: vertical; background: var(--field); border: 1px solid var(--field-border); border-radius: 3px; color: var(--text); padding: 6px; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .prefs-actions { display: flex; gap: 8px; }

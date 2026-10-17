@@ -286,7 +286,7 @@ export function newPage(name) {
 const ver = f => f.size.toString(36) + Math.floor(f.mtime ?? 0).toString(36);
 const assetVersions = () => Object.fromEntries((S.P.assets ?? []).map(a => [a.path, ver(a)]));
 const extensionVersions = () => Object.fromEntries(Object.entries(S.P.extensions ?? {}).map(([n, e]) => [n, ver(e)]));
-export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, clips: S.P.clips, breakpoints: breakpoints(), assetVersions: assetVersions(), extensionVersions: extensionVersions(), inject: S.P.project.inject, ...extra });
+export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, clips: S.P.clips, breakpoints: breakpoints(), assetVersions: assetVersions(), extensionVersions: extensionVersions(), inject: S.P.project.inject, tokens: S.P.project.tokens, ...extra });
 // editor=true: behaviours/animators don't auto-run (Scene). Play mode passes editor=false.
 // Absolute <base>: Chrome's srcdoc preload scanner resolves a relative one against the editor URL.
 export const previewHTML = (editor = !S.playing) =>

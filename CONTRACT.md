@@ -21,7 +21,10 @@ everyone working on the code. Read it fully before changing anything.
 ```
 project.json                 { "name": "...", "breakpoints": [{ "name": "Tablet", "maxWidth": 1024 }, ...],
                                "inject": { "head": "<html>", "bodyEnd": "<html>" },
-                               "siteUrl": "https://example.com/", "cleanUrls": false, "minify": false }
+                               "siteUrl": "https://example.com/", "cleanUrls": false, "minify": false,
+                               "tokens": { "colors": { "brand": "#ff3366" }, "fonts": { "heading": "fonts/H.ttf" },
+                                           "textStyles": { "h1": { "font": "$heading", "size": 48, "weight": "800",
+                                                                   "lineHeight": 1.1, "letterSpacing": 0 } } } }
 pages/<name>.json            one node tree per page (= a Unity scene) -> dist/<name>.html + <name>.css
 assets/**                    images, video, audio, json, fonts, text (copied to dist/assets/)
 components/<Name>.html       custom components (template/style/props/script) -> dist/components/<Name>.js
@@ -65,6 +68,17 @@ generated CSS; text content, raw HTML/Style code and JS modules are never rewrit
 - `overrides` (optional): `{ "<breakpoint>": { "<property path>": value } }` — responsive overrides, see below.
 - Component `type`: built-in name (`Image`), `component:<Name>` (components/Name.html), `behaviour:<Name>` (behaviours/Name.js).
   Multiple components per node; one of each built-in type, any number of behaviours.
+
+## Design tokens
+
+`project.json` `tokens` (names `[\w-]+`). A `color` prop holding `"$name"` renders as `var(--gpsb-color-name)`; a font
+prop (`string` with `asset: 'font'`, e.g. `Text.font`, `Canvas.font`) holding `"$name"` renders as
+`var(--gpsb-font-name)` (`fontFamily()`); the page CSS starts with `:root { --gpsb-color-*; --gpsb-font-* }`
+(font-asset tokens get `@font-face`). `Text.textStyle` names a text style whose non-empty fields (`font`, `size`,
+`weight`, `italic`, `lineHeight`, `letterSpacing`) replace the Text's own. Values are resolved in `propsOf`, so
+overrides and animation keys can hold tokens too (colour tokens animate as steps). The runtime gets
+`tokens.textStyles` in the page data. A prop schema `tokens: 'textStyles'` makes the Inspector show a picker.
+Editor: Project Settings ▸ Design Tokens; `files.js` `renameToken(kind, from, to)`, `tokenUses(kind, name)`.
 
 ## Prop types (component schemas)
 

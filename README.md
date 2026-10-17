@@ -137,6 +137,12 @@ Each key's easing can be linear, constant, ease-in/out, or a custom cubic-bezier
 
 Record mode works as in Unity. Press the red button, then move things in the Scene or change Inspector fields, and keys are written at the playhead.
 
+## Design tokens
+
+Project Settings ▸ Design Tokens holds named **colours**, **fonts** and **text styles**. Pick a colour or font token
+with ◆ in any colour or font field, and a text style with Text ▸ Text Style. Tokens compile to CSS variables, so
+changing one restyles every page. Renaming one updates everything that uses it.
+
 ## Publishing
 
 File ▸ Project Settings sets how the site is built:
