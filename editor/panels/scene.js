@@ -537,6 +537,7 @@ export function mount(root) {
       <nav class="sc-modes" title="Scene: edit with gizmos · Web: the page as visitors see it"><button data-mode-tab="scene">Scene</button><button data-mode-tab="web">Web</button></nav>
       <select class="sc-res" title="Resolution">${RES.map(([w, h, n]) => `<option value="${w}x${h}">${w}x${h}${n ? ' ' + n : ''}</option>`).join('')}<option value="custom">Custom…</option></select>
       <span class="sc-custom" hidden><input type="number" class="sc-w" min="1" title="Width"> × <input type="number" class="sc-h" min="1" title="Height"></span>
+      <select class="sc-item" title="Collection page: the item shown here (the build writes one page per item)" hidden></select>
       <span class="sc-scene">
         <select class="sc-zoom" title="Zoom (wheel)"><option value="">100%</option><option value="fit">Fit</option>${ZOOMS.map(z => `<option value="${z}">${z * 100}%</option>`).join('')}</select>
         <button class="btn" data-k="grid" title="Show grid">Grid</button>
@@ -649,6 +650,17 @@ export function mount(root) {
   S.on('load', bpUI);
   el.querySelector('.sc-modes').onclick = e => e.target.dataset.modeTab && setMode(e.target.dataset.modeTab);
   togUI(); scaleUI(); resUI(); bpUI();
+  const itemSel = el.querySelector('.sc-item');
+  const itemUI = () => {
+    const items = S.pageItems();
+    itemSel.hidden = !items;
+    if (!items) return;
+    const sig = items.map(x => x.slug).join('\n');
+    if (itemSel.dataset.sig !== sig) { itemSel.dataset.sig = sig; itemSel.innerHTML = items.length ? items.map((x, i) => `<option value="${i}">${x.slug.replace(/[<&]/g, '')}</option>`).join('') : '<option>no items</option>'; }
+    itemSel.value = String(Math.min(S.S.collectionItem, items.length - 1));
+  };
+  itemSel.onchange = () => S.setCollectionItem(+itemSel.value);
+  for (const ev of ['structure', 'page', 'load', 'assets']) S.on(ev, itemUI);
 
   // view input
   view.addEventListener('pointerdown', down);

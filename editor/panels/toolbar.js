@@ -108,11 +108,11 @@ export function prefabItems(a) {
   ];
 }
 
-export function newPagePrompt() {
+export function newPagePrompt(template = 'blank') {
   const name = prompt('New page name (letters, digits, - and _):', 'page' + (Object.keys(S.S.P.pages).length + 1))?.trim();
   if (!name) return;
   if (!/^[\w-]+$/.test(name)) return S.log(`Invalid page name "${name}"`, 'error');
-  S.newPage(name);
+  S.newPage(name, template);
 }
 export function deletePage(name = S.S.page) {
   const names = Object.keys(S.S.P.pages);
@@ -165,7 +165,8 @@ function componentItems() {
 }
 const MENUS = {
   File: () => [
-    { label: 'New Page…', action: newPagePrompt },
+    { label: 'New Page…', action: () => newPagePrompt() },
+    { label: 'New Flowing Page…', action: () => newPagePrompt('flow') },
     { label: 'Delete Page…', action: () => deletePage(), disabled: Object.keys(S.S.P.pages).length < 2 },
     '-',
     { label: 'Save', shortcut: sc('save'), action: S.save },
@@ -309,7 +310,8 @@ export function mount(root) {
       menuAt([
         ...Object.keys(S.S.P.pages).sort().map(n => ({ label: n, checked: n === S.S.page, action: () => S.setPage(n) })),
         '-',
-        { label: 'New Page…', action: newPagePrompt },
+        { label: 'New Page…', action: () => newPagePrompt() },
+    { label: 'New Flowing Page…', action: () => newPagePrompt('flow') },
         { label: `Delete "${S.S.page}"…`, action: () => deletePage(), disabled: Object.keys(S.S.P.pages).length < 2 },
       ], pageBtn);
     }

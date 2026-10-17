@@ -137,6 +137,15 @@ Each key's easing can be linear, constant, ease-in/out, or a custom cubic-bezier
 
 Record mode works as in Unity. Press the red button, then move things in the Scene or change Inspector fields, and keys are written at the playhead.
 
+## Content pages
+
+- **File ▸ New Flowing Page** starts a page whose sections stack and grow with their content. It has a centred content
+  column and text that wraps, for articles, docs and marketing copy. Add more with WebObject ▸ UI ▸ Section / Content
+  Column / Text Block / Markdown.
+- **Markdown** renders a `.md` file or inline text: headings, lists, tables, code, links to pages and images from assets.
+- **Collection pages:** point a page's Canvas ▸ Collection at a JSON array (e.g. blog posts). The build writes one page
+  per item at `page/<slug>`, and `{{item.title}}` works in every field. The Scene toolbar picks which item to preview.
+
 ## Prefabs
 
 Right-click an object ▸ **Create Prefab…** to make it reusable. Then drag the prefab from the Project window's

@@ -70,6 +70,22 @@ generated CSS; text content, raw HTML/Style code and JS modules are never rewrit
 - Component `type`: built-in name (`Image`), `component:<Name>` (components/Name.html), `behaviour:<Name>` (behaviours/Name.js).
   Multiple components per node; one of each built-in type, any number of behaviours.
 
+## Content pages
+
+- Flowing layout: a layout group on the Canvas stacks top-level sections (children are `position: relative`) and the
+  page grows with its content. Presets `Section`, `Content Column`, `Text Block`, `Markdown`; File ▸ New Flowing
+  Page (`newPage(name, 'flow')`). `LayoutElement.maxWidth` in a vertical layout: `width: 100%` + auto side margins.
+- `Markdown` (`lib/markdown.js` `markdown(src, { href, asset, html })`): `text` or a `.md`/`.txt` asset (`src`;
+  `ctx.text` holds text assets ≤ 512 KB from `loadProject`); links go through `ctx.href`, relative images through
+  `ctx.asset`, headings get slug ids, raw HTML is escaped unless `html`.
+- Collection pages: `Canvas.collection` (JSON asset), `collectionPath`, `slugField`. `collectionItems(root, ctx)` →
+  `[{ slug, item, index }]` (slugified, made unique). The build writes `<page>/<slug>.html` (or
+  `<page>/<slug>/index.html` with clean URLs) for each item instead of the template, rendered with scope
+  `{ item, index }` (`renderDocument(root, ctx, { scope })`), and lists them in the sitemap. `ctx.collections` (template
+  names) makes `href('post/<slug>')` resolve; the runtime gets it in the page data. A `Repeat` without `source` reads
+  `path` from the current scope (`item.tags`). The dev server renders `/project/<page>/<slug>.html`; the editor previews
+  `S.S.collectionItem` (Scene toolbar dropdown; `pageItems()`, `setCollectionItem(i)`).
+
 ## Prefabs (`lib/prefab.js`)
 
 `prefabs/<Name>.prefab.json` is a node subtree. A page (or another prefab) stores an instance as a reference:

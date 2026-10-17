@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { rectStyle, rectPixels, reanchor, defaultRect } from '../lib/rect.js';
 import { newNode, getProp, setProp, nodeAtPath, setOverride, clearOverride, isOverridden, withOverrides, effectiveTree, activeBreakpoints, componentPath } from '../lib/node.js';
-import { renderPage, renderDocument, makeCtx, bind, nodeStyle } from '../lib/render.js';
+import { renderPage, renderDocument, makeCtx, bind, nodeStyle, collectionItems } from '../lib/render.js';
 import { registerComponent, unregisterComponent, componentDef, isExtension } from '../lib/components.js';
 
 const rt = o => ({ ...defaultRect(), ...o });
@@ -277,5 +277,26 @@ assert.match(tokCss, /@font-face \{\n  font-family: "gpsb-fonts-h-ttf"/); // fon
 assert.match(tokCss, /\.bt:hover \{ background-color: var\(--gpsb-color-brand\) !important; \}/);
 assert.match(renderPage(pg, tc).body, /"textStyles"|data-gpsb/); // body renders
 assert.deepEqual(renderPage(pg, tc).data.tokens, { textStyles: tokens.textStyles });
+
+// ---- content: max-width column, Markdown, collection pages ----
+pg = canvasNode();
+const colm = newNode('Col', [{ type: 'VerticalLayoutGroup', props: {} }]), kid = newNode('Kid', [{ type: 'LayoutElement', props: { maxWidth: 720 } }]);
+colm.children.push(kid); pg.children.push(colm);
+const ks = nodeStyle(kid, colm, makeCtx());
+assert.deepEqual([ks['max-width'], ks.width, ks['margin-left'], ks['margin-right']], ['720px', '100%', 'auto', 'auto']);
+const json = { 'data/b.json': { posts: [{ title: 'Hello World', body: 'Hi *there*' }, { title: 'Hello World', body: 'x' }, { title: 'Second', tags: ['a', 'b'] }] } };
+const tpl = newNode('Canvas', [{ type: 'Canvas', props: { collection: 'data/b.json', collectionPath: 'posts', slugField: 'title', title: '{{item.title}}' } }]);
+const mdNode = newNode('Body', [{ type: 'Markdown', props: { text: '# {{item.title}}\n\n{{item.body}} [home](index) [next](post/second)' } }]);
+const tags = newNode('Tags', [{ type: 'Repeat', props: { path: 'item.tags' } }]); tags.children.push(newNode('Tag', [{ type: 'Text', props: { text: '{{item}}' } }]));
+tpl.children.push(mdNode, tags);
+const cctx = makeCtx({ json, pages: ['index', 'post'], collections: ['post'], cleanUrls: true, prefix: '../../' });
+const its = collectionItems(tpl, cctx);
+assert.deepEqual(its.map(x => x.slug), ['hello-world', 'hello-world-2', 'second']);
+const d0 = renderDocument(tpl, cctx, { name: 'hello-world', scope: { item: its[0].item, index: 0 } });
+assert.match(d0.html, /<title>Hello World<\/title>/);
+assert.match(d0.html, /<div class="gpsb-md"><h1 id="hello-world">Hello World<\/h1>\n<p>Hi <em>there<\/em> <a href="\.\.\/\.\.\/">home<\/a> <a href="\.\.\/\.\.\/post\/second\/">next<\/a><\/p><\/div>/);
+const d2 = renderDocument(tpl, cctx, { name: 'second', scope: { item: its[2].item, index: 2 } }).html;
+assert.equal((d2.match(/class="gpsb-text">[ab]</g) ?? []).length, 2); // Repeat over an array of the item
+assert.equal(collectionItems(canvasNode(), cctx), null);
 
 console.log('core ok');

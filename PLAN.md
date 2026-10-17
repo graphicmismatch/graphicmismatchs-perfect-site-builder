@@ -56,9 +56,9 @@ The docs will say so.
 
 | | Item | Design |
 |---|---|---|
-| ☐ | **Flowing sections** | Pages can flow: a layout group on the Canvas stacks top-level sections, and the page grows with its content. Presets: **Section** (full width, auto height, vertical layout with padding), **Text Block** (wraps, auto height) and **Content Column** (centred, readable max width). `LayoutElement` gains `maxWidth`/`maxHeight`. **File ▸ New Page ▸ Flowing page** starts from that structure. |
-| ☐ | **Markdown** | A `Markdown` component renders Markdown (a `text` prop or a `.md` asset) to semantic HTML at build time: headings, paragraphs, emphasis, links, images, lists, blockquote, code and tables. It uses a small parser in `lib/markdown.js` and no dependencies. Content styling stays the author's, through `Style`. |
-| ☐ | **Collection pages** | A page can be a template: `Canvas.collection = { source, path, slug }` (a JSON asset, a dot path to an array, and the field used as each item's URL). The build emits one page per item (`post/<slug>.html`, or `post/<slug>/` with clean URLs), with `{{item.*}}` bound everywhere, and the sitemap includes them. Link hrefs like `post/{{item.slug}}` resolve. The editor previews the first item, and a dropdown picks another. |
+| ☑ | **Flowing sections** | Pages can flow: a layout group on the Canvas stacks top-level sections, and the page grows with its content. Presets: **Section** (full width, auto height, vertical layout with padding), **Text Block** (wraps, auto height) and **Content Column** (centred, readable max width). `LayoutElement` gains `maxWidth`/`maxHeight`. **File ▸ New Page ▸ Flowing page** starts from that structure. |
+| ☑ | **Markdown** | A `Markdown` component renders Markdown (a `text` prop or a `.md` asset) to semantic HTML at build time: headings, paragraphs, emphasis, links, images, lists, blockquote, code and tables. It uses a small parser in `lib/markdown.js` and no dependencies. Content styling stays the author's, through `Style`. |
+| ☑ | **Collection pages** | A page can be a template: `Canvas.collection = { source, path, slug }` (a JSON asset, a dot path to an array, and the field used as each item's URL). The build emits one page per item (`post/<slug>.html`, or `post/<slug>/` with clean URLs), with `{{item.*}}` bound everywhere, and the sitemap includes them. Link hrefs like `post/{{item.slug}}` resolve. The editor previews the first item, and a dropdown picks another. |
 
 ## 4. Editor productivity
 

@@ -1,7 +1,7 @@
 // Editor state store. Every panel imports this; see CONTRACT.md "Editor".
 import { findNode, walk, setProp as setPath, getProp, newNode, newId, clone, getComponent, sortBreakpoints, withOverrides, setOverride, clearOverride, isOverridden as overridden, componentPath, nodeAtPath } from '/lib/node.js';
 import { componentDef, withDefaults, builtins, registerComponent, unregisterComponent, extensionNames } from '/lib/components.js';
-import { renderDocument, makeCtx } from '/lib/render.js';
+import { renderDocument, makeCtx, collectionItems } from '/lib/render.js';
 import { expandPrefabs, collapsePrefabs, overrideKey, bakeInstance, unpackInstance, OWN } from '/lib/prefab.js';
 
 export const S = {
@@ -14,6 +14,7 @@ export const S = {
   behaviourMeta: {},       // Name -> { props, methods } (imported from behaviours/Name.js)
   anim: { clip: null, time: 0, recording: false, playing: false, animatorId: null },
   breakpoint: null,        // breakpoint name being edited (null = base): edits become overrides, like prefab overrides
+  collectionItem: 0,       // which item a collection (template) page previews
   prefabEdit: null,        // { name, tree } while a prefab is open on its own (tree = a stage canvas holding it)
   dirty: new Set(),        // project-relative files with unsaved changes
   previewWin: null,        // Scene iframe contentWindow once loaded (window.GPSB inside it)
@@ -199,6 +200,16 @@ export const PRESETS = {
     return s;
   },
   Scrollbar: () => scrollbar('Scrollbar', false, rect({ size: [160, 20] })),
+  // flowing content: stacks vertically and grows with what's inside (pages, articles, docs)
+  Section: () => Object.assign(newNode('Section', [{ type: 'Element', props: { tag: 'section' } },
+    { type: 'VerticalLayoutGroup', props: { padding: [32, 32, 64, 64], spacing: 16, childAlignment: 'upper-center', controlWidth: true, expandWidth: true } },
+    { type: 'ContentSizeFitter', props: { vertical: 'preferred' } }]), { rect: rect({ anchorMin: [0, 0], anchorMax: [1, 0], pivot: [0.5, 0], size: [0, 200] }) }),
+  'Content Column': () => Object.assign(newNode('Content Column', [
+    { type: 'VerticalLayoutGroup', props: { spacing: 16, controlWidth: true, expandWidth: true } },
+    { type: 'ContentSizeFitter', props: { vertical: 'preferred' } }, { type: 'LayoutElement', props: { maxWidth: 720 } }]), { rect: rect({ size: [720, 200] }) }),
+  Markdown: () => Object.assign(newNode('Markdown', [{ type: 'Markdown', props: {} }, { type: 'ContentSizeFitter', props: { vertical: 'preferred' } }]), { rect: rect({ size: [600, 200] }) }),
+  'Text Block': () => Object.assign(newNode('Text Block', [{ type: 'Text', props: { text: 'Text that wraps and grows with its content.', tag: 'p', size: 18, lineHeight: 1.5 } },
+    { type: 'ContentSizeFitter', props: { vertical: 'preferred' } }]), { rect: rect({ size: [600, 30] }) }),
   Repeat: () => {
     const r = Object.assign(newNode('Repeat', [{ type: 'Repeat', props: {} }, { type: 'VerticalLayoutGroup', props: { spacing: 8 } }]), { rect: rect({ size: [300, 400] }) });
     r.children.push(Object.assign(newNode('Item', [{ type: 'Text', props: { text: '{{index}}: {{item}}' } }]), { rect: rect({ size: [300, 30] }) }));
@@ -424,10 +435,17 @@ function changeComponents(id, label, change) {
 }
 
 // ---------- pages ----------
-export function setPage(name) { if (!S.P.pages[name]) return; if (S.prefabEdit) { S.prefabEdit = null; refreshInstances(); } S.page = name; S.selection = []; emit('page'); emit('structure'); emit('selection'); }
-export function newPage(name) {
+export function setPage(name) { if (!S.P.pages[name]) return; S.collectionItem = 0; if (S.prefabEdit) { S.prefabEdit = null; refreshInstances(); } S.page = name; S.selection = []; emit('page'); emit('structure'); emit('selection'); }
+// template: 'blank' (free layout) | 'flow' (sections stack vertically and the page grows with its content)
+export function newPage(name, template = 'blank') {
   if (S.P.pages[name] || S.P.errors?.some(e => e.file === `pages/${name}.json`)) return log(`Page ${name} exists`, 'warn');
   const canvas = newNode('Canvas', [{ type: 'Canvas', props: { title: name } }, { type: 'CanvasScaler', props: {} }]);
+  if (template === 'flow') {
+    canvas.components.push({ type: 'VerticalLayoutGroup', props: { controlWidth: true, expandWidth: true } });
+    const sec = PRESETS.Section(), col = PRESETS['Content Column'](), h1 = PRESETS['Text Block'](), p = PRESETS['Text Block']();
+    h1.name = 'Heading'; Object.assign(h1.components[0].props, { text: name, tag: 'h1', size: 40, weight: 'bold', lineHeight: 1.2 });
+    col.children.push(h1, p); sec.children.push(col); canvas.children.push(sec);
+  }
   S.P.pages[name] = canvas; S.dirty.add(`pages/${name}.json`);
   setPage(name);
 }
@@ -437,12 +455,17 @@ export function newPage(name) {
 const ver = f => f.size.toString(36) + Math.floor(f.mtime ?? 0).toString(36);
 const assetVersions = () => Object.fromEntries((S.P.assets ?? []).map(a => [a.path, ver(a)]));
 const extensionVersions = () => Object.fromEntries(Object.entries(S.P.extensions ?? {}).map(([n, e]) => [n, ver(e)]));
-export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, clips: S.P.clips, breakpoints: breakpoints(), assetVersions: assetVersions(), extensionVersions: extensionVersions(), inject: S.P.project.inject, tokens: S.P.project.tokens, ...extra });
+const collections = () => Object.keys(S.P.pages).filter(n => getComponent(S.P.pages[n], 'Canvas')?.props?.collection);
+export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), collections: collections(), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, text: S.P.text, clips: S.P.clips, breakpoints: breakpoints(), assetVersions: assetVersions(), extensionVersions: extensionVersions(), inject: S.P.project.inject, tokens: S.P.project.tokens, ...extra });
 // editor=true: behaviours/animators don't auto-run (Scene). Play mode passes editor=false.
 // Absolute <base>: Chrome's srcdoc preload scanner resolves a relative one against the editor URL.
+// collection (template) pages preview one item: [{ slug, item, index }] / the previewed one's scope
+export const pageItems = () => (S.P && root() ? collectionItems(root(), ctx()) : null);
+const previewScope = () => { const it = pageItems(); const x = it?.[Math.min(S.collectionItem, it.length - 1)]; return x ? { item: x.item, index: x.index } : null; };
+export function setCollectionItem(i) { S.collectionItem = i; emit('structure'); }
 export const previewHTML = (editor = !S.playing) =>
-  renderDocument(root(), ctx({ editor, base: location.origin + '/project/' }), { name: S.page, cssHref: null }).html;
-export const generatedCode = () => renderDocument(root(), ctx(), { name: S.page }); // { html, css } as built (the build versions assets by content hash)
+  renderDocument(root(), ctx({ editor, base: location.origin + '/project/' }), { name: S.page, cssHref: null, scope: previewScope() }).html;
+export const generatedCode = () => renderDocument(root(), ctx(), { name: S.page, scope: previewScope() }); // { html, css } as built (the build versions assets by content hash)
 
 export function setPlaying(on) { S.playing = on; emit('play'); }
 
@@ -533,7 +556,7 @@ export async function reloadMeta() {
   if (!r.ok) return log('Project reload failed: ' + await r.text(), 'error');
   const P = await r.json();
   if (P.root !== S.P.root) return log('A different project was opened in the Hub; reload this tab to edit it.', 'warn');
-  for (const k of ['components', 'behaviours', 'assets', 'json', 'extensions']) S.P[k] = P[k];
+  for (const k of ['components', 'behaviours', 'assets', 'json', 'text', 'extensions']) S.P[k] = P[k];
   for (const e of P.errors ?? []) if (/^(components|assets)\//.test(e.file)) log(`${e.file}: ${e.error}`, 'error');
   await loadExtensions();
   await loadBehaviours();

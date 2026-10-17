@@ -11,10 +11,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import crypto from 'node:crypto';
-import { renderDocument, makeCtx, pageUrl } from './lib/render.js';
+import { renderDocument, makeCtx, pageUrl, itemUrl, collectionItems } from './lib/render.js';
 import { registerComponent, unregisterComponent, extensionNames } from './lib/components.js';
 import { parseComponent, compileComponent } from './lib/compile.js';
-import { newNode, walk } from './lib/node.js';
+import { newNode, walk, getComponent } from './lib/node.js';
 import { expandPrefabs } from './lib/prefab.js';
 
 const TOOL = path.dirname(fileURLToPath(import.meta.url));
@@ -59,7 +59,7 @@ export async function loadProject(root) {
   const p = n => path.join(root, n);
   const errors = [], dflt = { name: path.basename(root) };
   const project = await tryJSON(root, 'project.json', dflt, dflt, errors);
-  const pages = {}, components = {}, behaviours = {}, clips = {}, json = {}, assets = [];
+  const pages = {}, components = {}, behaviours = {}, clips = {}, json = {}, text = {}, assets = [];
   for (const f of await files(p('pages'))) if (f.endsWith('.json')) {
     const t = await tryJSON(root, 'pages/' + f, null, null, errors);
     if (t) pages[f.slice(0, -5)] = t;
@@ -89,9 +89,10 @@ export async function loadProject(root) {
     const st = await fsp.stat(p('assets/' + f));
     assets.push({ path: f, type: assetType(f), size: st.size, mtime: st.mtimeMs });
     if (ext(f) === 'json') json[f] = await tryJSON(root, 'assets/' + f, null, null, errors);
+    else if (['md', 'txt'].includes(ext(f)) && st.size <= 512 * 1024) text[f] = await fsp.readFile(p('assets/' + f), 'utf8'); // Markdown component sources
   }
   for (const c of Object.values(components)) if (c.error) errors.push({ file: `components/${c.name}.html`, error: c.error });
-  return { project, pages, prefabs, components, behaviours, clips, json, assets, extensions, errors };
+  return { project, pages, prefabs, components, behaviours, clips, json, text, assets, extensions, errors };
 }
 
 // dev server: a version per asset from size + mtime (changes whenever the file does)
@@ -118,7 +119,7 @@ async function hashFile(file) {
   return h.digest('hex').slice(0, 10);
 }
 
-const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, clips: P.clips, breakpoints: P.project.breakpoints, inject: P.project.inject, tokens: P.project.tokens, ...extra });
+const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, text: P.text, clips: P.clips, breakpoints: P.project.breakpoints, inject: P.project.inject, tokens: P.project.tokens, ...extra });
 
 // The output folder is deleted before every build: refuse anything that is not a previous build or a fresh folder.
 async function checkOut(root, out) {
@@ -159,19 +160,26 @@ export async function build(root, out = path.join(root, 'dist')) {
   }
   const site = siteUrl(P.project), clean = !!P.project.cleanUrls, files = [];
   const opts = { assetVersions: await hashVersions(root, P), extensionVersions, cleanUrls: clean, minify: !!P.project.minify };
+  // every output page: normal pages, and one per item of each collection (template) page
+  const base = ctxFor(P, opts), outputs = [];
   for (const [name, tree] of Object.entries(P.pages)) {
-    const o = pageOutput(name, clean, site);
-    let r = renderDocument(tree, ctxFor(P, { ...opts, prefix: o.prefix }), { name, cssHref: o.cssHref });
-    if (hooks.transformPage) r = { ...r, ...(await hooks.transformPage({ name, html: r.html, css: r.css, project: P.project }) ?? {}) };
+    const items = collectionItems(tree, base);
+    if (!items) outputs.push({ name, tree, scope: null, ...pageOutput(name, clean, site), url: pageUrl(name, clean).replace(/^index\.html$/, '') });
+    else for (const it of items) outputs.push({ name: `${name}/${it.slug}`, tree, scope: { item: it.item, index: it.index }, ...itemOutput(name, it.slug, clean), url: itemUrl(name, it.slug, clean) });
+  }
+  const collections = collectionsOf(P);
+  for (const o of outputs) {
+    let r = renderDocument(o.tree, ctxFor(P, { ...opts, collections, prefix: o.prefix }), { name: o.name.split('/').pop(), cssHref: o.cssHref, scope: o.scope });
+    if (hooks.transformPage) r = { ...r, ...(await hooks.transformPage({ name: o.name, html: r.html, css: r.css, project: P.project, item: o.scope?.item }) ?? {}) };
     await fsp.mkdir(path.join(out, path.dirname(o.file)), { recursive: true });
     await fsp.writeFile(path.join(out, o.file), r.html);
-    await fsp.writeFile(path.join(out, path.dirname(o.file), name + '.css'), r.css);
+    await fsp.writeFile(path.join(out, path.dirname(o.file), o.cssFile), r.css);
     files.push(o.file);
   }
   // search engines: sitemap of the indexable pages (needs the public site URL), robots.txt pointing at it
   if (site) {
-    const urls = Object.entries(P.pages).filter(([name, tree]) => name !== '404' && !tree.components?.find(c => c.type === 'PageMeta')?.props?.noindex)
-      .map(([name]) => `  <url><loc>${escXml(site + pageUrl(name, clean).replace(/^index\.html$/, ''))}</loc></url>`);
+    const urls = outputs.filter(o => o.name !== '404' && !o.tree.components?.find(c => c.type === 'PageMeta')?.props?.noindex)
+      .map(o => `  <url><loc>${escXml(site + o.url)}</loc></url>`);
     await fsp.writeFile(path.join(out, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
   }
   await fsp.writeFile(path.join(out, 'robots.txt'), `User-agent: *\nAllow: /\n${site ? `\nSitemap: ${site}sitemap.xml\n` : ''}`);
@@ -181,6 +189,8 @@ export async function build(root, out = path.join(root, 'dist')) {
   return { out, pages: Object.keys(P.pages), warnings };
 }
 
+// names of the pages that are collection templates
+const collectionsOf = P => Object.keys(P.pages).filter(n => getComponent(P.pages[n], 'Canvas')?.props?.collection);
 const escXml = s => s.replace(/[<>&'"]/g, c => `&#${c.charCodeAt(0)};`);
 // project.siteUrl normalised to end in '/', or '' when unset/invalid
 export function siteUrl(project) {
@@ -189,9 +199,14 @@ export function siteUrl(project) {
 // where a page is written and the URL prefix its links/assets need. The 404 page is served for any missing path,
 // so it uses root-relative URLs (the site URL's path, default /).
 function pageOutput(name, clean, site) {
-  if (name === '404') { const root = site ? new URL(site).pathname : '/'; return { file: '404.html', prefix: root, cssHref: `${root}404.css` }; }
-  if (clean && name !== 'index') return { file: `${name}/index.html`, prefix: '../', cssHref: `${name}.css` };
-  return { file: `${name}.html`, prefix: '', cssHref: `${name}.css` };
+  if (name === '404') { const root = site ? new URL(site).pathname : '/'; return { file: '404.html', prefix: root, cssHref: `${root}404.css`, cssFile: '404.css' }; }
+  if (clean && name !== 'index') return { file: `${name}/index.html`, prefix: '../', cssHref: `${name}.css`, cssFile: `${name}.css` };
+  return { file: `${name}.html`, prefix: '', cssHref: `${name}.css`, cssFile: `${name}.css` };
+}
+// one item of a collection page: post/<slug>.html, or post/<slug>/index.html with clean URLs
+function itemOutput(page, slugv, clean) {
+  return clean ? { file: `${page}/${slugv}/index.html`, prefix: '../../', cssHref: `${page}.css`, cssFile: `${page}.css` }
+    : { file: `${page}/${slugv}.html`, prefix: '../', cssHref: `${slugv}.css`, cssFile: `${slugv}.css` };
 }
 
 // Optional build.js in the project root (Node only, never copied to the site):
@@ -374,12 +389,21 @@ function serve(initial) {
         const out = compileComponent(comp[1], src);
         return send(res, 200, out[comp[1] + (comp[2] ?? '') + '.js'] ?? '', MIME.js);
       }
+      const it = p.match(/^\/project\/([\w-]+)\/([\w-]+)\.html$/); // collection item (preview links)
+      if (it && fs.existsSync(safe(`pages/${it[1]}.json`))) {
+        const P = await loadProject(root), tree = P.pages[it[1]], extensionVersions = statExtVersions(P);
+        await loadExtensions(root, P, extensionVersions);
+        if (tree) expandPrefabs(tree, P.prefabs);
+        const cx = ctxFor(P, { assetVersions: statVersions(P), extensionVersions, prefix: '../', collections: collectionsOf(P) });
+        const item = tree && collectionItems(tree, cx)?.find(x => x.slug === it[2]);
+        if (item) return send(res, 200, renderDocument(tree, cx, { name: it[2], cssHref: null, scope: { item: item.item, index: item.index } }).html, MIME.html);
+      }
       const page = p.match(/^\/project\/([\w-]+)\.html$/)?.[1];
       if (page && fs.existsSync(safe(`pages/${page}.json`))) { // a page rendered on the fly (Links / IFrames in the editor preview)
         const P = await loadProject(root), extensionVersions = statExtVersions(P);
         await loadExtensions(root, P, extensionVersions);
         if (P.pages[page]) expandPrefabs(P.pages[page], P.prefabs);
-        if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P), extensionVersions }), { name: page, cssHref: null }).html, MIME.html);
+        if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P), extensionVersions, collections: collectionsOf(P) }), { name: page, cssHref: null }).html, MIME.html);
       }
       if (p.startsWith('/project/')) return sendFile(res, safe(p.slice(9)));
       if (p === '/api/project') { if (!root) throw notOpen(); return sendJSON(res, { root, ...await loadProject(root) }); }
