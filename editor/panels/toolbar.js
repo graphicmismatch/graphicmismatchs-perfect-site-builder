@@ -87,6 +87,27 @@ export function createItems(parentId) {
     ...(customs.length ? ['-', ...customs.map(n => ({ label: n, action: () => S.addNode(customNode(n), parentId) }))] : []),
   ];
 }
+// Prefab submenu for the active node: create one from it, or work with the instance it belongs to
+export function prefabItems(a) {
+  const inst = a && S.instanceRoot(a.id), names = Object.keys(S.S.P.prefabs ?? {});
+  return [
+    { label: 'Create Prefab…', disabled: !a || a === S.root() || !!a._inst, action: () => {
+      const n = prompt('Prefab name:', a.name)?.trim();
+      if (n) S.createPrefab(a.id, n);
+    } },
+    { label: 'Prefab', disabled: !inst, sub: inst ? [
+      { label: `Open "${inst.prefab}"`, action: () => S.openPrefab(inst.prefab), disabled: !!inst._missing },
+      { label: 'Select Instance Root', action: () => S.select(inst.id), disabled: inst === a },
+      '-',
+      { label: 'Apply Overrides to Prefab', action: () => confirm(`Apply this instance's changes to "${inst.prefab}"? Every instance updates (this can't be undone).`) && S.applyInstance(inst.id), disabled: !inst.prefabOverrides || !Object.keys(inst.prefabOverrides).length },
+      { label: 'Revert Overrides', action: () => S.revertInstance(inst.id), disabled: !inst.prefabOverrides || !Object.keys(inst.prefabOverrides).length },
+      '-',
+      { label: 'Unpack', action: () => S.unpack(inst.id) },
+    ] : [] },
+    { label: 'Add Prefab', disabled: !names.length, sub: names.map(n => ({ label: n, action: () => S.instantiate(n, a && a !== S.root() ? a.id : undefined) })) },
+  ];
+}
+
 export function newPagePrompt() {
   const name = prompt('New page name (letters, digits, - and _):', 'page' + (Object.keys(S.S.P.pages).length + 1))?.trim();
   if (!name) return;
@@ -190,6 +211,8 @@ const MENUS = {
       { label: 'Create Empty Child', action: () => S.create('Create Empty', a.id), disabled: !a },
       '-',
       ...createItems(a?.id),
+      '-',
+      ...prefabItems(a),
     ];
   },
   Component: componentItems,

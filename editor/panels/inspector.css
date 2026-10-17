@@ -204,3 +204,11 @@ textarea.mono { font: var(--mono); font-size: 11px; white-space: pre; tab-size: 
 .in-bp-btn { background: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 60%, #000); border-radius: 3px; color: var(--sel-text); padding: 1px 8px; font-size: 11px; }
 .in-bp-btn:hover { background: var(--accent-hi); }
 .in-bp-also { color: var(--info-text); }
+
+/* prefab instance bar + overridden fields (bold label, prefab-blue bar) */
+.in-prefab { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--prefab) 12%, transparent); }
+.in-prefab .in-pf-l { flex: 1 0 100%; color: var(--prefab); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.in-prefab.missing .in-pf-l { color: #e06c6c; }
+.in-prefab .btn { padding: 0 6px; height: 18px; }
+.pfo > .f-lab, .pfo .rt-lab, .pfo.in-head .in-name { font-weight: 700; }
+.f-row.pfo, .rt-cell.pfo { box-shadow: inset 2px 0 var(--prefab); }

@@ -31,6 +31,7 @@ components/<Name>.html       custom components (template/style/props/script) -> 
 behaviours/<Name>.js         MonoBehaviour-style scripts -> dist/behaviours/<Name>.js
 extensions/<Name>.js         extension components (same format as built-ins) -> dist/extensions/ (subfolders: helpers)
 animations/<Name>.anim.json  animation clips (inlined into pages that use them)
+prefabs/<Name>.prefab.json   prefab node trees (expanded into pages at build time; not shipped)
 build.js                     optional build hooks (Node only, not shipped)
 public/**                    copied to the site root as-is, after everything else (CNAME, _redirects, .well-known/…)
 ```
@@ -68,6 +69,25 @@ generated CSS; text content, raw HTML/Style code and JS modules are never rewrit
 - `overrides` (optional): `{ "<breakpoint>": { "<property path>": value } }` — responsive overrides, see below.
 - Component `type`: built-in name (`Image`), `component:<Name>` (components/Name.html), `behaviour:<Name>` (behaviours/Name.js).
   Multiple components per node; one of each built-in type, any number of behaviours.
+
+## Prefabs (`lib/prefab.js`)
+
+`prefabs/<Name>.prefab.json` is a node subtree. A page (or another prefab) stores an instance as a reference:
+`{ id, name, active, rect, prefab: 'Name', prefabOverrides?: { '<key>|<path>': value }, overrides? }`; name, active, rect
+and the root's breakpoint `overrides` belong to the instance. `expandPrefabs(tree, prefabs)` materialises instances in
+place (build, dev server, editor): components and children come from the prefab, descendants get the deterministic id
+`<instance id>-<prefab node id>` (nested: `<outer>-<inner>-<x>`), references between the prefab's own nodes are
+remapped, then overrides are applied. Override key = id suffix ('' = the instance root) + `|` + path, or
+`<suffix>|@<breakpoint>|<path>` for a breakpoint override. Marks (never saved or shipped): `_inst` (outermost instance id
+on every descendant), `_pf` (prefab name on instance roots), `_missing` (`missing` | `cycle`). `collapsePrefabs` gives
+the stored form; `bakeInstance` (Apply), `unpackInstance`, `stripMarks` (page data), `overrideKey`, `OWN`.
+Editor (`state.js`): `instanceRoot(id)`, `isPrefabOverridden`, `structureLocked(id, own?)` (children/components of an
+instance can't change: open the prefab or unpack), `createPrefab`, `instantiate`, `openPrefab` / `closePrefab`
+(`S.S.prefabEdit = { name, tree }`; `root()` is then a stage canvas holding the prefab, edits go to
+`prefabs/<Name>.prefab.json`, closing refreshes every instance), `applyInstance`, `revertInstance`,
+`revertPrefabOverride`, `unpack`, `renamePrefab`, `deletePrefab`, `prefabUses`, `refreshInstances`. `setProp` inside an
+instance records an override. `cloneTree` keeps the id shape of prefab content. Pages are expanded on load and
+collapsed on save.
 
 ## Design tokens
 

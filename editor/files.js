@@ -153,6 +153,7 @@ const typeRef = (a, b) => v => (v === a ? b : v.startsWith(a + '.') || v.startsW
 // from/to are project-relative paths; kind: 'asset' | 'folder' | 'component' | 'behaviour' | 'anim'
 export async function renamePath(from, to, kind) {
   if (from === to) return;
+  if (kind === 'prefab') return S.renamePrefab(from.slice(8, -12), to.slice(8, -12));
   if (kind === 'anim') {
     const a = from.slice(11, -10), b = to.slice(11, -10);
     if (S.S.P.clips[b]) throw new Error(`${b} exists`);

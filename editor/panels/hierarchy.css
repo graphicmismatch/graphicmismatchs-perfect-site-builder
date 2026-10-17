@@ -45,3 +45,13 @@ input.rename { height: 18px; padding: 0 3px; flex: 1; margin-right: 6px; border-
 /* breakpoint override bar (like Unity's prefab override marker) */
 .hier-tree .row.ovr::before { content: ''; position: absolute; left: 0; top: 1px; bottom: 1px; width: 3px; background: var(--ovr); border-radius: 0 2px 2px 0; }
 .hier-tree .row.ovr .name { font-weight: 600; }
+
+/* prefab instances (Unity's blue) */
+.hier .row.pf .name { color: var(--prefab, #6fa8ff); }
+.hier .row.pf-root .name { font-weight: 600; }
+.hier .row.pf-missing .name { color: #e06c6c; font-style: italic; }
+.hier .row.sel.pf .name { color: inherit; }
+.hier .scene-row.pf-stage { color: var(--prefab, #6fa8ff); }
+.hier .scene-row.pf-stage small { color: var(--text-dim); margin-left: 6px; }
+.hier .pf-back { background: none; border: 0; color: inherit; padding: 0 6px 0 2px; }
+.hier .pf-back:hover { color: var(--text-strong); }

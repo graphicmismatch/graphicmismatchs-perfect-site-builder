@@ -2,6 +2,7 @@
 import { findNode, walk, setProp as setPath, getProp, newNode, newId, clone, getComponent, sortBreakpoints, withOverrides, setOverride, clearOverride, isOverridden as overridden, componentPath, nodeAtPath } from '/lib/node.js';
 import { componentDef, withDefaults, builtins, registerComponent, unregisterComponent, extensionNames } from '/lib/components.js';
 import { renderDocument, makeCtx } from '/lib/render.js';
+import { expandPrefabs, collapsePrefabs, overrideKey, bakeInstance, unpackInstance, OWN } from '/lib/prefab.js';
 
 export const S = {
   P: null,                 // { project, pages, components, behaviours, clips, json, assets } from /api/project
@@ -13,6 +14,7 @@ export const S = {
   behaviourMeta: {},       // Name -> { props, methods } (imported from behaviours/Name.js)
   anim: { clip: null, time: 0, recording: false, playing: false, animatorId: null },
   breakpoint: null,        // breakpoint name being edited (null = base): edits become overrides, like prefab overrides
+  prefabEdit: null,        // { name, tree } while a prefab is open on its own (tree = a stage canvas holding it)
   dirty: new Set(),        // project-relative files with unsaved changes
   previewWin: null,        // Scene iframe contentWindow once loaded (window.GPSB inside it)
   hooks: {
@@ -30,7 +32,7 @@ export const emit = (ev, ...a) => subs[ev]?.forEach(f => { try { f(...a); } catc
 export function log(msg, level = 'info', extra = {}) { emit('log', { msg: String(msg), level, time: new Date(), ...extra }); }
 
 // ---------- lookups ----------
-export const root = () => S.P?.pages[S.page];
+export const root = () => S.prefabEdit?.tree ?? S.P?.pages[S.page];
 export const node = id => (root() && id ? findNode(root(), id)?.node ?? null : null);
 export const parentOf = id => (root() && id ? findNode(root(), id)?.parent ?? null : null);
 export const selected = () => S.selection.map(node).filter(Boolean);
@@ -48,11 +50,13 @@ export { getProp, walk, clone, newId, builtins, getComponent };
 // ---------- undo / edits ----------
 const undoStack = [], redoStack = [];
 let lastEdit = { label: '', t: 0 };
-const snap = () => JSON.stringify({ page: S.page, tree: root(), clips: S.P.clips });
+const snap = () => JSON.stringify({ page: S.page, prefab: S.prefabEdit?.name, tree: root(), clips: S.P.clips });
 function restore(json) {
-  const s = JSON.parse(json), pageChanged = s.page !== S.page;
-  S.page = s.page; S.P.pages[s.page] = s.tree; S.P.clips = s.clips;
-  S.dirty.add(`pages/${s.page}.json`);
+  const s = JSON.parse(json), pageChanged = s.page !== S.page || s.prefab !== S.prefabEdit?.name;
+  S.page = s.page; S.P.clips = s.clips;
+  if (s.prefab) { S.prefabEdit = { name: s.prefab, tree: s.tree }; S.P.prefabs[s.prefab] = s.tree.children[0]; }
+  else { S.prefabEdit = null; S.P.pages[s.page] = s.tree; }
+  S.dirty.add(fileOfRoot());
   for (const k of Object.keys(s.clips)) S.dirty.add(`animations/${k}.anim.json`);
   S.selection = S.selection.filter(id => node(id));
   if (pageChanged) emit('page');
@@ -60,6 +64,9 @@ function restore(json) {
 }
 export function undo() { if (!undoStack.length) return; redoStack.push(snap()); restore(undoStack.pop()); }
 export function redo() { if (!redoStack.length) return; undoStack.push(snap()); restore(redoStack.pop()); }
+
+// file holding what root() shows: the page, or the prefab open on its own
+const fileOfRoot = () => (S.prefabEdit ? `prefabs/${S.prefabEdit.name}.prefab.json` : `pages/${S.page}.json`);
 
 // Wrap every mutation. kind: 'structure' (preview rebuild) | 'props' (patch nodes `ids`) | 'anim'.
 // merge: consecutive edits with the same label within 1s share one undo step (drags, typing).
@@ -70,7 +77,7 @@ export function edit(label, fn, { kind = 'structure', ids = [], merge = false, f
   redoStack.length = 0;
   lastEdit = { label, t: now };
   fn();
-  for (const f of files ?? [`pages/${S.page}.json`]) S.dirty.add(f);
+  for (const f of files ?? [fileOfRoot()]) S.dirty.add(f);
   emit(kind, ids);
 }
 
@@ -78,6 +85,25 @@ export function edit(label, fn, { kind = 'structure', ids = [], merge = false, f
 // edited the value is stored as an override of that breakpoint instead of the base value.
 export function setProp(id, path, value, opts = {}) {
   if (S.hooks.setProp?.(id, path, value)) return;
+  const n = node(id), inst = instanceRoot(id), bp = path !== 'name' ? S.breakpoint : null;
+  // inside a prefab instance: the change is applied and remembered as an override of that instance
+  // (the instance root's name/active/rect and its breakpoint overrides belong to the instance itself)
+  if (inst && !(n === inst && (OWN.test(path) || bp))) {
+    return edit(opts.label ?? `Override ${path} ${id}`, () => {
+      const o = (inst.prefabOverrides ??= {});
+      if (bp) {
+        setOverride(n, bp, path, value);
+        const pre = overrideKey(inst.id, n.id, '', bp); // re-record this node's overrides for bp
+        for (const k of Object.keys(o)) if (k.startsWith(pre)) delete o[k];
+        for (const [p, v] of Object.entries(n.overrides?.[bp] ?? {})) o[pre + p] = clone(v);
+      } else {
+        setPath(n, path, value);
+        const key = overrideKey(inst.id, n.id, path);
+        for (const k of Object.keys(o)) if (k.startsWith(key + '.')) delete o[k];
+        o[key] = clone(value);
+      }
+    }, { kind: 'props', ids: [id], merge: true, ...opts });
+  }
   if (S.breakpoint && path !== 'name') {
     const bp = S.breakpoint;
     return edit(opts.label ?? `Override ${path} ${id}`, () => setOverride(node(id), bp, path, value), { kind: 'props', ids: [id], merge: true, ...opts });
@@ -180,7 +206,125 @@ export const PRESETS = {
   },
 };
 
+// ---------- prefabs ----------
+// the outermost instance a node belongs to (or the node itself if it is an instance root), else null
+export function instanceRoot(id) { const n = node(id); return !n ? null : n._inst ? node(n._inst) : n.prefab ? n : null; }
+export const isPrefabOverridden = (id, path) => {
+  const inst = instanceRoot(id), o = inst?.prefabOverrides;
+  if (!o) return false;
+  const key = overrideKey(inst.id, id, path, S.breakpoint && path !== 'name' ? S.breakpoint : null);
+  return Object.keys(o).some(k => k === key || k.startsWith(key + '.') || key.startsWith(k + '.'));
+};
+// structural edits (children, components) are only possible in the prefab itself or after unpacking
+export function structureLocked(id, own = false) {
+  const n = node(id), inst = n && (n._inst ? node(n._inst) : own && n.prefab ? n : null);
+  if (inst) log(`"${n.name}" is part of the prefab "${inst._pf}" (instance "${inst.name}"): open the prefab to change its structure, or unpack the instance`, 'warn');
+  return !!inst;
+}
+// re-materialise every instance (after a prefab changed); keeps instance overrides
+export function refreshInstances() {
+  for (const t of Object.values(S.P.pages)) expandPrefabs(t, S.P.prefabs);
+  if (S.prefabEdit) expandPrefabs(S.prefabEdit.tree, S.P.prefabs, [S.prefabEdit.name]);
+}
+const prefabName = n => n.replace(/[^\w -]/g, '').trim();
+export function createPrefab(id, name) {
+  const n = node(id);
+  name = prefabName(name ?? n?.name ?? '');
+  if (!n || n === root() || structureLocked(id)) return;
+  if (!name || S.P.prefabs[name]) return log(`Prefab name "${name}" is empty or taken`, 'warn');
+  const src = collapsePrefabs(n), ids = new Map([...walk(n)].map(([x]) => [x.id, x === n ? n.id : `${n.id}-${x.id}`]));
+  S.P.prefabs[name] = src;
+  edit('Create Prefab ' + name, () => {
+    for (const k of Object.keys(n)) if (!['id', 'name', 'active', 'rect', 'overrides'].includes(k)) delete n[k];
+    n.prefab = name;
+    expandPrefabs(root(), S.P.prefabs);
+    // references from elsewhere on the page to nodes now inside the instance follow their new ids
+    const fix = o => { for (const k in o) { const v = o[k]; if (typeof v === 'string') { if (ids.has(v) && v !== n.id) o[k] = ids.get(v); } else if (v && typeof v === 'object') fix(v); } };
+    for (const [x] of walk(root())) if (!x._inst && x !== n) fix(x.components);
+  }, { files: [fileOfRoot(), `prefabs/${name}.prefab.json`] });
+  emit('assets');
+  log(`Created prefab ${name}`);
+  return name;
+}
+export function instantiate(name, parentId = root().id) {
+  const src = S.P.prefabs[name];
+  if (!src || structureLocked(parentId, true)) return;
+  if (S.prefabEdit?.name === name) return log('A prefab cannot contain itself', 'warn');
+  const n = { id: newId(), name, active: true, rect: clone(src.rect ?? rect()), prefab: name, components: [], children: [] };
+  addNode(n, parentId);
+  expandPrefabs(root(), S.P.prefabs, S.prefabEdit ? [S.prefabEdit.name] : []);
+  emit('structure');
+  return n;
+}
+export function revertInstance(id) {
+  const inst = instanceRoot(id);
+  if (inst) edit('Revert Prefab Overrides', () => { delete inst.prefabOverrides; expandPrefabs(root(), S.P.prefabs); });
+}
+export function revertPrefabOverride(id, path) {
+  const inst = instanceRoot(id), o = inst?.prefabOverrides;
+  if (!o) return;
+  const key = overrideKey(inst.id, id, path, S.breakpoint && path !== 'name' ? S.breakpoint : null);
+  edit(`Revert ${path}`, () => { for (const k of Object.keys(o)) if (k === key || k.startsWith(key + '.') || key.startsWith(k + '.')) delete o[k]; expandPrefabs(root(), S.P.prefabs); });
+}
+export function applyInstance(id) {
+  const inst = instanceRoot(id), src = inst && S.P.prefabs[inst.prefab];
+  if (!src) return;
+  const name = inst.prefab;
+  S.P.prefabs[name] = bakeInstance(clone(inst), src);
+  edit('Apply to Prefab ' + name, () => { delete inst.prefabOverrides; refreshInstances(); }, { files: [fileOfRoot(), `prefabs/${name}.prefab.json`] });
+  log(`Applied "${inst.name}" to prefab ${name}: every instance updated`);
+}
+export function unpack(id) {
+  const inst = instanceRoot(id);
+  if (inst) edit('Unpack Prefab', () => unpackInstance(inst));
+}
+// every tree that can hold instances (pages + prefabs), with the file it is saved in
+const trees = () => [...Object.entries(S.P.pages).map(([n, t]) => [t, `pages/${n}.json`]), ...Object.entries(S.P.prefabs).map(([n, t]) => [t, `prefabs/${n}.prefab.json`])];
+export const prefabUses = name => trees().reduce((k, [t]) => k + [...walk(t)].filter(([x]) => x.prefab === name).length, 0);
+export function renamePrefab(from, to) {
+  if (!S.P.prefabs[from] || S.P.prefabs[to] || !prefabName(to) || prefabName(to) !== to) return log(`Can't rename prefab to "${to}"`, 'warn');
+  S.P.prefabs[to] = S.P.prefabs[from]; delete S.P.prefabs[from];
+  for (const [t, f] of trees()) for (const [x] of walk(t)) if (x.prefab === from || x._pf === from) {
+    if (x.prefab === from) x.prefab = to;
+    if (x._pf === from) x._pf = to;
+    S.dirty.add(f);
+  }
+  if (S.prefabEdit?.name === from) S.prefabEdit.name = to;
+  S.dirty.add(`prefabs/${from}.prefab.json`); S.dirty.add(`prefabs/${to}.prefab.json`); // old file is removed on save
+  emit('assets'); emit('structure');
+  log(`Renamed prefab ${from} -> ${to}`);
+}
+export function deletePrefab(name) {
+  if (S.prefabEdit?.name === name) closePrefab();
+  delete S.P.prefabs[name];
+  S.dirty.add(`prefabs/${name}.prefab.json`);
+  refreshInstances();
+  emit('assets'); emit('structure');
+}
+
+// open a prefab on its own; edits update every instance when it is closed
+export function openPrefab(name) {
+  if (!S.P.prefabs[name]) return;
+  const stage = newNode('Prefab Stage', [{ type: 'Canvas', props: { title: name, background: '#00000000' } }, { type: 'CanvasScaler', props: {} }]);
+  stage.children.push(S.P.prefabs[name]);
+  expandPrefabs(stage, S.P.prefabs, [name]);
+  S.prefabEdit = { name, tree: stage };
+  S.selection = [S.P.prefabs[name].id];
+  emit('page'); emit('structure'); emit('selection');
+}
+export function closePrefab() {
+  if (!S.prefabEdit) return;
+  S.prefabEdit = null;
+  refreshInstances();
+  S.selection = [];
+  emit('page'); emit('structure'); emit('selection');
+}
+
+// open prefab: only its root is saved, so everything goes inside it
+const stageRoot = () => S.prefabEdit && S.P.prefabs[S.prefabEdit.name];
 export function addNode(n, parentId = root().id, index) {
+  if (stageRoot() && parentId === root().id) parentId = stageRoot().id;
+  if (structureLocked(parentId, true)) return;
   edit('Create ' + n.name, () => { const p = node(parentId) ?? root(); index == null ? p.children.push(n) : p.children.splice(index, 0, n); });
   select(n.id);
   return n;
@@ -188,7 +332,7 @@ export function addNode(n, parentId = root().id, index) {
 export const create = (preset, parentId) => addNode(PRESETS[preset](), parentId);
 
 export function deleteNodes(ids = S.selection) {
-  ids = ids.filter(id => id !== root().id);
+  ids = ids.filter(id => id !== root().id && id !== stageRoot()?.id && !(node(id)?._inst && structureLocked(id)));
   if (!ids.length) return;
   edit('Delete', () => { for (const id of ids) { const p = parentOf(id); if (p) p.children = p.children.filter(c => c.id !== id); } });
   select([]);
@@ -197,7 +341,11 @@ export function deleteNodes(ids = S.selection) {
 // Copy of a subtree with fresh ids; references between its own nodes (event targets, node props) follow the copies.
 export function cloneTree(n) {
   const c = clone(n), ids = new Map();
-  for (const [x] of walk(c)) { const id = newId(); ids.set(x.id, id); x.id = id; }
+  for (const [x] of walk(c)) { // prefab content keeps its <instance>-<prefab id> shape under the new instance id
+    const id = x._inst && ids.has(x._inst) ? ids.get(x._inst) + x.id.slice(x._inst.length) : newId();
+    ids.set(x.id, id); x.id = id;
+    if (x._inst) x._inst = ids.get(x._inst) ?? x._inst;
+  }
   const fix = o => {
     for (const k in o) { const v = o[k]; if (typeof v === 'string') { if (ids.has(v)) o[k] = ids.get(v); } else if (v && typeof v === 'object') fix(v); }
   };
@@ -209,6 +357,7 @@ export function duplicate(ids = S.selection) {
   edit('Duplicate', () => {
     for (const id of ids) {
       const p = parentOf(id); if (!p || ids.some(o => o !== id && findNode(node(o), id))) continue; // inside another duplicated node
+      if (node(id)._inst && structureLocked(id)) continue;
       const c = cloneTree(node(id));
       p.children.splice(p.children.findIndex(x => x.id === id) + 1, 0, c);
       out.push(c.id);
@@ -218,7 +367,8 @@ export function duplicate(ids = S.selection) {
 }
 
 export function reparent(id, newParentId, index) {
-  if (id === root().id) return;
+  if (stageRoot() && (id === stageRoot().id || newParentId === root().id)) return;
+  if (id === root().id || structureLocked(id) || structureLocked(newParentId, true)) return;
   const target = node(newParentId);
   for (const [n] of walk(node(id))) if (n === target) return; // no cycles
   edit('Reparent', () => {
@@ -234,11 +384,12 @@ export function addComponent(id, type) {
   const d = def(type);
   if (!d) return log(`Unknown component ${type}`, 'error');
   const n = node(id);
+  if (structureLocked(id, true)) return;
   if (getComponent(n, type) && !type.startsWith('behaviour:')) return log(`${n.name} already has ${type}`, 'warn');
   edit('Add ' + type, () => n.components.push({ type, props: withDefaults(d, {}) }));
 }
-export function removeComponent(id, i) { changeComponents(id, 'Remove component', c => c.splice(i, 1)); }
-export function moveComponent(id, i, to) { changeComponents(id, 'Move component', c => c.splice(to, 0, c.splice(i, 1)[0])); }
+export function removeComponent(id, i) { if (structureLocked(id, true)) return; changeComponents(id, 'Remove component', c => c.splice(i, 1)); }
+export function moveComponent(id, i, to) { if (structureLocked(id, true)) return; changeComponents(id, 'Move component', c => c.splice(to, 0, c.splice(i, 1)[0])); }
 
 // Remove/reorder components and keep `<Type>[n].prop` paths (overrides, animation tracks) on the same component:
 // removing Spin[0] turns Spin[1].speed into Spin.speed. Overrides of a removed component are dropped; its tracks are
@@ -273,7 +424,7 @@ function changeComponents(id, label, change) {
 }
 
 // ---------- pages ----------
-export function setPage(name) { if (!S.P.pages[name]) return; S.page = name; S.selection = []; emit('page'); emit('structure'); emit('selection'); }
+export function setPage(name) { if (!S.P.pages[name]) return; if (S.prefabEdit) { S.prefabEdit = null; refreshInstances(); } S.page = name; S.selection = []; emit('page'); emit('structure'); emit('selection'); }
 export function newPage(name) {
   if (S.P.pages[name] || S.P.errors?.some(e => e.file === `pages/${name}.json`)) return log(`Page ${name} exists`, 'warn');
   const canvas = newNode('Canvas', [{ type: 'Canvas', props: { title: name } }, { type: 'CanvasScaler', props: {} }]);
@@ -309,7 +460,8 @@ export const api = {
 export async function save() {
   const files = [...S.dirty];
   const content = f => {
-    const body = f === 'project.json' ? S.P.project : f.startsWith('pages/') ? S.P.pages[f.slice(6, -5)]
+    const tree = f.startsWith('pages/') ? S.P.pages[f.slice(6, -5)] : f.startsWith('prefabs/') ? S.P.prefabs[f.slice(8, -12)] : undefined;
+    const body = f === 'project.json' ? S.P.project : tree ? collapsePrefabs(tree) // instances are saved as references
       : f.startsWith('animations/') ? S.P.clips[f.slice(11, -10)] : undefined;
     return body === undefined ? undefined : JSON.stringify(body, null, 2);
   };
@@ -368,6 +520,8 @@ export async function load() {
   H['x-gpsb-project'] = encodeURIComponent(S.P.root);
   for (const e of S.P.errors ?? []) log(`${e.file}: ${e.error}` + (/^(pages|animations)\//.test(e.file) ? ' (not loaded; fix the file and reload)' : ''), 'error');
   if (!S.P.pages[S.page]) S.page = Object.keys(S.P.pages)[0];
+  S.P.prefabs ??= {};
+  for (const t of Object.values(S.P.pages)) expandPrefabs(t, S.P.prefabs);
   await loadExtensions();
   await loadBehaviours();
   emit('load'); emit('page'); emit('assets'); emit('structure'); emit('selection'); emit('anim');

@@ -1,7 +1,7 @@
 /* Editor theme. Tokens per theme (data-theme set by prefs.js); panels use the tokens, never hard-coded chrome colors. */
 :root, :root[data-theme=dark] {
   --bg: #191919; --panel: #282828; --panel-2: #383838; --surface: #303030; --header: #3c3c3c; --section: #3e3e3e; --section-hover: #454545;
-  --field: #2a2a2a; --field-border: #212121; --well: #2a2a2a; --sunken: #1e1e1e; --border: #1a1a1a; --border-soft: #232323; --line: #444;
+  --field: #2a2a2a; --field-border: #212121; --well: #2a2a2a; --sunken: #1e1e1e; --border: #1a1a1a; --border-soft: #232323; --line: #444; --prefab: #6fa8ff;
   --text: #d2d2d2; --text-dim: #8a8a8a; --text-strong: #fff; --disabled: #6d6d6d;
   --hover: #ffffff10; --hover-2: #ffffff1c; --sel-dim: #4d4d4d; --sel-text: #fff;
   --btn: #585858; --btn-hover: #676767; --btn-border: #303030; --btn-on: #6a6a6a; --tool: #464646; --tool-hover: #525252;
@@ -15,7 +15,7 @@
 }
 :root[data-theme=light] {
   --bg: #a5a5a5; --panel: #c2c2c2; --panel-2: #cbcbcb; --surface: #c8c8c8; --header: #cbcbcb; --section: #d3d3d3; --section-hover: #dcdcdc;
-  --field: #f0f0f0; --field-border: #a3a3a3; --well: #d6d6d6; --sunken: #f7f7f7; --border: #8f8f8f; --border-soft: #b1b1b1; --line: #a8a8a8;
+  --field: #f0f0f0; --field-border: #a3a3a3; --well: #d6d6d6; --sunken: #f7f7f7; --border: #8f8f8f; --border-soft: #b1b1b1; --line: #a8a8a8; --prefab: #1d5fbf;
   --text: #101010; --text-dim: #555; --text-strong: #000; --disabled: #8e8e8e;
   --hover: #00000010; --hover-2: #0000001c; --sel-dim: #aeaeae; --sel-text: #fff;
   --btn: #e3e3e3; --btn-hover: #efefef; --btn-border: #9a9a9a; --btn-on: #b8b8b8; --tool: #e0e0e0; --tool-hover: #ececec;

@@ -74,12 +74,19 @@ function val(id, path) {
 // Prefab-style override marker: bold label + blue bar; right-click the label to revert. Animation tints win.
 function mark(row, id, paths, b) {
   paths = [paths].flat();
-  live.push(() => row.classList.toggle('ovr', !b?.state?.() && paths.some(p => S.isOverridden(id, p))));
+  live.push(() => {
+    row.classList.toggle('ovr', !b?.state?.() && paths.some(p => S.isOverridden(id, p)));
+    row.classList.toggle('pfo', paths.some(p => S.isPrefabOverridden(id, p))); // differs from its prefab (bold, like Unity)
+  });
   row.addEventListener('contextmenu', e => {
-    if (!e.target.closest('.f-lab, .rt-lab, .v-lab, .ev-head, .ls-head, .in-head') || !paths.some(p => S.isOverridden(id, p))) return;
+    if (!e.target.closest('.f-lab, .rt-lab, .v-lab, .ev-head, .ls-head, .in-head')) return;
+    const items = [];
+    if (paths.some(p => S.isOverridden(id, p))) items.push({ label: `Revert to Base (${S.S.breakpoint})`, action: () => (paths.length === 1 ? S.revertOverride(id, paths[0])
+      : S.edit(`Revert ${paths} ${id}`, () => paths.forEach(p => clearOverride(S.node(id), S.S.breakpoint, p)), { kind: 'props', ids: [id] })) });
+    if (paths.some(p => S.isPrefabOverridden(id, p))) items.push({ label: `Revert to Prefab (${S.instanceRoot(id)?.prefab})`, action: () => paths.forEach(p => S.revertPrefabOverride(id, p)) });
+    if (!items.length) return;
     e.preventDefault(); e.stopPropagation();
-    menu([{ label: `Revert to Base (${S.S.breakpoint})`, action: () => (paths.length === 1 ? S.revertOverride(id, paths[0])
-      : S.edit(`Revert ${paths} ${id}`, () => paths.forEach(p => clearOverride(S.node(id), S.S.breakpoint, p)), { kind: 'props', ids: [id] })) }], e.clientX, e.clientY);
+    menu(items, e.clientX, e.clientY);
   });
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -132,6 +139,18 @@ function renderNode() {
   });
   el.append(head);
   mark(head, n.id, 'active');
+  const inst = S.instanceRoot(n.id);
+  if (inst) { // Unity's prefab bar: what this belongs to + Open / Select / Apply / Revert / Unpack
+    const has = !!inst.prefabOverrides && Object.keys(inst.prefabOverrides).length > 0;
+    const btn = (label, title, fn, off = false) => h('button', { class: 'btn', title, disabled: off || null, onclick: fn }, label);
+    el.append(h('div', { class: 'in-prefab' + (inst._missing ? ' missing' : '') },
+      h('span', { class: 'in-pf-l' }, inst._missing ? `Missing prefab ${inst.prefab}` : inst === n ? `Prefab ${inst.prefab}` : `Part of prefab ${inst.prefab} (${inst.name})`),
+      btn('Open', 'Edit the prefab on its own; every instance updates', () => S.openPrefab(inst.prefab), !!inst._missing),
+      inst !== n ? btn('Select', 'Select the instance root', () => S.select(inst.id)) : null,
+      btn('Apply', "Write this instance's overrides into the prefab (every instance updates)", () => confirm(`Apply this instance's changes to "${inst.prefab}"? Every instance updates (this can't be undone).`) && S.applyInstance(inst.id), !has),
+      btn('Revert', 'Drop all overrides of this instance', () => S.revertInstance(inst.id), !has),
+      btn('Unpack', 'Turn the instance into plain objects (no longer linked)', () => S.unpack(inst.id))));
+  }
   if (S.S.breakpoint) el.append(overridesRow(n.id));
   if (ids.length > 1) el.append(h('div', { class: 'in-multi' }, `${ids.length} objects selected · showing ${n.name}. RectTransform edits apply to all.`));
 

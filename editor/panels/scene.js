@@ -506,6 +506,11 @@ async function drop(e) {
   const local = pe ? stage().multiplySelf(elMatrix(pe)).translateSelf(pe.clientLeft - pe.scrollLeft, pe.clientTop - pe.scrollTop).inverse().transformPoint(v) : { x: 0, y: 0 };
   const P = pe ? box(pe) : S.S.resolution, dt = e.dataTransfer, paths = [];
   const asset = dt.getData('application/x-gpsb-asset');
+  if (asset?.startsWith('prefab:')) { // a prefab from the Project window: an instance where it was dropped
+    const n = S.instantiate(asset.slice(7), parentId);
+    if (n) S.setProp(n.id, 'rect.pos', [r3(local.x - 0.5 * P[0]), r3(local.y - 0.5 * P[1])], { label: 'Place prefab' });
+    return;
+  }
   try { if (asset) paths.push(asset); else for (const f of dt.files) paths.push(await S.upload(f)); }
   catch (err) { return S.log(`Import failed: ${err.message}`, 'error'); }
   for (const p of paths) {

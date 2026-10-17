@@ -137,6 +137,16 @@ Each key's easing can be linear, constant, ease-in/out, or a custom cubic-bezier
 
 Record mode works as in Unity. Press the red button, then move things in the Scene or change Inspector fields, and keys are written at the playhead.
 
+## Prefabs
+
+Right-click an object ▸ **Create Prefab…** to make it reusable. Then drag the prefab from the Project window's
+Prefabs folder into any page (or use WebObject ▸ Add Prefab).
+- **Overrides:** a change inside an instance becomes an override of that instance, shown bold in the Inspector.
+  Right-click a field ▸ Revert to Prefab.
+- **Open:** edits the prefab on its own (Hierarchy ◀ goes back). Every instance updates and keeps its overrides.
+- **Apply / Revert / Unpack:** in the Inspector's prefab bar. Unpack turns an instance into plain objects.
+- **Structure:** adding or removing children and components inside an instance requires Open or Unpack, as in Unity.
+
 ## Design tokens
 
 Project Settings ▸ Design Tokens holds named **colours**, **fonts** and **text styles**. Pick a colour or font token

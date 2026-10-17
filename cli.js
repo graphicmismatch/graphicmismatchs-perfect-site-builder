@@ -14,7 +14,8 @@ import crypto from 'node:crypto';
 import { renderDocument, makeCtx, pageUrl } from './lib/render.js';
 import { registerComponent, unregisterComponent, extensionNames } from './lib/components.js';
 import { parseComponent, compileComponent } from './lib/compile.js';
-import { newNode } from './lib/node.js';
+import { newNode, walk } from './lib/node.js';
+import { expandPrefabs } from './lib/prefab.js';
 
 const TOOL = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -69,6 +70,11 @@ export async function loadProject(root) {
     catch (e) { components[name] = { name, tag: 'gpsb-error', props: {}, error: String(e) }; }
   }
   for (const f of await files(p('behaviours'))) if (f.endsWith('.js')) behaviours[f.slice(0, -3)] = { path: 'behaviours/' + f };
+  const prefabs = {};
+  for (const f of await files(p('prefabs'))) if (f.endsWith('.prefab.json')) {
+    const t = await tryJSON(root, 'prefabs/' + f, null, null, errors);
+    if (t) prefabs[f.slice(0, -12)] = t;
+  }
   // extension components: top-level extensions/<Name>.js (subfolders may hold their helper modules)
   const extensions = {};
   for (const f of await files(p('extensions'))) if (/^[A-Za-z_]\w*\.js$/.test(f)) {
@@ -85,7 +91,7 @@ export async function loadProject(root) {
     if (ext(f) === 'json') json[f] = await tryJSON(root, 'assets/' + f, null, null, errors);
   }
   for (const c of Object.values(components)) if (c.error) errors.push({ file: `components/${c.name}.html`, error: c.error });
-  return { project, pages, components, behaviours, clips, json, assets, extensions, errors };
+  return { project, pages, prefabs, components, behaviours, clips, json, assets, extensions, errors };
 }
 
 // dev server: a version per asset from size + mtime (changes whenever the file does)
@@ -137,6 +143,10 @@ export async function build(root, out = path.join(root, 'dist')) {
   const fatal = P.errors.filter(e => !/^(components|assets)\//.test(e.file));
   if (fatal.length) throw new Error('cannot build:\n' + fatal.map(e => `  ${e.file}: ${e.error}`).join('\n'));
   const warnings = P.errors.map(e => `${e.file}: ${e.error}`);
+  for (const [name, tree] of Object.entries(P.pages)) { // prefab instances -> real nodes
+    expandPrefabs(tree, P.prefabs);
+    for (const [n] of walk(tree)) if (n._missing) warnings.push(`pages/${name}.json: ${n.name} uses ${n._missing === 'cycle' ? 'a prefab that contains itself' : 'a missing prefab'} (${n.prefab})`);
+  }
   await fsp.rm(out, { recursive: true, force: true });
   await fsp.mkdir(path.join(out, 'gpsb'), { recursive: true });
   for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f !== 'compile.js') await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'gpsb', f));
@@ -368,6 +378,7 @@ function serve(initial) {
       if (page && fs.existsSync(safe(`pages/${page}.json`))) { // a page rendered on the fly (Links / IFrames in the editor preview)
         const P = await loadProject(root), extensionVersions = statExtVersions(P);
         await loadExtensions(root, P, extensionVersions);
+        if (P.pages[page]) expandPrefabs(P.pages[page], P.prefabs);
         if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P), extensionVersions }), { name: page, cssHref: null }).html, MIME.html);
       }
       if (p.startsWith('/project/')) return sendFile(res, safe(p.slice(9)));

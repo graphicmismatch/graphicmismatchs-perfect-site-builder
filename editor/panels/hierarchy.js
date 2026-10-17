@@ -1,6 +1,6 @@
 // Hierarchy: page (scene) tree with selection, drag & drop reparenting, inline rename, copy/paste, asset drops.
 import * as S from '../state.js';
-import { menu, menuAt, createItems, newPagePrompt, deletePage, buildSite } from './toolbar.js';
+import { menu, menuAt, createItems, newPagePrompt, deletePage, buildSite, prefabItems } from './toolbar.js';
 import { shortcut as sc } from '../preferences.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
@@ -31,9 +31,11 @@ const ICON = {
   Form: svg('M4 5h8M4 8h8M4 11h4', '<rect x="1.5" y="2" width="13" height="12" rx="1"/>'),
   IFrame: svg('M1.5 5.5h13M4 4h0M6 4h0', '<rect x="1.5" y="2.5" width="13" height="11" rx="1"/>'),
   scene: svg('M8 1.5l6 3.3v6.4L8 14.5l-6-3.3V4.8zM2 4.8l6 3.3 6-3.3M8 8.1v6.4'),
+  prefab: svg('M8 1.5l6 3.3v6.4L8 14.5l-6-3.3V4.8zM2 4.8l6 3.3 6-3.3M8 8.1v6.4', '<path d="M8 8.1v6.4l6-3.3V4.8z" fill="currentColor" stroke="none" opacity=".45"/>'),
 };
 const PRIMARY = ['Canvas', 'Button', 'Toggle', 'Slider', 'Scrollbar', 'InputField', 'Dropdown', 'Form', 'Link', 'Video', 'Audio', 'IFrame', 'Text', 'Image', 'RawImage', 'Repeat', 'ScrollRect', 'HorizontalLayoutGroup', 'VerticalLayoutGroup', 'GridLayoutGroup', 'HTML', 'Animator'];
 function icon(n) {
+  if (n.prefab) return ['prefab', ICON.prefab];
   const types = n.components.map(c => c.type);
   if (types.includes('Canvas')) return ['Canvas', ICON.Canvas];
   const custom = types.find(t => t.startsWith('component:'));
@@ -67,7 +69,9 @@ function render() {
   const row = (n, d) => {
     const [kind, ic] = icon(n), kids = n.children?.length > 0, open = !collapsed.has(n.id);
     const ov = bp ? Object.keys(n.overrides?.[bp] ?? {}) : [];
-    out.push(`<div class="row${sel.has(n.id) ? ' sel' : ''}${n.id === act ? ' act' : ''}${dim.get(n.id) ? ' dim' : ''}${ov.length ? ' ovr' : ''}" data-id="${n.id}" draggable="true" style="--d:${d}"` +
+    const pf = n._missing ? ' pf-missing' : n.prefab ? ' pf pf-root' : n._inst ? ' pf' : '';
+    out.push(`<div class="row${sel.has(n.id) ? ' sel' : ''}${n.id === act ? ' act' : ''}${dim.get(n.id) ? ' dim' : ''}${ov.length ? ' ovr' : ''}${pf}" data-id="${n.id}" draggable="true" style="--d:${d}"` +
+      `${n._missing ? ` title="${esc(n._missing === 'cycle' ? `Prefab ${n.prefab} contains itself` : `Missing prefab ${n.prefab}`)}"` : ''}` +
       `${ov.length ? ` title="${esc(`${bp} overrides:\n${ov.join('\n')}`)}"` : ''}>` +
       `<span class="arrow${kids && !q ? (open ? ' open' : ' shut') : ''}"></span><span class="ico ico-${kind}">${ic}</span><span class="name">${esc(n.name)}</span></div>`);
     order.push(n.id);
@@ -76,7 +80,10 @@ function render() {
   order = [];
   if (q) { for (const [n] of S.walk(root)) if (matches(n, q)) row(n, 0); }
   else if (sceneOpen) row(root, 1);
-  tree.innerHTML = (q ? '' : `<div class="scene-row"><span class="arrow ${sceneOpen ? 'open' : 'shut'}"></span><span class="ico">${ICON.scene}</span><b>${esc(S.S.page)}${S.S.dirty.has(`pages/${S.S.page}.json`) ? '*' : ''}</b><button class="dots" title="Page menu">⋮</button></div>`) +
+  const pe = S.S.prefabEdit;
+  tree.innerHTML = (q ? '' : pe
+    ? `<div class="scene-row pf-stage"><button class="pf-back" title="Back to the page (every instance updates)">◀</button><span class="ico">${ICON.prefab}</span><b>${esc(pe.name)}${S.S.dirty.has(`prefabs/${pe.name}.prefab.json`) ? '*' : ''}</b><small>prefab</small></div>`
+    : `<div class="scene-row"><span class="arrow ${sceneOpen ? 'open' : 'shut'}"></span><span class="ico">${ICON.scene}</span><b>${esc(S.S.page)}${S.S.dirty.has(`pages/${S.S.page}.json`) ? '*' : ''}</b><button class="dots" title="Page menu">⋮</button></div>`) +
     out.join('') + (q && !out.length ? '<div class="empty">No matches</div>' : '');
 }
 
@@ -105,7 +112,7 @@ function rename(id = S.S.selection.at(-1)) {
     if (!renaming) return;
     renaming = false;
     const v = inp.value.trim();
-    if (ok && v && v !== n.name) S.edit('Rename', () => { S.node(id).name = v; }, { kind: 'props', ids: [id] });
+    if (ok && v && v !== n.name) S.setProp(id, 'name', v, { label: `Rename ${id}`, merge: false }); // inside a prefab instance: an override
     else render();
   };
   inp.onkeydown = e => {
@@ -123,6 +130,7 @@ function paste(asChild = false) {
   const a = S.active();
   let parent = a ?? S.root(), index;
   if (!asChild && a && a !== S.root()) { parent = S.parentOf(a.id); index = parent.children.indexOf(a) + 1; }
+  if (S.structureLocked(parent.id, true)) return;
   const nodes = clip.map(n => S.cloneTree(n));
   S.edit('Paste', () => { const p = S.node(parent.id); index == null ? p.children.push(...nodes) : p.children.splice(index, 0, ...nodes); });
   S.select(nodes.map(n => n.id));
@@ -145,6 +153,7 @@ const clearMarks = () => { tree.classList.remove('drop-end'); tree.querySelector
 const validMove = (ids, t) => { const [pid] = place(t); return ids.length && !ids.includes(t.id) && !ids.some(id => id === rootId() || id === pid || ancestors(pid).includes(id)); };
 
 function moveNodes(ids, parentId, index) {
+  if (ids.some(id => S.structureLocked(id)) || S.structureLocked(parentId, true)) return render();
   S.edit('Reparent', () => {
     const target = S.node(parentId);
     for (const id of ids) {
@@ -158,6 +167,7 @@ function moveNodes(ids, parentId, index) {
 }
 
 async function assetNode(path, parentId, index) {
+  if (path.startsWith('prefab:')) return S.instantiate(path.slice(7), parentId);
   path = path.replace(/^assets\//, '');
   const type = assetType(path);
   const [preset, comp, prop] = { image: ['Image', 'Image', 'sprite'], video: ['Video', 'Video', 'src'], audio: ['Audio', 'Audio', 'src'], json: ['Repeat', 'Repeat', 'source'] }[type] ?? [];
@@ -203,6 +213,8 @@ function rowMenu(onRow) {
     '-',
     { label: onRow ? 'Create Empty Child' : 'Create Empty', action: () => S.create('Create Empty', pid) },
     { label: 'UI', sub: createItems(pid) },
+    '-',
+    ...prefabItems(a),
   ];
 }
 
@@ -228,6 +240,7 @@ export function mount(root) {
   ], add);
 
   tree.onclick = e => {
+    if (e.target.closest('.pf-back')) return S.closePrefab();
     if (e.target.closest('.dots')) return menuAt(sceneMenu(), e.target);
     if (e.target.closest('.scene-row')) {
       if (e.target.closest('.arrow')) { sceneOpen = !sceneOpen; render(); } else S.select([]);

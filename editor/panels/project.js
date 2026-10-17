@@ -6,7 +6,7 @@ import { h, menu, fmtSize, hidden, setDragAsset } from '../fields.js';
 import { icon } from '../icons.js';
 import { openCode, createClip, uniqueName, renamePath, deletePath, behaviourTemplate, componentTemplate, extensionTemplate, validName } from '../files.js';
 
-const ROOTS = { assets: 'Assets', components: 'Components', behaviours: 'Behaviours', extensions: 'Extensions', animations: 'Animations' };
+const ROOTS = { assets: 'Assets', prefabs: 'Prefabs', components: 'Components', behaviours: 'Behaviours', extensions: 'Extensions', animations: 'Animations' };
 const OPENABLE = ['component', 'behaviour', 'extension', 'json', 'text', 'file'];
 let el, treeEl, gridEl, crumbs, footPath, searchEl, slider, fileIn;
 let cur = 'assets', selPath = null, size = 72, query = '', renaming = false, pending = false, M = { items: [], folders: new Set() };
@@ -74,6 +74,7 @@ function model() {
   for (const n of Object.keys(P.components)) items.push({ path: `components/${n}.html`, name: n, dir: 'components', kind: 'component', ren: 'component', comp: 'component:' + n });
   for (const [n, b] of Object.entries(P.behaviours)) items.push({ path: b.path, name: n, dir: 'behaviours', kind: 'behaviour', ren: 'behaviour', comp: 'behaviour:' + n });
   for (const [n, e] of Object.entries(P.extensions ?? {})) items.push({ path: e.path, name: n, dir: 'extensions', kind: 'extension', ren: 'extension', comp: n });
+  for (const n of Object.keys(P.prefabs ?? {})) items.push({ path: `prefabs/${n}.prefab.json`, name: n, dir: 'prefabs', kind: 'prefab', drag: 'prefab:' + n, ren: 'prefab' });
   for (const n of Object.keys(P.clips)) items.push({ path: `animations/${n}.anim.json`, name: n, dir: 'animations', kind: 'anim', drag: n, ren: 'anim' });
   const cmp = (a, b) => (a.kind === 'folder') !== (b.kind === 'folder') ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
   items.sort(cmp);
@@ -185,6 +186,7 @@ function openItem(it) {
   if (it.kind === 'folder') return setFolder(it.folder);
   if (OPENABLE.includes(it.kind)) return openCode(it.path);
   if (it.kind === 'anim') { S.S.anim.clip = it.name; S.emit('anim'); S.emit('show-tab', 'animation'); return; }
+  if (it.kind === 'prefab') return S.openPrefab(it.name);
   open(S.assetUrl(it.drag), '_blank');
 }
 
@@ -201,7 +203,7 @@ function reveal(p) {
 
 const targetPath = (it, v) => ({
   asset: () => join(it.dir, v), folder: () => join(parentDir(it.folder), v),
-  component: () => `components/${v}.html`, behaviour: () => `behaviours/${v}.js`, extension: () => `extensions/${v}.js`, anim: () => `animations/${v}.anim.json`,
+  component: () => `components/${v}.html`, behaviour: () => `behaviours/${v}.js`, extension: () => `extensions/${v}.js`, prefab: () => `prefabs/${v}.prefab.json`, anim: () => `animations/${v}.anim.json`,
 }[it.ren]());
 
 function startRename(it) {
@@ -245,6 +247,11 @@ function startRename(it) {
 }
 
 async function remove(it) {
+  if (it.kind === 'prefab') {
+    const uses = S.prefabUses(it.name);
+    if (confirm(`Delete prefab ${it.name}?${uses ? `\n${uses} instance(s) will show as missing (Unpack them first to keep their objects).` : ''}\nThe file is removed on the next save.`)) S.deletePrefab(it.name);
+    return;
+  }
   const n = it.kind === 'folder' ? M.items.filter(x => x.kind !== 'folder' && x.path.startsWith(it.path)).length : 0;
   if (!confirm(`Delete ${it.path}${n ? ` and the ${n} file(s) inside` : ''}?\nThis cannot be undone.`)) return;
   try {
@@ -309,7 +316,8 @@ function createMenu(x, y) {
 
 function itemMenu(it, x, y) {
   menu([
-    { label: it.kind === 'folder' ? 'Open' : OPENABLE.includes(it.kind) ? 'Open in Editor' : it.kind === 'anim' ? 'Open in Animation Window' : 'Open in New Tab', action: () => openItem(it) },
+    { label: it.kind === 'folder' ? 'Open' : OPENABLE.includes(it.kind) ? 'Open in Editor' : it.kind === 'anim' ? 'Open in Animation Window' : it.kind === 'prefab' ? 'Open Prefab' : 'Open in New Tab', action: () => openItem(it) },
+    ...(it.kind === 'prefab' ? [{ label: 'Add to Page', action: () => S.instantiate(it.name) }] : []),
     { label: 'Rename', action: () => startRename(it) },
     { label: 'Delete', action: () => remove(it) },
     '-',
