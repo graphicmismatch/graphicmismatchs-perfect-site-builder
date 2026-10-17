@@ -117,6 +117,9 @@ const clients = new Set();
 function serve() {
   const server = http.createServer(async (req, res) => {
     try {
+      // only our own editor may talk to us: block DNS rebinding (Host) and cross-site writes (custom header)
+      if (![`127.0.0.1:${PORT}`, `localhost:${PORT}`].includes(req.headers.host)) return send(res, 403, 'bad host');
+      if (req.method !== 'GET' && req.headers['x-psb'] !== '1') return send(res, 403, 'missing x-psb header');
       const u = new URL(req.url, 'http://x');
       const p = decodeURIComponent(u.pathname);
       const q = u.searchParams;

@@ -36,6 +36,11 @@ export const selected = () => S.selection.map(node).filter(Boolean);
 export const active = () => node(S.selection.at(-1));
 export const def = type => componentDef(type, S.P?.components, S.behaviourMeta);
 export const propsOf = c => withDefaults(def(c.type), c.props);
+// Untransformed CSS px size of a node's parent (for reanchor / gizmos). Root or no preview -> resolution.
+export function parentSize(id) {
+  const p = parentOf(id), el = p && S.previewWin?.PSB?.el(p.id);
+  return el ? [el.offsetWidth, el.offsetHeight] : [...S.resolution];
+}
 export const assetUrl = p => '/project/assets/' + String(p).split('/').map(encodeURIComponent).join('/');
 export { getProp, walk, clone, newId, builtins, getComponent };
 
@@ -184,12 +189,13 @@ export const generatedCode = () => renderDocument(root(), ctx(), { name: S.page 
 export function setPlaying(on) { S.playing = on; emit('play'); }
 
 // ---------- files / server ----------
+const H = { 'x-psb': '1' }; // required by the server for every non-GET request
 export const api = {
   get: p => fetch('/api/file?path=' + encodeURIComponent(p)).then(r => (r.ok ? r.text() : Promise.reject(new Error(r.statusText)))),
-  put: (p, body) => fetch('/api/file?path=' + encodeURIComponent(p), { method: 'PUT', body }).then(r => (r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t))))),
-  del: p => fetch('/api/file?path=' + encodeURIComponent(p), { method: 'DELETE' }).then(r => r.json()),
-  rename: (from, to) => fetch(`/api/rename?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'POST' }).then(r => r.json()),
-  build: () => fetch('/api/build', { method: 'POST' }).then(r => (r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t))))),
+  put: (p, body) => fetch('/api/file?path=' + encodeURIComponent(p), { method: 'PUT', body, headers: H }).then(r => (r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t))))),
+  del: p => fetch('/api/file?path=' + encodeURIComponent(p), { method: 'DELETE', headers: H }).then(r => r.json()),
+  rename: (from, to) => fetch(`/api/rename?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'POST', headers: H }).then(r => r.json()),
+  build: () => fetch('/api/build', { method: 'POST', headers: H }).then(r => (r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t))))),
 };
 
 export async function save() {

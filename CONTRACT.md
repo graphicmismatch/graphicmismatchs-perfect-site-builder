@@ -105,7 +105,9 @@ dispatches `psb:ready` on window. API:
 PSB.data, PSB.ctx, PSB.editor, PSB.scale, PSB.canvas
 PSB.node(id) PSB.parent(id) PSB.el(id) PSB.els(id)       // els: all elements (Repeat clones share an id)
 PSB.find('Header/Logo' | 'Logo', fromNode?) -> node
-PSB.applyNode(node, parent?)   // re-apply a (mutated or cloned) node's style/attrs/patch to its elements
+PSB.applyNode(node, parent?, els?)  // PURE: re-apply node data's style/attrs/patch to els (default: all elements
+                                    // with that id). Never writes the tree. Runtime code mutates PSB.node(id) in
+                                    // place then calls it; editor preview passes clones.
 PSB.setActive(id, bool)
 PSB.assets.url(p) .json(p) .text(p)
 // added by animator.js:
@@ -156,8 +158,8 @@ export default class Spin {
 ```
 
 Injected before `start()`: `this.el`, `this.node` (runtime node data; a per-element clone for Repeat clones),
-`this.props` (defaults merged), `this.PSB`, `this.find(path)` (node), `this.apply()` (= PSB.applyNode(this.node)),
-`this.animator` (controller of the nearest Animator on self/ancestors or null), `this.setActive(bool)`.
+`this.props` (defaults merged), `this.PSB`, `this.find(path)` (node),
+`this.apply()` is `PSB.applyNode(this.node, parent, this.el)` (own element only). `this.animator` (controller of the nearest Animator on self/ancestors or null), `this.setActive(bool)`.
 One instance per element. `update` driven by one shared rAF loop, dt in seconds.
 Modules are loaded from `behaviours/<Name>.js` relative to the page (`new URL('../behaviours/…', import.meta.url)` from psb/).
 
@@ -190,7 +192,9 @@ Clip `animations/<Name>.anim.json`:
   `ease-in-out` | `[x1, y1, x2, y2]` (cubic-bezier, the Curves view edits these handles).
 - `lib/anim.js` (isomorphic): `sampleClip(clip, t) -> [{ path, prop, value }]`, `evalTrack(track, t)`, `ease(e, u)`,
   `lerpValue(a, b, u)`, `applyClip(animatorNode, clip, t) -> Map<id, clonedNode>` (clones of affected nodes with sampled
-  values set, ready for `PSB.applyNode`).
+  values set — **editor preview only**).
+- Runtime animation (like Unity) overwrites values: write samples into `PSB.node(id)` in place with `setProp`, then
+  `PSB.applyNode(node)`.
 - `lib/animator.js#boot(PSB)`: one controller per Animator node; `playOn` start/hover/click/visible/manual; speed;
   loop or hold last frame; fires clip events through `PSB.invoke(animatorNodeId-relative target, call, arg)`;
   exposes `PSB.animator(id)`.
@@ -214,6 +218,8 @@ GET|PUT|DELETE /api/file?path= read / write (raw body, streamed) / delete a proj
 POST /api/rename?from=&to=     POST /api/build -> { out, pages }
 GET  /api/events               SSE { file } on external changes (editor hot-reloads components/behaviours/assets)
 ```
+Requests with a Host other than `127.0.0.1:PORT`/`localhost:PORT` get 403; non-GET requests need header `x-psb: 1`
+(`S.api` sends it).
 
 ## Editor (`editor/`)
 
@@ -228,8 +234,8 @@ bottom tabs (`emit('show-tab', name)` switches) and splitters.
 ```
 S.S: { P, page, selection[], tool, resolution, playing, behaviourMeta, anim{clip,time,recording,playing,animatorId}, dirty, previewWin, hooks }
 on(ev, fn) -> unsubscribe     emit(ev, ...args)     log(msg, level='info'|'warn'|'error', extra)
-events: load structure props(ids) selection tool page anim assets log(entry) play resolution saved preview-ready show-tab
-root() node(id) parentOf(id) selected() active() def(type) propsOf(component) assetUrl(path)
+events: load structure props(ids) selection tool page anim assets log(entry) play resolution saved preview-ready show-tab frame
+root() node(id) parentOf(id) parentSize(id) selected() active() def(type) propsOf(component) assetUrl(path)
 edit(label, fn, { kind, ids, merge, files })   undo() redo()
 setProp(id, path, value, opts)     // ALWAYS use this for property edits (record mode hooks in)
 select(ids, additive) setTool(t) PRESETS create(preset, parentId) addNode(node, parentId, index)
@@ -242,7 +248,12 @@ api.get/put/del/rename/build   save() build() upload(file, dir) load() reloadMet
   `previewWin.PSB.applyNode(...)` immediately, plus a debounced (~300 ms) full rebuild to catch tag/inner/layout changes.
 - Drag & drop between panels: `dataTransfer` types `application/x-psb-asset` (asset path) and
   `application/x-psb-node` (node id). OS file drops anywhere in Project/Scene/Hierarchy import via `S.upload`.
-- Keyboard (Unity): Q W E R T tools, Ctrl+S save, Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y undo/redo, Ctrl+D duplicate,
+- `parentSize(id)` → `[w, h]` untransformed CSS px of the node's parent (preview element, else `S.resolution`).
+  Use it for `reanchor` (Inspector anchor presets) and Scene gizmos.
+- **Keyboard: `main.js` (shell) owns ALL global shortcuts.** Others must not bind global keys. F emits `frame`
+  (Scene listens). Panels may handle their own keys only while focus is inside them (local listener + stopPropagation),
+  e.g. Animation window Delete on keys, Project F2 rename.
+  Unity keys: Q W E R T tools, Ctrl+S save, Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y undo/redo, Ctrl+D duplicate,
   Delete, F frame selection, Ctrl+P play, F2 rename. Ignore shortcuts while typing in inputs.
 
 ## Ownership
