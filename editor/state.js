@@ -1,6 +1,6 @@
 // Editor state store. Every panel imports this; see CONTRACT.md "Editor".
 import { findNode, walk, setProp as setPath, getProp, newNode, newId, clone, getComponent, sortBreakpoints, withOverrides, setOverride, clearOverride, isOverridden as overridden, componentPath, nodeAtPath } from '/lib/node.js';
-import { componentDef, withDefaults, builtins } from '/lib/components.js';
+import { componentDef, withDefaults, builtins, registerComponent, unregisterComponent, extensionNames } from '/lib/components.js';
 import { renderDocument, makeCtx } from '/lib/render.js';
 
 export const S = {
@@ -273,8 +273,10 @@ export function newPage(name) {
 
 // ---------- preview / generated code ----------
 // asset versions from size + mtime: preview URLs change when a file changes, and are otherwise cached for good
-const assetVersions = () => Object.fromEntries((S.P.assets ?? []).map(a => [a.path, a.size.toString(36) + Math.floor(a.mtime ?? 0).toString(36)]));
-export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, clips: S.P.clips, breakpoints: breakpoints(), assetVersions: assetVersions(), ...extra });
+const ver = f => f.size.toString(36) + Math.floor(f.mtime ?? 0).toString(36);
+const assetVersions = () => Object.fromEntries((S.P.assets ?? []).map(a => [a.path, ver(a)]));
+const extensionVersions = () => Object.fromEntries(Object.entries(S.P.extensions ?? {}).map(([n, e]) => [n, ver(e)]));
+export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, clips: S.P.clips, breakpoints: breakpoints(), assetVersions: assetVersions(), extensionVersions: extensionVersions(), inject: S.P.project.inject, ...extra });
 // editor=true: behaviours/animators don't auto-run (Scene). Play mode passes editor=false.
 // Absolute <base>: Chrome's srcdoc preload scanner resolves a relative one against the editor URL.
 export const previewHTML = (editor = !S.playing) =>
@@ -328,6 +330,15 @@ export async function upload(file, dir = '') {
   return p.slice(7);
 }
 
+// extensions/<Name>.js -> registered like built-ins (Add Component, inspector, preview); re-imported when they change
+async function loadExtensions() {
+  for (const n of extensionNames()) if (!S.P.extensions?.[n]) unregisterComponent(n);
+  for (const [name, e] of Object.entries(S.P.extensions ?? {})) {
+    try { registerComponent(name, (await import(`/project/${e.path}?v=${ver(e)}`)).default); }
+    catch (err) { log(`Extension ${name}: ${err.message}`, 'error'); }
+  }
+}
+
 async function loadBehaviours() {
   S.behaviourMeta = {};
   for (const [name, b] of Object.entries(S.P.behaviours)) {
@@ -347,6 +358,7 @@ export async function load() {
   H['x-gpsb-project'] = encodeURIComponent(S.P.root);
   for (const e of S.P.errors ?? []) log(`${e.file}: ${e.error}` + (/^(pages|animations)\//.test(e.file) ? ' (not loaded; fix the file and reload)' : ''), 'error');
   if (!S.P.pages[S.page]) S.page = Object.keys(S.P.pages)[0];
+  await loadExtensions();
   await loadBehaviours();
   emit('load'); emit('page'); emit('assets'); emit('structure'); emit('selection'); emit('anim');
 }
@@ -357,8 +369,9 @@ export async function reloadMeta() {
   if (!r.ok) return log('Project reload failed: ' + await r.text(), 'error');
   const P = await r.json();
   if (P.root !== S.P.root) return log('A different project was opened in the Hub; reload this tab to edit it.', 'warn');
-  for (const k of ['components', 'behaviours', 'assets', 'json']) S.P[k] = P[k];
+  for (const k of ['components', 'behaviours', 'assets', 'json', 'extensions']) S.P[k] = P[k];
   for (const e of P.errors ?? []) if (/^(components|assets)\//.test(e.file)) log(`${e.file}: ${e.error}`, 'error');
+  await loadExtensions();
   await loadBehaviours();
   emit('assets'); emit('structure');
 }
@@ -366,5 +379,5 @@ export async function reloadMeta() {
 // external file edits (VS Code etc.) -> hot reload components/behaviours/assets
 new EventSource('/api/events').onmessage = e => {
   const { file } = JSON.parse(e.data);
-  if (/^(components|behaviours|assets)\//.test(file)) { clearTimeout(load.t); load.t = setTimeout(reloadMeta, 150); }
+  if (/^(components|behaviours|assets|extensions)\//.test(file)) { clearTimeout(load.t); load.t = setTimeout(reloadMeta, 150); }
 };

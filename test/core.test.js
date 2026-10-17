@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { rectStyle, rectPixels, reanchor, defaultRect } from '../lib/rect.js';
 import { newNode, getProp, setProp, nodeAtPath, setOverride, clearOverride, isOverridden, withOverrides, effectiveTree, activeBreakpoints, componentPath } from '../lib/node.js';
 import { renderPage, renderDocument, makeCtx, bind, nodeStyle } from '../lib/render.js';
+import { registerComponent, unregisterComponent, componentDef, isExtension } from '../lib/components.js';
 
 const rt = o => ({ ...defaultRect(), ...o });
 
@@ -206,5 +207,29 @@ assert.match(doc, /<html lang="de">/);
 assert.match(doc, /<link rel="icon" href="assets\/img\/f.png">/);
 assert.match(doc, /<meta property="og:image" content="https:\/\/site.test\/a\/assets\/img\/s.png">/);
 assert.match(doc, /<link rel="canonical" href="https:\/\/site.test\/a\/">/);
+
+// ---- extension components ----
+assert.throws(() => registerComponent('Image', {}), /built-in/);
+assert.throws(() => registerComponent('bad-name', {}), /invalid/);
+registerComponent('Badge', ({ esc }) => ({
+  props: { label: { type: 'string', default: 'New' } },
+  style: () => ({ 'border-radius': '9px' }),
+  inner: p => `<b>${esc(p.label)}</b>`,
+  head: p => `<link rel="preconnect" href="https://cdn.test">`,
+}));
+assert.ok(isExtension('Badge') && componentDef('Badge').category === 'Extensions');
+pg = canvasNode();
+pg.children.push(newNode('B1', [{ type: 'Badge', props: { label: '<x>' } }]), newNode('B2', [{ type: 'Badge', props: {} }]));
+const extDoc = renderDocument(pg, makeCtx({ extensionVersions: { Badge: 'abc' }, inject: { head: '<meta name="h">', bodyEnd: '<script>1</script>' } })).html;
+assert.match(extDoc, /<b>&#60;x&#62;<\/b>/);
+assert.equal(extDoc.match(/rel="preconnect"/g).length, 1); // head() deduplicated
+assert.match(extDoc, /"extensions":\{"Badge":"abc"\}/);
+assert.match(extDoc, /<meta name="h">/);
+assert.match(extDoc, /<script>1<\/script>/);
+assert.ok(!renderDocument(pg, makeCtx({ editor: true, inject: { bodyEnd: '<script>1</script>' } })).html.includes('<script>1</script>')); // not while editing
+registerComponent('Badge', { props: {}, inner: () => 'v2' }); // re-registering an extension replaces it (hot reload)
+assert.equal(componentDef('Badge').inner(), 'v2');
+unregisterComponent('Badge');
+assert.equal(componentDef('Badge'), undefined);
 
 console.log('core ok');

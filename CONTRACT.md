@@ -19,12 +19,15 @@ everyone working on the code. Read it fully before changing anything.
 ## Project on disk
 
 ```
-project.json                 { "name": "...", "breakpoints": [{ "name": "Tablet", "maxWidth": 1024 }, ...] }
+project.json                 { "name": "...", "breakpoints": [{ "name": "Tablet", "maxWidth": 1024 }, ...],
+                               "inject": { "head": "<html>", "bodyEnd": "<html>" } }
 pages/<name>.json            one node tree per page (= a Unity scene) -> dist/<name>.html + <name>.css
 assets/**                    images, video, audio, json, fonts, text (copied to dist/assets/)
 components/<Name>.html       custom components (template/style/props/script) -> dist/components/<Name>.js
 behaviours/<Name>.js         MonoBehaviour-style scripts -> dist/behaviours/<Name>.js
+extensions/<Name>.js         extension components (same format as built-ins) -> dist/extensions/ (subfolders: helpers)
 animations/<Name>.anim.json  animation clips (inlined into pages that use them)
+build.js                     optional build hooks (Node only, not shipped)
 ```
 
 ## Node
@@ -273,6 +276,41 @@ Project writes (`PUT/DELETE /api/file`, `/api/rename`, `/api/build`) must send `
 `fontSize`, `layout` (current dock layout), `layouts` ({name: layout} saved layouts), `shortcuts` ({action: key combo}
 overrides); panels namespace their own keys (`scene.grid`, …). Theme tokens are defined in `editor/style.css` under
 `:root[data-theme=dark|light]`; panel CSS must use the tokens, never hard-coded chrome colors.
+
+## Extending the output
+
+The output is meant to grow: dynamic components (runtime data, embeds, third-party widgets) plug in without changing
+the build. Anything below is a stable contract; changes to the build (minify, clean URLs, asset versions, ...) must
+keep it working.
+
+**Extension components** (`extensions/<Name>.js`, `Name` a JS identifier, not a built-in name). The default export is
+a component definition (format at the top of `lib/components.js`) or a factory `kit => definition` where `kit` =
+`{ esc, cssUrl, control, near, findComp, fontFamily }`, so the module needs no imports. The file must load in Node and
+the browser: browser-only work goes in `init` / `patch` / `state`. Registered with `registerComponent(name, def)`
+(`lib/components.js`; `isExtension`, `extensionNames`, `unregisterComponent`) and from then on indistinguishable from
+a built-in (Add Component, Inspector, animation, overrides, build, runtime). Default category: `Extensions`.
+- Build (`cli.js build`): imported with a content-hash version, registered before rendering, copied to `dist/extensions/`.
+  A load error fails the build (the pages would silently lose content).
+- Dev server / on-the-fly pages and editor: imported from `/project/extensions/` with a size+mtime version;
+  re-imported when the file changes (SSE `extensions/…` → `reloadMeta`).
+- Published runtime: page data `extensions: { Name: version }` lists the extensions the page uses; `runtime.js`
+  imports `../extensions/<Name>.js?v=…` relative to itself and registers them before applying or initialising anything.
+- Hooks for dynamic behaviour: `init({ el, GPSB, ci })` (published page / Play mode only, once per element),
+  `patch(el, p, ctx)` (after any prop change), `state` (user-edited values, see form controls), `head(p, ctx)` (HTML
+  added to `<head>`, deduplicated per page; e.g. a widget's script or stylesheet), `inner` (build-time HTML, also what
+  the editor shows).
+
+**Custom code**: `project.json` `inject.head` (every page's `<head>`) and `inject.bodyEnd` (end of every `<body>`, not
+in the editor's edit-mode preview), `PageMeta.head` (one page's `<head>`).
+
+**Build hooks** (`build.js`, optional, Node, never copied): `transformPage({ name, html, css, project })` → partial
+`{ html, css }`; `afterBuild({ out, root, project, pages })` (RSS, search index, upload). Errors fail the build.
+
+**Output contract** (what code added later can rely on):
+- every node element has `data-gpsb="<node id>"` and a class from its name (unique per page); the root has `gpsb-canvas`
+- page data in `<script type="application/json" id="gpsb-data">`; `window.GPSB` (see Page runtime) and `gpsb:ready`
+- unbundled ES modules: `gpsb/*.js` (runtime and lib), `components/<Name>.js`, `behaviours/<Name>.js`, `extensions/<Name>.js`
+- asset URLs always come from `ctx.asset` (`GPSB.ctx.asset` / `GPSB.assets.url` at runtime), never hand-built
 
 ## Dev server (`cli.js serve`)
 

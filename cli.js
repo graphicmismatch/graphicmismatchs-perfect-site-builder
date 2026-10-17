@@ -9,9 +9,10 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import crypto from 'node:crypto';
 import { renderDocument, makeCtx } from './lib/render.js';
+import { registerComponent, unregisterComponent, extensionNames } from './lib/components.js';
 import { parseComponent, compileComponent } from './lib/compile.js';
 import { newNode } from './lib/node.js';
 
@@ -68,6 +69,12 @@ export async function loadProject(root) {
     catch (e) { components[name] = { name, tag: 'gpsb-error', props: {}, error: String(e) }; }
   }
   for (const f of await files(p('behaviours'))) if (f.endsWith('.js')) behaviours[f.slice(0, -3)] = { path: 'behaviours/' + f };
+  // extension components: top-level extensions/<Name>.js (subfolders may hold their helper modules)
+  const extensions = {};
+  for (const f of await files(p('extensions'))) if (/^[A-Za-z_]\w*\.js$/.test(f)) {
+    const st = await fsp.stat(p('extensions/' + f));
+    extensions[f.slice(0, -3)] = { path: 'extensions/' + f, size: st.size, mtime: st.mtimeMs };
+  }
   for (const f of await files(p('animations'))) if (f.endsWith('.anim.json')) {
     const c = await tryJSON(root, 'animations/' + f, null, null, errors);
     if (c) clips[f.slice(0, -10)] = c;
@@ -78,7 +85,7 @@ export async function loadProject(root) {
     if (ext(f) === 'json') json[f] = await tryJSON(root, 'assets/' + f, null, null, errors);
   }
   for (const c of Object.values(components)) if (c.error) errors.push({ file: `components/${c.name}.html`, error: c.error });
-  return { project, pages, components, behaviours, clips, json, assets, errors };
+  return { project, pages, components, behaviours, clips, json, assets, extensions, errors };
 }
 
 // dev server: a version per asset from size + mtime (changes whenever the file does)
@@ -86,14 +93,26 @@ const statVersions = P => Object.fromEntries(P.assets.map(a => [a.path, a.size.t
 // build: content hashes, so a published asset URL only changes when its bytes do
 async function hashVersions(root, P) {
   const out = {};
-  for (const a of P.assets) {
-    const h = crypto.createHash('sha1');
-    for await (const chunk of fs.createReadStream(path.join(root, 'assets', a.path))) h.update(chunk);
-    out[a.path] = h.digest('hex').slice(0, 10);
-  }
+  for (const a of P.assets) out[a.path] = await hashFile(path.join(root, 'assets', a.path));
   return out;
 }
-const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, clips: P.clips, breakpoints: P.project.breakpoints, ...extra });
+// Register the project's extension components (replacing the previous project's) so rendering knows them.
+// versions: { Name: v } (import cache key; the same value goes into page URLs). Load errors land in P.errors.
+async function loadExtensions(root, P, versions) {
+  for (const n of extensionNames()) unregisterComponent(n);
+  for (const [name, e] of Object.entries(P.extensions)) {
+    try { registerComponent(name, (await import(`${pathToFileURL(path.join(root, e.path)).href}?v=${versions[name]}`)).default); }
+    catch (err) { P.errors.push({ file: e.path, error: err.message }); }
+  }
+}
+const statExtVersions = P => Object.fromEntries(Object.entries(P.extensions).map(([n, e]) => [n, e.size.toString(36) + Math.floor(e.mtime).toString(36)]));
+async function hashFile(file) {
+  const h = crypto.createHash('sha1');
+  for await (const chunk of fs.createReadStream(file)) h.update(chunk);
+  return h.digest('hex').slice(0, 10);
+}
+
+const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, clips: P.clips, breakpoints: P.project.breakpoints, inject: P.project.inject, ...extra });
 
 // The output folder is deleted before every build: refuse anything that is not a previous build or a fresh folder.
 async function checkOut(root, out) {
@@ -110,27 +129,42 @@ export async function build(root, out = path.join(root, 'dist')) {
   root = path.resolve(root); out = path.resolve(out);
   await checkOut(root, out);
   const P = await loadProject(root);
-  // a broken page/clip/project.json would silently drop content from the site: fail. Bad components/assets: warn.
+  const extensionVersions = {};
+  for (const [n, e] of Object.entries(P.extensions)) extensionVersions[n] = await hashFile(path.join(root, e.path));
+  await loadExtensions(root, P, extensionVersions);
+  const hooks = await buildHooks(root);
+  // a broken page/clip/extension/project.json would silently drop content from the site: fail. Bad components/assets: warn.
   const fatal = P.errors.filter(e => !/^(components|assets)\//.test(e.file));
   if (fatal.length) throw new Error('cannot build:\n' + fatal.map(e => `  ${e.file}: ${e.error}`).join('\n'));
   const warnings = P.errors.map(e => `${e.file}: ${e.error}`);
   await fsp.rm(out, { recursive: true, force: true });
   await fsp.mkdir(path.join(out, 'gpsb'), { recursive: true });
   for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f !== 'compile.js') await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'gpsb', f));
-  for (const d of ['assets', 'behaviours']) if (fs.existsSync(path.join(root, d))) await fsp.cp(path.join(root, d), path.join(out, d), { recursive: true });
+  for (const d of ['assets', 'behaviours', 'extensions']) if (fs.existsSync(path.join(root, d))) await fsp.cp(path.join(root, d), path.join(out, d), { recursive: true });
   await fsp.mkdir(path.join(out, 'components'), { recursive: true });
   for (const name of Object.keys(P.components)) {
     if (P.components[name].error) continue; // reported in warnings
     const src = await fsp.readFile(path.join(root, 'components', name + '.html'), 'utf8');
     for (const [f, code] of Object.entries(compileComponent(name, src))) await fsp.writeFile(path.join(out, 'components', f), code);
   }
-  const ctx = ctxFor(P, { assetVersions: await hashVersions(root, P) });
+  const ctx = ctxFor(P, { assetVersions: await hashVersions(root, P), extensionVersions });
   for (const [name, tree] of Object.entries(P.pages)) {
-    const { html, css } = renderDocument(tree, ctx, { name });
-    await fsp.writeFile(path.join(out, name + '.html'), html);
-    await fsp.writeFile(path.join(out, name + '.css'), css);
+    let r = renderDocument(tree, ctx, { name });
+    if (hooks.transformPage) r = { ...r, ...(await hooks.transformPage({ name, html: r.html, css: r.css, project: P.project }) ?? {}) };
+    await fsp.writeFile(path.join(out, name + '.html'), r.html);
+    await fsp.writeFile(path.join(out, name + '.css'), r.css);
   }
+  await hooks.afterBuild?.({ out, root, project: P.project, pages: Object.keys(P.pages) });
   return { out, pages: Object.keys(P.pages), warnings };
+}
+
+// Optional build.js in the project root (Node only, never copied to the site):
+//   export function transformPage({ name, html, css, project }) -> { html?, css? }
+//   export async function afterBuild({ out, root, project, pages })
+async function buildHooks(root) {
+  const f = path.join(root, 'build.js');
+  if (!fs.existsSync(f)) return {};
+  return import(`${pathToFileURL(f).href}?v=${(await fsp.stat(f)).mtimeMs}`);
 }
 
 export async function create(root) {
@@ -306,8 +340,9 @@ function serve(initial) {
       }
       const page = p.match(/^\/project\/([\w-]+)\.html$/)?.[1];
       if (page && fs.existsSync(safe(`pages/${page}.json`))) { // a page rendered on the fly (Links / IFrames in the editor preview)
-        const P = await loadProject(root);
-        if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P) }), { name: page, cssHref: null }).html, MIME.html);
+        const P = await loadProject(root), extensionVersions = statExtVersions(P);
+        await loadExtensions(root, P, extensionVersions);
+        if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P), extensionVersions }), { name: page, cssHref: null }).html, MIME.html);
       }
       if (p.startsWith('/project/')) return sendFile(res, safe(p.slice(9)));
       if (p === '/api/project') { if (!root) throw notOpen(); return sendJSON(res, { root, ...await loadProject(root) }); }

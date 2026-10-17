@@ -23,6 +23,29 @@ export default class ${name} {
 }
 `;
 
+export const extensionTemplate = name => `// ${name}: an extension component. Add it with Add Component > Extensions > ${name}.
+// It works like a built-in: props show in the Inspector, can be animated and overridden per breakpoint.
+// This file runs at build time (Node) and in the browser, so keep browser-only code inside init / patch.
+// Hooks: style, attrs, inner, rules, head, patch, init, state (see CONTRACT.md "Extension components").
+export default ({ esc }) => ({
+  category: 'Extensions',
+  props: {
+    text: { type: 'string', default: 'Hello' },
+    src: { type: 'string', default: '', help: 'optional URL of JSON { "text": "..." } loaded on the published page' },
+  },
+  // HTML written into the page at build time (and shown in the editor)
+  inner: p => \`<span class="ext-text">\${esc(p.text)}</span>\`,
+  // a prop changed (Inspector, animation, breakpoint): update the element
+  patch: (el, p) => { const t = el.querySelector(':scope > .ext-text'); if (t) t.textContent = p.text; },
+  // published page / Play mode, once per element: fetch data, start widgets, listen to events
+  init({ el, GPSB, ci }) {
+    const n = GPSB.nodeFor(el), p = n.components[ci].props;
+    if (!p.src) return;
+    fetch(p.src).then(r => r.json()).then(d => { p.text = String(d.text ?? ''); GPSB.applyNode(n, undefined, el); });
+  },
+});
+`;
+
 export const componentTemplate = name => `<template>
   <div class="box">
     <h3>{{title}}</h3>
@@ -141,6 +164,9 @@ export async function renamePath(from, to, kind) {
     } else if (kind === 'behaviour') {
       const m = typeRef('behaviour:' + from.slice(11, -3), 'behaviour:' + to.slice(11, -3));
       retarget(m, 'Rename behaviour', m);
+    } else if (kind === 'extension') { // plain names: only component types, track props and override keys
+      const a = from.slice(11, -3), b = to.slice(11, -3), m = typeRef(a, b);
+      retarget((v, o, k) => (k === 'type' && v === a ? b : k === 'prop' && v !== a ? m(v) : undefined), 'Rename extension', v => (v === a ? undefined : m(v)));
     }
     await S.reloadMeta();
   }

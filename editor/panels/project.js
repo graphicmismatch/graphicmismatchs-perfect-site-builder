@@ -4,10 +4,10 @@
 import * as S from '../state.js';
 import { h, menu, fmtSize, hidden, setDragAsset } from '../fields.js';
 import { icon } from '../icons.js';
-import { openCode, createClip, uniqueName, renamePath, deletePath, behaviourTemplate, componentTemplate, validName } from '../files.js';
+import { openCode, createClip, uniqueName, renamePath, deletePath, behaviourTemplate, componentTemplate, extensionTemplate, validName } from '../files.js';
 
-const ROOTS = { assets: 'Assets', components: 'Components', behaviours: 'Behaviours', animations: 'Animations' };
-const OPENABLE = ['component', 'behaviour', 'json', 'text', 'file'];
+const ROOTS = { assets: 'Assets', components: 'Components', behaviours: 'Behaviours', extensions: 'Extensions', animations: 'Animations' };
+const OPENABLE = ['component', 'behaviour', 'extension', 'json', 'text', 'file'];
 let el, treeEl, gridEl, crumbs, footPath, searchEl, slider, fileIn;
 let cur = 'assets', selPath = null, size = 72, query = '', renaming = false, pending = false, M = { items: [], folders: new Set() };
 const expanded = new Set(['assets']);
@@ -73,6 +73,7 @@ function model() {
   for (const f of folders) if (f !== 'assets') items.push({ path: f + '/', name: f.split('/').pop(), dir: parentDir(f), kind: 'folder', folder: f, ren: 'folder' });
   for (const n of Object.keys(P.components)) items.push({ path: `components/${n}.html`, name: n, dir: 'components', kind: 'component', ren: 'component', comp: 'component:' + n });
   for (const [n, b] of Object.entries(P.behaviours)) items.push({ path: b.path, name: n, dir: 'behaviours', kind: 'behaviour', ren: 'behaviour', comp: 'behaviour:' + n });
+  for (const [n, e] of Object.entries(P.extensions ?? {})) items.push({ path: e.path, name: n, dir: 'extensions', kind: 'extension', ren: 'extension', comp: n });
   for (const n of Object.keys(P.clips)) items.push({ path: `animations/${n}.anim.json`, name: n, dir: 'animations', kind: 'anim', drag: n, ren: 'anim' });
   const cmp = (a, b) => (a.kind === 'folder') !== (b.kind === 'folder') ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
   items.sort(cmp);
@@ -200,7 +201,7 @@ function reveal(p) {
 
 const targetPath = (it, v) => ({
   asset: () => join(it.dir, v), folder: () => join(parentDir(it.folder), v),
-  component: () => `components/${v}.html`, behaviour: () => `behaviours/${v}.js`, anim: () => `animations/${v}.anim.json`,
+  component: () => `components/${v}.html`, behaviour: () => `behaviours/${v}.js`, extension: () => `extensions/${v}.js`, anim: () => `animations/${v}.anim.json`,
 }[it.ren]());
 
 function startRename(it) {
@@ -223,6 +224,7 @@ function startRename(it) {
     if (ok && v && v !== base) {
       if (/[/\\]/.test(v) || v.startsWith('.')) err = `Invalid name "${v}"`;
       else if (!['asset', 'folder'].includes(it.ren) && !validName(v)) err = `"${v}" must be an identifier (letters, digits, _ or -)`;
+      else if (it.ren === 'extension' && (!/^[A-Za-z_]\w*$/.test(v) || (S.builtins[v] && !S.builtins[v].extension))) err = `"${v}" must be a JS identifier and not a built-in component`;
       else if (M.items.some(x => x.path.replace(/\/$/, '') === targetPath(it, v))) err = `${v} already exists`;
       if (!err) try {
         const to = targetPath(it, v);
@@ -272,6 +274,10 @@ async function create(kind) {
       const n = uniqueName('NewBehaviour', x => P.behaviours[x], '');
       path = `behaviours/${n}.js`;
       await S.api.put(path, behaviourTemplate(n));
+    } else if (kind === 'extension') {
+      const n = uniqueName('NewExtension', x => P.extensions?.[x] || S.builtins[x], '');
+      path = `extensions/${n}.js`;
+      await S.api.put(path, extensionTemplate(n));
     } else if (kind === 'anim') {
       const n = uniqueName('NewAnimation', x => P.clips[x], '');
       path = `animations/${n}.anim.json`;
@@ -293,6 +299,7 @@ function createMenu(x, y) {
     { label: 'JSON File', action: () => create('json') },
     { label: 'Component', action: () => create('component') },
     { label: 'Behaviour Script', action: () => create('behaviour') },
+    { label: 'Extension Component', action: () => create('extension') },
     { label: 'Animation Clip', action: () => create('anim') },
     '-',
     { label: 'Import New Asset…', action: () => fileIn.click() },
@@ -319,6 +326,7 @@ async function importFiles(files, folder) {
     try {
       if (folder === 'components' && f.name.endsWith('.html')) { await S.api.put('components/' + f.name, f); meta = true; last = 'components/' + f.name; }
       else if (folder === 'behaviours' && f.name.endsWith('.js')) { await S.api.put('behaviours/' + f.name, f); meta = true; last = 'behaviours/' + f.name; }
+      else if (folder === 'extensions' && f.name.endsWith('.js')) { await S.api.put('extensions/' + f.name, f); meta = true; last = 'extensions/' + f.name; }
       else if (f.name.endsWith('.anim.json')) {
         const text = await f.text(), n = f.name.slice(0, -10);
         S.S.P.clips[n] = JSON.parse(text);

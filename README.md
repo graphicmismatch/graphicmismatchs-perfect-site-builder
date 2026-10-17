@@ -137,12 +137,25 @@ Each key's easing can be linear, constant, ease-in/out, or a custom cubic-bezier
 
 Record mode works as in Unity. Press the red button, then move things in the Scene or change Inspector fields, and keys are written at the playhead.
 
+## Extending
+
+- **Extension components** (`extensions/<Name>.js`) are added like built-in components: they show up in Add Component,
+  get Inspector fields from their props, can be animated, and work in the build, the editor and the published site.
+  They're for anything dynamic: data loaded at runtime, embeds, third-party widgets. Project ▸ Create ▸ Extension
+  Component starts one from a commented template.
+- **Custom code:** `project.json` `inject.head` / `inject.bodyEnd` go on every page (analytics, consent, fonts), and
+  Page Meta's `head` goes on one page.
+- **Build hooks:** an optional `build.js` can rewrite each page (`transformPage`) or post-process the whole site
+  (`afterBuild`, e.g. RSS or a search index).
+- The generated markup keeps stable hooks (`data-gpsb` ids, `window.GPSB`, unbundled ES modules) for code you add
+  later. See "Extending the output" in [CONTRACT.md](CONTRACT.md).
+
 ## Project layout
 
 ```
-project.json
+project.json            build.js (optional build hooks)
 pages/*.json            animations/*.anim.json
-assets/**               components/*.html       behaviours/*.js
+assets/**               components/*.html       behaviours/*.js       extensions/*.js
 ```
 
 See [CONTRACT.md](CONTRACT.md) for the full file formats, the property-path syntax and the internal architecture.

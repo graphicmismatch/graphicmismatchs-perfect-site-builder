@@ -10,6 +10,7 @@ const I = {
   font: '<path d="M3 13.5L7.2 2.5h1.6L13 13.5M5 9h6" stroke="#d8d8d8" stroke-width="1.5"/>',
   text: '<path d="M3.5 1.5h6l3 3v10h-9z" fill="#4a4a4a" stroke="#bdbdbd"/><path d="M5.5 7h5M5.5 9.5h5M5.5 12h3" stroke="#bdbdbd"/>',
   file: '<path d="M3.5 1.5h6l3 3v10h-9z" fill="#444" stroke="#999"/><path d="M9.5 1.5v3h3" stroke="#999"/>',
+  extension: '<path d="M2.5 3.5h4v1.2a1.3 1.3 0 1 0 2.6 0V3.5h4.4v4.4h-1.2a1.3 1.3 0 1 0 0 2.6h1.2v4h-11z" fill="#6a4a8c" stroke="#d2b4f5"/>',
   component: '<path d="M2.5 5.5h3a1.5 1.5 0 1 1 3 0h3v3a1.5 1.5 0 1 1 0 3v3h-9z" fill="#2f7d6d" stroke="#7fe0c8"/>',
   behaviour: '<path d="M3.5 1.5h6l3 3v10h-9z" fill="#2c4f7c" stroke="#8ab4f0"/><path d="M6.8 7.5l-1.8 2 1.8 2M9.2 7.5l1.8 2-1.8 2" stroke="#e6f0ff"/>',
   anim: '<path d="M2 8l3-3 3 3-3 3z" fill="#9b8de8" stroke="#d6cfff"/><path d="M8.5 8l3-3 3 3-3 3z" fill="#5f52b0" stroke="#d6cfff"/>',
@@ -35,7 +36,7 @@ const BY_TYPE = {
   Canvas: 'canvas', CanvasScaler: 'canvas', Image: 'image', Text: 'textc', Button: 'button', Link: 'link', Video: 'video',
   Audio: 'audio', HTML: 'html', Style: 'style', Animator: 'anim', Repeat: 'data',
 };
-const BY_CAT = { Layout: 'layout', Effects: 'effect', Media: 'video', Web: 'html', Data: 'data', Animation: 'anim' };
+const BY_CAT = { Layout: 'layout', Effects: 'effect', Media: 'video', Web: 'html', Data: 'data', Animation: 'anim', Extensions: 'extension' };
 export function compIcon(type, def) {
   if (type.startsWith('component:')) return icon('component');
   if (type.startsWith('behaviour:')) return icon('behaviour');
