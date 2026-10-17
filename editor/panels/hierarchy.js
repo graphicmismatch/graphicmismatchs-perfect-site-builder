@@ -47,7 +47,7 @@ const EXT = { image: /\.(png|jpe?g|gif|webp|svg|avif|ico)$/i, video: /\.(mp4|web
 const assetType = p => S.S.P.assets.find(a => a.path === p)?.type ?? Object.keys(EXT).find(t => EXT[t].test(p));
 
 let el, tree, search, collapsed = new Set(), sceneOpen = true, order = [], anchor = null;
-let renaming = false, dragging = false, dragIds = null, clip = [];
+let renaming = false, dragging = false, dragIds = null, clip = [], pasteChild = false;
 
 const rootId = () => S.root()?.id;
 const ancestors = id => { const out = []; for (let p = S.parentOf(id); p; p = S.parentOf(p.id)) out.push(p.id); return out; };
@@ -124,7 +124,27 @@ function rename(id = S.S.selection.at(-1)) {
 }
 
 // ---------- clipboard ----------
-const copy = () => { clip = topLevel(S.S.selection.filter(id => id !== rootId())).map(id => S.clone(S.node(id))); if (clip.length) S.log(`Copied ${clip.length} object(s)`); };
+// Copies go to the system clipboard too (JSON tagged "gpsb-nodes"), so they paste into other pages, tabs and projects;
+// the prefabs they use travel with them and are added to a project that doesn't have them.
+const copy = e => {
+  clip = topLevel(S.S.selection.filter(id => id !== rootId())).map(id => S.collapsePrefabs(S.node(id)));
+  if (!clip.length) return;
+  const prefabs = {};
+  const need = n => { for (const [x] of S.walk(n)) if (x.prefab && !prefabs[x.prefab] && S.S.P.prefabs[x.prefab]) { prefabs[x.prefab] = S.collapsePrefabs(S.S.P.prefabs[x.prefab]); need(prefabs[x.prefab]); } };
+  clip.forEach(need);
+  const text = JSON.stringify({ 'gpsb-nodes': 1, nodes: clip, prefabs });
+  if (e?.clipboardData) { e.clipboardData.setData('text/plain', text); e.preventDefault(); } else navigator.clipboard?.writeText(text).catch(() => {});
+  S.log(`Copied ${clip.length} object(s)`);
+};
+function fromClipboard(e) {
+  try {
+    const d = JSON.parse(e.clipboardData?.getData('text/plain') ?? '');
+    if (!d?.['gpsb-nodes'] || !Array.isArray(d.nodes)) return false;
+    for (const [n, t] of Object.entries(d.prefabs ?? {})) if (!S.S.P.prefabs[n]) { S.S.P.prefabs[n] = t; S.S.dirty.add(`prefabs/${n}.prefab.json`); S.log(`Added prefab ${n} from the clipboard`); }
+    clip = d.nodes;
+    return true;
+  } catch { return false; }
+}
 function paste(asChild = false) {
   if (!clip.length) return;
   const a = S.active();
@@ -132,7 +152,7 @@ function paste(asChild = false) {
   if (!asChild && a && a !== S.root()) { parent = S.parentOf(a.id); index = parent.children.indexOf(a) + 1; }
   if (S.structureLocked(parent.id, true)) return;
   const nodes = clip.map(n => S.cloneTree(n));
-  S.edit('Paste', () => { const p = S.node(parent.id); index == null ? p.children.push(...nodes) : p.children.splice(index, 0, ...nodes); });
+  S.edit('Paste', () => { const p = S.node(parent.id); index == null ? p.children.push(...nodes) : p.children.splice(index, 0, ...nodes); S.refreshInstances(); });
   S.select(nodes.map(n => n.id));
 }
 
@@ -201,7 +221,7 @@ const sceneMenu = () => [
 function rowMenu(onRow) {
   const sel = S.S.selection.length > 0, a = S.active(), pid = onRow ? a?.id : undefined, nonRoot = S.S.selection.some(id => id !== rootId());
   return [
-    { label: 'Copy', shortcut: 'Ctrl+C', action: copy, disabled: !nonRoot },
+    { label: 'Copy', shortcut: 'Ctrl+C', action: () => copy(), disabled: !nonRoot },
     { label: 'Paste', shortcut: 'Ctrl+V', action: () => paste(), disabled: !clip.length },
     { label: 'Paste As Child', action: () => paste(true), disabled: !clip.length || !a },
     '-',
@@ -276,8 +296,7 @@ export function mount(root) {
   tree.onkeydown = e => {
     const mod = e.ctrlKey || e.metaKey, k = e.key, cur = order.indexOf(S.S.selection.at(-1));
     const go = i => { if (order[i]) { anchor = order[i]; S.select(order[i]); } };
-    if (mod && k.toLowerCase() === 'c') copy();
-    else if (mod && k.toLowerCase() === 'v') paste(e.shiftKey);
+    if (mod && k.toLowerCase() === 'v' && e.shiftKey) { pasteChild = true; return; } // the paste event follows
     else if (k === 'ArrowDown') go(cur < 0 ? 0 : cur + 1);
     else if (k === 'ArrowUp') go(Math.max(0, cur - 1));
     else if (k === 'ArrowRight' || k === 'ArrowLeft') {
@@ -337,6 +356,14 @@ export function mount(root) {
   };
 
   S.on('rename', () => rename());
+  // Ctrl+C / Ctrl+V anywhere outside text fields (Hierarchy, Scene): system clipboard events
+  const inField = t => t?.isContentEditable || t?.matches?.('textarea, input:not([type=checkbox], [type=radio], [type=button], [type=range], [type=color]), select');
+  document.addEventListener('copy', e => { if (S.S.P && !inField(e.target) && S.S.selection.length) copy(e); });
+  document.addEventListener('paste', e => {
+    if (!S.S.P || inField(e.target)) return;
+    if (fromClipboard(e) || clip.length) { e.preventDefault(); paste(pasteChild); }
+    pasteChild = false;
+  });
   S.on('selection', reveal);
   for (const ev of ['structure', 'props', 'page', 'saved', 'assets', 'breakpoint']) S.on(ev, render);
   S.on('page', () => { collapsed.clear(); anchor = null; search.value = ''; });

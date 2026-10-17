@@ -108,6 +108,15 @@ export function prefabItems(a) {
   ];
 }
 
+// newest first: redo steps (greyed check), the current state, then undo steps; picking one jumps there
+function historyItems() {
+  const h = S.history(), out = [];
+  for (let k = Math.min(15, h.redo.length); k >= 1; k--) out.push({ label: h.redo[k - 1], action: () => S.jump(k) }); // h.redo[0] = next redo
+  out.push({ label: 'Current state', checked: true, disabled: true });
+  h.undo.slice(0, 25).forEach((l, i) => out.push({ label: l, action: () => S.jump(-(i + 1)) }));
+  if (h.undo.length > 25) out.push({ label: `… ${h.undo.length - 25} older`, disabled: true });
+  return out.length > 1 ? out : [{ label: 'Nothing to undo', disabled: true }];
+}
 export function newPagePrompt(template = 'blank') {
   const name = prompt('New page name (letters, digits, - and _):', 'page' + (Object.keys(S.S.P.pages).length + 1))?.trim();
   if (!name) return;
@@ -181,6 +190,7 @@ const MENUS = {
     return [
       { label: 'Undo', shortcut: sc('undo'), action: S.undo },
       { label: 'Redo', shortcut: sc('redo'), action: S.redo },
+      { label: 'Undo History', sub: historyItems() },
       '-',
       { label: 'Select All', shortcut: sc('selectAll'), action: () => S.select(allIds()) },
       { label: 'Deselect All', action: () => S.select([]), disabled: !sel },

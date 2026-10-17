@@ -46,11 +46,13 @@ export function parentSize(id) {
   return el ? [el.offsetWidth, el.offsetHeight] : [...S.resolution];
 }
 export const assetUrl = p => '/project/assets/' + String(p).split('/').map(encodeURIComponent).join('/');
-export { getProp, walk, clone, newId, builtins, getComponent };
+export { getProp, walk, clone, newId, builtins, getComponent, collapsePrefabs };
 
 // ---------- undo / edits ----------
-const undoStack = [], redoStack = [];
+const undoStack = [], redoStack = []; // entries: { label, snap }
 let lastEdit = { label: '', t: 0 };
+// readable step name: node ids in an edit label become node names ('Set Text.text a1b2c3' -> 'Set Text.text · Title')
+const nice = label => label.split(' ').map(t => { const names = t.split(',').map(id => node(id)?.name); return names.every(Boolean) ? '· ' + names.join(', ') : t; }).join(' ');
 const snap = () => JSON.stringify({ page: S.page, prefab: S.prefabEdit?.name, tree: root(), clips: S.P.clips });
 function restore(json) {
   const s = JSON.parse(json), pageChanged = s.page !== S.page || s.prefab !== S.prefabEdit?.name;
@@ -63,8 +65,11 @@ function restore(json) {
   if (pageChanged) emit('page');
   emit('structure'); emit('anim'); emit('selection');
 }
-export function undo() { if (!undoStack.length) return; redoStack.push(snap()); restore(undoStack.pop()); }
-export function redo() { if (!redoStack.length) return; undoStack.push(snap()); restore(redoStack.pop()); }
+export function undo() { if (!undoStack.length) return; const e = undoStack.pop(); redoStack.push({ label: e.label, snap: snap() }); restore(e.snap); }
+export function redo() { if (!redoStack.length) return; const e = redoStack.pop(); undoStack.push({ label: e.label, snap: snap() }); restore(e.snap); }
+// Edit > Undo History: labels, newest first; jump(-n) undoes n steps, jump(n) redoes n
+export const history = () => ({ undo: undoStack.map(e => e.label).reverse(), redo: redoStack.map(e => e.label).reverse() });
+export function jump(n) { for (let i = 0; i < Math.abs(n); i++) n < 0 ? undo() : redo(); }
 
 // file holding what root() shows: the page, or the prefab open on its own
 const fileOfRoot = () => (S.prefabEdit ? `prefabs/${S.prefabEdit.name}.prefab.json` : `pages/${S.page}.json`);
@@ -74,7 +79,7 @@ const fileOfRoot = () => (S.prefabEdit ? `prefabs/${S.prefabEdit.name}.prefab.js
 export function edit(label, fn, { kind = 'structure', ids = [], merge = false, files } = {}) {
   const now = performance.now();
   // labels with '#' are unique per gesture (e.g. 'size#12'): merge regardless of pauses
-  if (!(merge && lastEdit.label === label && (label.includes('#') || now - lastEdit.t < 1000))) { undoStack.push(snap()); if (undoStack.length > 200) undoStack.shift(); }
+  if (!(merge && lastEdit.label === label && (label.includes('#') || now - lastEdit.t < 1000))) { undoStack.push({ label: nice(label.replace(/#\d+$/, '')), snap: snap() }); if (undoStack.length > 200) undoStack.shift(); }
   redoStack.length = 0;
   lastEdit = { label, t: now };
   fn();
