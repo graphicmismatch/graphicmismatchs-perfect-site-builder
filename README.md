@@ -51,6 +51,11 @@ Shortcuts work as in Unity:
   - Layout: Horizontal / Vertical / Grid Layout Group, Layout Element, Content Size Fitter, Scroll Rect, Mask
   - Effects: Canvas Group, Shadow
   - Animation and data: Animator, Repeat
+- **Breakpoints** cover responsive layout. Defaults are Tablet ≤1024 px and Phone ≤600 px; edit them in the Scene toolbar.
+  - Pick a breakpoint and every change you make in the Scene or Inspector is stored as an override, much like a Unity prefab override.
+  - Any property can be overridden: anchors, size, font size, layout spacing, text, or active (to hide a node).
+  - Overridden fields get a blue bar. Right-click one to revert it to the base value.
+  - Overrides build to `@media` rules and also apply at runtime, for example to elements that are animating.
 - **Assets** live in `assets/` and are referenced by path.
   - JSON can be bound into any text field, for example `{{data/site.json:hero.title}}`.
   - A **Repeat** creates one copy of its children per item in a JSON array, with `{{item.name}}` and `{{index}}` available.

@@ -2,6 +2,7 @@
 // rect/move/rotate/scale tools, anchor flower + pivot, asset drops, Game view for play mode.
 import * as S from '../state.js';
 import { reanchor } from '/lib/rect.js';
+import { activeBreakpoints } from '/lib/node.js';
 
 const RES = [[1920, 1080], [1280, 720], [1366, 768], [1440, 900], [390, 844, 'phone'], [768, 1024, 'tablet']];
 const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 4];
@@ -20,6 +21,7 @@ const HOOK = `<script>(() => {
 })();</script>`;
 
 const r3 = n => Math.round(n * 1000) / 1000;
+const esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const norm = (x, y) => { const l = Math.hypot(x, y) || 1; return { x: x / l, y: y / l }; };
@@ -84,11 +86,11 @@ function parentFrame(id) {
 }
 function inLayout(id) {
   const p = S.parentOf(id);
-  return !!p?.components.some(c => S.def(c.type)?.childStyle) && !S.getComponent(S.node(id), 'LayoutElement')?.props?.ignoreLayout;
+  return !!p && S.view(p.id).components.some(c => S.def(c.type)?.childStyle) && !S.getComponent(S.view(id), 'LayoutElement')?.props?.ignoreLayout;
 }
-// rect as currently displayed (record mode shows animated values)
+// rect as currently displayed: breakpoint overrides applied, record mode's animated values win
 function rect0(id) {
-  const r = S.clone(S.node(id).rect), st = S.S.hooks.animState;
+  const r = S.clone(S.view(id).rect), st = S.S.hooks.animState;
   if (st) for (const k of Object.keys(r)) {
     const v = st(id, 'rect.' + k)?.value;
     if (v !== undefined) r[k] = S.clone(v);
@@ -103,6 +105,11 @@ function snap0(id) {
   return { id, r: rect0(id), M: i.M, Mi: i.M.inverse(), w: i.w, h: i.h, Mp: pf.M, Mpi: pf.M.inverse(), P: pf.P, Mn: pf.M.inverse().multiplySelf(i.M), lay: inLayout(id) };
 }
 const isAnc = (a, id) => { for (let p = S.parentOf(id); p; p = S.parentOf(p.id)) if (p.id === a) return true; return false; };
+// selected nodes that can be transformed, minus descendants of other selected ones
+const tops = () => {
+  const sel = S.S.selection.filter(id => S.node(id) && S.parentOf(id));
+  return sel.filter(id => !sel.some(o => o !== id && isAnc(o, id)));
+};
 const movable = () => {
   const sel = S.S.selection.filter(id => S.node(id) && S.parentOf(id) && !inLayout(id));
   return sel.filter(id => !sel.some(o => o !== id && isAnc(o, id)));
@@ -121,7 +128,7 @@ const snapping = e => cfg.snap || e.ctrlKey || e.metaKey;
 const snapv = x => { const s = +cfg.inc || 1; return Math.round(x / s) * s; };
 function put(id, k, v, label = drag?.label) {
   v = Array.isArray(v) ? v.map(r3) : r3(v);
-  if (JSON.stringify(v) !== JSON.stringify(S.node(id)?.rect[k])) S.setProp(id, 'rect.' + k, v, { label });
+  if (JSON.stringify(v) !== JSON.stringify(S.view(id)?.rect[k])) S.setProp(id, 'rect.' + k, v, { label });
 }
 
 // ---------- gizmo handles for the active node (ordered by hit priority) ----------
@@ -129,10 +136,24 @@ function geo() {
   const id = S.S.selection.at(-1), n = id && S.node(id), tool = S.S.tool;
   const i = n && S.parentOf(id) && tool !== 'hand' && info(id), pf = i && parentFrame(id);
   if (!pf) return null;
-  const lay = inLayout(id), r = n.rect, q = i.q, h = [];
+  const lay = inLayout(id), r = rect0(id), q = i.q, h = [], multi = tops().length > 1;
   const pv = i.M.transformPoint({ x: r.pivot[0] * i.w, y: r.pivot[1] * i.h });
   const add = (k, test, svg, o = {}) => h.push({ k, test, svg, key: k + [o.hx, o.hy, o.c, o.ax].join(), ...o });
-  if (tool === 'rect') {
+  let rc = pv;
+  if (tool === 'rect' && multi) { // combined bounds of the selection: resize scales every node, rotate turns each around its pivot
+    const qs = tops().map(info).filter(Boolean).flatMap(x => x.q), xs = qs.map(p => p.x), ys = qs.map(p => p.y);
+    const [x0, y0, x1, y1] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+    const B = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }], CUR = ['nwse', 'nesw', 'nwse', 'nesw'], E = ['ns', 'ew', 'ns', 'ew'];
+    rc = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+    add('deco', () => false, () => poly(B, 'bnd'));
+    const HC = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    B.forEach((p, j) => add('mresize', t => dist(t, p) < 7, hc => circ(p, 4, 'hnd' + hc), { hx: HC[j][0], hy: HC[j][1], cur: CUR[j] + '-resize', B: [x0, y0, x1, y1] }));
+    B.forEach((p, j) => {
+      const [hx, hy] = [[0, -1], [1, 0], [0, 1], [-1, 0]][j];
+      add('mresize', t => segDist(t, p, B[(j + 1) % 4]) < 5, () => '', { hx, hy, cur: E[j] + '-resize', B: [x0, y0, x1, y1] });
+    });
+    B.forEach(p => add('rotate', t => { const d = dist(t, p); return d > 6 && d < 24 && !inside(t, B); }, () => ''));
+  } else if (tool === 'rect') {
     if (cfg.gizmos && !lay) {
       const ux = axis(pf.M, 1, 0), uy = axis(pf.M, 0, 1), mn = r.anchorMin, mx = r.anchorMax;
       const A = (fx, fy) => pf.M.transformPoint({ x: fx * pf.P[0], y: fy * pf.P[1] });
@@ -173,7 +194,7 @@ function geo() {
     }
     add('scale', t => Math.abs(t.x - pv.x) < 8 && Math.abs(t.y - pv.y) < 8, hc => sq(pv, 6, 'scc' + hc), { ax: 2 });
   }
-  return { id, i, pf, pv, lay, h };
+  return { id, i, pf, pv, rc, lay, h };
 }
 const hit = v => geo()?.h.find(h => h.test(v));
 
@@ -312,7 +333,7 @@ function hoverAt(v) {
   const hand = spaceDown || S.S.tool === 'hand', h = hand ? null : hit(v);
   hotKey = h?.key ?? null;
   hover = hand || h ? null : picks(v)[0] ?? null;
-  let c = hand ? 'grab' : h ? (h.k === 'resize' ? h.cur : h.k === 'rotate' ? ROT : h.k === 'move' ? 'move' : 'pointer') : '';
+  let c = hand ? 'grab' : h ? (h.k.endsWith('resize') ? h.cur : h.k === 'rotate' ? ROT : h.k === 'move' ? 'move' : 'pointer') : '';
   if (!c && S.S.tool === 'rect') { const g = geo(); if (g && !g.lay && inside(v, g.i.q)) c = 'move'; }
   view.style.cursor = c;
 }
@@ -329,8 +350,9 @@ function down(e) {
     const g = geo(), h = g?.h.find(x => x.test(v)), t = h && snap0(g.id);
     if (t) {
       drag = { ...h, v, t, label: h.k + '#' + ++seq };
-      if (h.k === 'rotate') Object.assign(drag, { c: g.pv, last: ang(g.pv, v), acc: 0 });
+      if (h.k === 'rotate') Object.assign(drag, { c: g.rc, last: ang(g.rc, v), acc: 0 });
       if (h.k === 'scale') drag.axes = [axis(t.M, 1, 0), axis(t.M, 0, 1)];
+      if (h.k === 'rotate' || h.k === 'scale' || h.k === 'mresize') drag.targets = tops().map(snap0).filter(Boolean);
       if (h.k === 'move') drag.targets = movable().map(snap0).filter(Boolean);
     } else {
       const ids = picks(v), add = e.shiftKey || e.ctrlKey || e.metaKey, onSel = ids.some(id => S.S.selection.includes(id));
@@ -409,15 +431,35 @@ const TOOLS = {
     const a = ang(d.c, v);
     d.acc += ((a - d.last + 540) % 360) - 180;
     d.last = a;
-    const r = d.t.r.rotation + d.acc;
-    put(d.t.id, 'rotation', snapping(e) ? Math.round(r / 15) * 15 : r);
+    for (const t of d.targets) { const r = t.r.rotation + d.acc; put(t.id, 'rotation', snapping(e) ? Math.round(r / 15) * 15 : r); }
   },
   scale(d, v, e) {
-    const t = d.t, dx = v.x - d.v.x, dy = v.y - d.v.y;
-    let s = [...t.r.scale];
-    if (d.ax === 2) s = s.map(x => x * (1 + (dx - dy) / 100));
-    else s[d.ax] *= 1 + (dx * d.axes[d.ax].x + dy * d.axes[d.ax].y) / 80;
-    put(t.id, 'scale', snapping(e) ? s.map(x => Math.round(x * 10) / 10) : s);
+    const dx = v.x - d.v.x, dy = v.y - d.v.y, f = [1, 1];
+    if (d.ax === 2) f[0] = f[1] = 1 + (dx - dy) / 100;
+    else f[d.ax] = 1 + (dx * d.axes[d.ax].x + dy * d.axes[d.ax].y) / 80;
+    for (const t of d.targets) {
+      const s = t.r.scale.map((x, i) => x * f[i]);
+      put(t.id, 'scale', snapping(e) ? s.map(x => Math.round(x * 10) / 10) : s);
+    }
+  },
+  // multi-selection rect tool: map the combined bounds, move each pivot with it and scale each box along its own axes
+  mresize(d, v, e) {
+    const [x0, y0, x1, y1] = d.B, W = x1 - x0 || 1, H = y1 - y0 || 1, k = e.altKey ? 2 : 1;
+    let w = W + d.hx * (v.x - d.v.x) * k, h = H + d.hy * (v.y - d.v.y) * k;
+    if (e.shiftKey) { const f = !d.hy ? w / W : !d.hx ? h / H : Math.abs(w / W - 1) > Math.abs(h / H - 1) ? w / W : h / H; w = W * f; h = H * f; }
+    w = Math.max(1, w); h = Math.max(1, h);
+    const nx = e.altKey || !d.hx ? (x0 + x1 - w) / 2 : d.hx > 0 ? x0 : x1 - w, ny = e.altKey || !d.hy ? (y0 + y1 - h) / 2 : d.hy > 0 ? y0 : y1 - h;
+    const fx = w / W, fy = h / H;
+    for (const t of d.targets) {
+      const u = axis(t.M, 1, 0), c2 = u.x * u.x, s2 = u.y * u.y; // node x axis on screen: blend factors (exact at 0/90°)
+      const nw = t.w * (fx * c2 + fy * s2), nh = t.h * (fx * s2 + fy * c2);
+      if (t.lay) { put(t.id, 'size', [t.r.size[0] + nw - t.w, t.r.size[1] + nh - t.h]); continue; }
+      const p0 = t.M.transformPoint({ x: t.r.pivot[0] * t.w, y: t.r.pivot[1] * t.h });
+      const c = t.Mpi.transformPoint({ x: nx + (p0.x - x0) * fx, y: ny + (p0.y - y0) * fy }), C = [c.x, c.y], E = [nw, nh], r = t.r;
+      const span = i => r.anchorMax[i] - r.anchorMin[i];
+      put(t.id, 'pos', [0, 1].map(i => C[i] - (r.anchorMin[i] + r.pivot[i] * span(i)) * t.P[i]));
+      put(t.id, 'size', [0, 1].map(i => E[i] - span(i) * t.P[i]));
+    }
   },
   pivot(d, v, e) {
     const t = d.t, a = t.Mi.transformPoint(d.v), b = t.Mi.transformPoint(v);
@@ -497,9 +539,11 @@ export function mount(root) {
         <button class="btn" data-k="snap" title="Snap to increment (or hold Ctrl while dragging)">Snap</button>
         <input type="number" class="sc-inc" min="0.01" step="any" title="Snap increment (px); rotation snaps to 15°">
       </span>
+      <span class="sc-bps" title="Breakpoint being edited (lit = active at the current preview width)"></span>
       <span class="sc-game">Scale <input type="range" class="sc-scale" min="1" max="5" step="0.1"> <output></output></span>
     </div>
     <div class="sc-view" tabindex="0">
+      <div class="sc-banner" hidden></div>
       <div class="sc-sizer"></div>
       <div class="sc-world"><iframe title="Preview"></iframe><iframe title="Preview"></iframe></div>
       <svg class="sc-ov"></svg>
@@ -532,8 +576,74 @@ export function mount(root) {
   inc.onchange = () => { cfg.inc = +inc.value > 0 ? +inc.value : 10; inc.value = cfg.inc; saveCfg(); applyView(); };
   const scaleUI = () => { scale.value = cfg.scale; scale.nextElementSibling.textContent = (+cfg.scale).toFixed(1) + 'x'; };
   scale.oninput = () => { cfg.scale = +scale.value; saveCfg(); scaleUI(); applyView(); };
+  // responsive breakpoints: editing context (Base | Tablet | Phone ...), like Unity's prefab mode
+  const bpBar = $('.sc-bps'), banner = $('.sc-banner');
+  let baseRes = null;
+  const bpUI = () => {
+    const bps = S.breakpoints(), W = S.S.resolution[0], live = activeBreakpoints(bps, W), cur = S.S.breakpoint, b = bps.find(x => x.name === cur);
+    bpBar.innerHTML = [{ name: '', label: 'Base' }, ...bps.map(x => ({ name: x.name, label: `${x.name} ≤${x.maxWidth}` }))]
+      .map(x => `<button class="btn${(x.name || null) === cur ? ' on' : ''}${(x.name ? live.includes(x.name) : !live.length) ? ' live' : ''}" data-bp="${esc(x.name)}">${esc(x.label)}</button>`).join('')
+      + '<button class="btn" data-bp-edit title="Edit Breakpoints…">⋯</button>';
+    bpBar.title = `Preview ${W}px: ${live.length ? live.join(' + ') + ' overrides apply' : 'base only'}`;
+    el.classList.toggle('bp', !!b);
+    banner.hidden = !b;
+    if (b) banner.textContent = `Editing ${b.name} overrides — changes apply at ≤${b.maxWidth}px only`;
+  };
+  // keep the preview width inside the edited level's range (narrower levels would otherwise show through)
+  const fitRes = () => {
+    const bps = S.breakpoints(), i = bps.findIndex(b => b.name === S.S.breakpoint), [W] = S.S.resolution;
+    if (!activeBreakpoints(bps, W).length) baseRes = [...S.S.resolution];
+    const hi = i < 0 ? Infinity : bps[i].maxWidth, lo = (i < 0 ? bps[0] : bps[i + 1])?.maxWidth ?? 0, ok = w => w > lo && w <= hi;
+    if (ok(W)) return;
+    if (i < 0 && baseRes && ok(baseRes[0])) return setRes(...baseRes);
+    const pr = RES.filter(([w]) => ok(w)).sort((a, b) => b[0] - a[0])[0];
+    setRes(...(pr ? pr.slice(0, 2) : [hi === Infinity ? Math.max(1920, lo + 1) : hi, 800]));
+  };
+  let pop = null;
+  const closePop = () => { pop?.remove(); pop = null; removeEventListener('pointerdown', outside, true); };
+  const outside = e => pop && !pop.contains(e.target) && closePop();
+  const editBps = btn => {
+    if (pop) return closePop();
+    const rows = S.breakpoints().map(b => ({ from: b.name, name: b.name, maxWidth: b.maxWidth }));
+    pop = document.createElement('div');
+    pop.className = 'sc-pop';
+    const render = (err = '') => {
+      pop.innerHTML = '<div class="sc-pop-h">Breakpoints <span>max viewport width</span></div>'
+        + rows.map((r, i) => `<div class="sc-pop-r"><input data-i="${i}" data-f="name" value="${esc(r.name)}"><input type="number" min="1" data-i="${i}" data-f="maxWidth" value="${r.maxWidth}"> px <button class="btn" data-del="${i}" title="Remove">×</button></div>`).join('')
+        + `<div class="sc-pop-f"><button class="btn" data-add>Add</button><span class="err">${esc(err)}</span><button class="btn" data-cancel>Cancel</button><button class="btn on" data-apply>Apply</button></div>`;
+    };
+    pop.oninput = e => { const { i, f } = e.target.dataset; if (i != null) rows[i][f] = e.target.value; };
+    pop.onkeydown = e => { if (e.key === 'Escape') closePop(); else if (e.key === 'Enter') pop.querySelector('[data-apply]').click(); e.stopPropagation(); };
+    pop.onclick = e => {
+      const d = e.target.dataset;
+      if (d.del != null) { rows.splice(+d.del, 1); render(); }
+      else if ('add' in d) { rows.push({ name: 'Breakpoint ' + (rows.length + 1), maxWidth: 480 }); render(); }
+      else if ('cancel' in d) closePop();
+      else if ('apply' in d) {
+        const list = rows.map(r => ({ name: String(r.name).trim(), maxWidth: Math.round(+r.maxWidth), ...(r.from ? { from: r.from } : {}) }));
+        const bad = list.find(b => !b.name) ? 'Name required' : new Set(list.map(b => b.name)).size < list.length ? 'Names must be unique'
+          : list.find(b => !(b.maxWidth > 0)) ? 'Width must be > 0' : '';
+        if (bad) return render(bad);
+        const cur = list.find(b => b.from === S.S.breakpoint);
+        S.setBreakpoints(list);
+        if (cur && cur.name !== cur.from) S.setBreakpoint(cur.name); // keep editing a renamed breakpoint
+        closePop();
+      }
+    };
+    render();
+    document.body.append(pop);
+    const r = btn.getBoundingClientRect();
+    Object.assign(pop.style, { left: Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + 'px', top: r.bottom + 4 + 'px' });
+    addEventListener('pointerdown', outside, true);
+  };
+  bpBar.onclick = e => {
+    const b = e.target.closest('button');
+    if (b) 'bpEdit' in b.dataset ? editBps(b) : S.setBreakpoint(b.dataset.bp || null);
+  };
+  S.on('breakpoint', () => { fitRes(); bpUI(); });
+  S.on('load', bpUI);
   el.querySelector('.tabs').onclick = e => e.target.dataset.modeTab && setMode(e.target.dataset.modeTab);
-  togUI(); scaleUI(); resUI();
+  togUI(); scaleUI(); resUI(); bpUI();
 
   // view input
   view.addEventListener('pointerdown', down);
@@ -567,7 +677,7 @@ export function mount(root) {
 
   // store events
   for (const ev of ['structure', 'page', 'load']) S.on(ev, rebuild);
-  S.on('resolution', () => { resUI(); fitted = false; rebuild(); });
+  S.on('resolution', () => { resUI(); bpUI(); fitted = false; rebuild(); });
   S.on('play', () => {
     el.classList.toggle('playing', S.S.playing);
     if (S.S.playing) { prevMode = mode; setMode('game'); } else setMode(prevMode);

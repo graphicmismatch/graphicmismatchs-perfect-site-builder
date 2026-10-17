@@ -2,7 +2,7 @@
 import * as S from '../state.js';
 import { reanchor } from '/lib/rect.js';
 import { withDefaults } from '/lib/components.js';
-import { componentPath } from '/lib/node.js';
+import { componentPath, clearOverride } from '/lib/node.js';
 import { h, nice, fmt, fmtSize, field, numInput, scrub, menu, popup, listNav, closePopup, accept, hidden } from '../fields.js';
 import { icon, compIcon } from '../icons.js';
 import { openCode, createScript, createComponent, validName } from '../files.js';
@@ -76,9 +76,10 @@ function mark(row, id, paths, b) {
   paths = [paths].flat();
   live.push(() => row.classList.toggle('ovr', !b?.state?.() && paths.some(p => S.isOverridden(id, p))));
   row.addEventListener('contextmenu', e => {
-    if (!e.target.closest('.f-lab, .rt-lab, .v-lab, .ev-head, .ls-head') || !paths.some(p => S.isOverridden(id, p))) return;
+    if (!e.target.closest('.f-lab, .rt-lab, .v-lab, .ev-head, .ls-head, .in-head') || !paths.some(p => S.isOverridden(id, p))) return;
     e.preventDefault(); e.stopPropagation();
-    menu([{ label: `Revert to Base (${S.S.breakpoint})`, action: () => { const label = `Revert ${paths} ${++presetN}`; paths.forEach(p => S.isOverridden(id, p) && S.edit(label, () => {}, { kind: 'props', ids: [id], merge: true }) && 0); paths.forEach(p => S.revertOverride(id, p)); } }], e.clientX, e.clientY);
+    menu([{ label: `Revert to Base (${S.S.breakpoint})`, action: () => (paths.length === 1 ? S.revertOverride(id, paths[0])
+      : S.edit(`Revert ${paths} ${id}`, () => paths.forEach(p => clearOverride(S.node(id), S.S.breakpoint, p)), { kind: 'props', ids: [id] })) }], e.clientX, e.clientY);
   });
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -130,6 +131,7 @@ function renderNode() {
     act.classList.toggle('keyed', !!st?.keyed); act.classList.toggle('animated', !!st && !st.keyed);
   });
   el.append(head);
+  mark(head, n.id, 'active');
   if (S.S.breakpoint) el.append(overridesRow(n.id));
   if (ids.length > 1) el.append(h('div', { class: 'in-multi' }, `${ids.length} objects selected · showing ${n.name}. RectTransform edits apply to all.`));
 
