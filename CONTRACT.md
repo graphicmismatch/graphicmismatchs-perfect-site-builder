@@ -20,7 +20,8 @@ everyone working on the code. Read it fully before changing anything.
 
 ```
 project.json                 { "name": "...", "breakpoints": [{ "name": "Tablet", "maxWidth": 1024 }, ...],
-                               "inject": { "head": "<html>", "bodyEnd": "<html>" } }
+                               "inject": { "head": "<html>", "bodyEnd": "<html>" },
+                               "siteUrl": "https://example.com/", "cleanUrls": false, "minify": false }
 pages/<name>.json            one node tree per page (= a Unity scene) -> dist/<name>.html + <name>.css
 assets/**                    images, video, audio, json, fonts, text (copied to dist/assets/)
 components/<Name>.html       custom components (template/style/props/script) -> dist/components/<Name>.js
@@ -28,7 +29,16 @@ behaviours/<Name>.js         MonoBehaviour-style scripts -> dist/behaviours/<Nam
 extensions/<Name>.js         extension components (same format as built-ins) -> dist/extensions/ (subfolders: helpers)
 animations/<Name>.anim.json  animation clips (inlined into pages that use them)
 build.js                     optional build hooks (Node only, not shipped)
+public/**                    copied to the site root as-is, after everything else (CNAME, _redirects, .well-known/…)
 ```
+
+Build output (`cli.js build`): `<page>.html` + `<page>.css` (or `<page>/index.html` + `<page>/<page>.css` with
+`cleanUrls`; `index` always at the root). Every site-relative URL a page uses goes through `ctx.prefix` (`''`, `'../'`,
+or for the `404` page the site URL's path, default `/`, because hosts serve it for any missing path); the prefix and
+`cleanUrls` are passed to the runtime in the page data. `robots.txt` always; `sitemap.xml` when `siteUrl` is set
+(every page except `404` and `PageMeta.noindex` pages). `minify` drops the renderer's indentation and compacts the
+generated CSS; text content, raw HTML/Style code and JS modules are never rewritten. `pageUrl(name, clean)` in
+`lib/render.js` gives a page's URL relative to the site root.
 
 ## Node
 

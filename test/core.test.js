@@ -232,4 +232,21 @@ assert.equal(componentDef('Badge').inner(), 'v2');
 unregisterComponent('Badge');
 assert.equal(componentDef('Badge'), undefined);
 
+// ---- production output: URL prefix, clean URLs, noindex, minify ----
+const cx = makeCtx({ pages: ['index', 'about'], cleanUrls: true, prefix: '../' });
+assert.deepEqual([cx.href('index'), cx.href('about'), cx.href('about#team'), cx.href('#top'), cx.href('https://x.test/'), cx.asset('img/a b.png')],
+  ['../', '../about/', '../about/#team', '#top', 'https://x.test/', '../assets/img/a%20b.png']);
+assert.deepEqual([makeCtx({ pages: ['index'], cleanUrls: true }).href('index'), makeCtx({ pages: ['about'] }).href('about#x')], ['./', 'about.html#x']);
+pg = canvasNode();
+pg.components.push({ type: 'PageMeta', props: { noindex: true } });
+pg.children.push(newNode('Box', [{ type: 'Image', props: {} }]), newNode('Txt', [{ type: 'Text', props: { text: 'a\n  b' } }]));
+const pretty = renderDocument(pg, makeCtx({ prefix: '../' })).html, mini = renderDocument(pg, makeCtx({ prefix: '../', minify: true }));
+assert.match(pretty, /<meta name="robots" content="noindex">/);
+assert.match(pretty, /href="\.\.\/gpsb\/base\.css"/);
+assert.match(pretty, /src="\.\.\/gpsb\/runtime\.js"/);
+assert.match(pretty, /"prefix":"\.\.\/"/);
+assert.ok(mini.html.length < pretty.length && !/\n {2}<div/.test(mini.html));
+assert.ok(mini.html.includes('a\n  b')); // text content is never touched
+assert.match(mini.css, /\.box\{position:absolute;/);
+
 console.log('core ok');

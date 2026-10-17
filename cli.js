@@ -11,7 +11,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import crypto from 'node:crypto';
-import { renderDocument, makeCtx } from './lib/render.js';
+import { renderDocument, makeCtx, pageUrl } from './lib/render.js';
 import { registerComponent, unregisterComponent, extensionNames } from './lib/components.js';
 import { parseComponent, compileComponent } from './lib/compile.js';
 import { newNode } from './lib/node.js';
@@ -147,15 +147,41 @@ export async function build(root, out = path.join(root, 'dist')) {
     const src = await fsp.readFile(path.join(root, 'components', name + '.html'), 'utf8');
     for (const [f, code] of Object.entries(compileComponent(name, src))) await fsp.writeFile(path.join(out, 'components', f), code);
   }
-  const ctx = ctxFor(P, { assetVersions: await hashVersions(root, P), extensionVersions });
+  const site = siteUrl(P.project), clean = !!P.project.cleanUrls, files = [];
+  const opts = { assetVersions: await hashVersions(root, P), extensionVersions, cleanUrls: clean, minify: !!P.project.minify };
   for (const [name, tree] of Object.entries(P.pages)) {
-    let r = renderDocument(tree, ctx, { name });
+    const o = pageOutput(name, clean, site);
+    let r = renderDocument(tree, ctxFor(P, { ...opts, prefix: o.prefix }), { name, cssHref: o.cssHref });
     if (hooks.transformPage) r = { ...r, ...(await hooks.transformPage({ name, html: r.html, css: r.css, project: P.project }) ?? {}) };
-    await fsp.writeFile(path.join(out, name + '.html'), r.html);
-    await fsp.writeFile(path.join(out, name + '.css'), r.css);
+    await fsp.mkdir(path.join(out, path.dirname(o.file)), { recursive: true });
+    await fsp.writeFile(path.join(out, o.file), r.html);
+    await fsp.writeFile(path.join(out, path.dirname(o.file), name + '.css'), r.css);
+    files.push(o.file);
   }
-  await hooks.afterBuild?.({ out, root, project: P.project, pages: Object.keys(P.pages) });
+  // search engines: sitemap of the indexable pages (needs the public site URL), robots.txt pointing at it
+  if (site) {
+    const urls = Object.entries(P.pages).filter(([name, tree]) => name !== '404' && !tree.components?.find(c => c.type === 'PageMeta')?.props?.noindex)
+      .map(([name]) => `  <url><loc>${escXml(site + pageUrl(name, clean).replace(/^index\.html$/, ''))}</loc></url>`);
+    await fsp.writeFile(path.join(out, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
+  }
+  await fsp.writeFile(path.join(out, 'robots.txt'), `User-agent: *\nAllow: /\n${site ? `\nSitemap: ${site}sitemap.xml\n` : ''}`);
+  // public/: copied to the site root as-is, last (CNAME, _redirects, .well-known/, your own robots.txt...)
+  if (fs.existsSync(path.join(root, 'public'))) await fsp.cp(path.join(root, 'public'), out, { recursive: true });
+  await hooks.afterBuild?.({ out, root, project: P.project, pages: Object.keys(P.pages), files });
   return { out, pages: Object.keys(P.pages), warnings };
+}
+
+const escXml = s => s.replace(/[<>&'"]/g, c => `&#${c.charCodeAt(0)};`);
+// project.siteUrl normalised to end in '/', or '' when unset/invalid
+export function siteUrl(project) {
+  try { const u = new URL(project.siteUrl); u.search = u.hash = ''; return u.href.endsWith('/') ? u.href : u.href + '/'; } catch { return ''; }
+}
+// where a page is written and the URL prefix its links/assets need. The 404 page is served for any missing path,
+// so it uses root-relative URLs (the site URL's path, default /).
+function pageOutput(name, clean, site) {
+  if (name === '404') { const root = site ? new URL(site).pathname : '/'; return { file: '404.html', prefix: root, cssHref: `${root}404.css` }; }
+  if (clean && name !== 'index') return { file: `${name}/index.html`, prefix: '../', cssHref: `${name}.css` };
+  return { file: `${name}.html`, prefix: '', cssHref: `${name}.css` };
 }
 
 // Optional build.js in the project root (Node only, never copied to the site):

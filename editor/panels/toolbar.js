@@ -4,6 +4,7 @@ import * as S from '../state.js';
 import * as layout from '../layout.js';
 import * as prefs from '../prefs.js';
 import { openPreferences, shortcut as sc } from '../preferences.js';
+import { openProjectSettings } from '../settings.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const svg = (d, extra = '') => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d ? `<path d="${d}"/>` : ''}${extra}</svg>`;
@@ -148,6 +149,7 @@ const MENUS = {
     '-',
     { label: 'Save', shortcut: sc('save'), action: S.save },
     { label: 'Build Site', shortcut: sc('build'), action: buildSite },
+    { label: 'Project Settings…', action: () => openProjectSettings() },
     '-',
     { label: 'Open Project Hub', action: () => { location.href = '/'; } },
     { label: 'Open Recent', disabled: !recent.length, sub: recent.map(p => ({ label: `${p.name} — ${p.path}`, action: () => openProject(p.path) })) },

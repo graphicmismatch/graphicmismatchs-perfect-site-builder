@@ -109,6 +109,16 @@ export function setBreakpoints(list) {
   emit('breakpoint'); emit('structure');
 }
 
+// ---------- project settings (project.json) ----------
+// path like 'siteUrl' or 'inject.head'; undefined removes the key (and an emptied parent object)
+export function setProjectSetting(path, value) {
+  const keys = path.split('.'), last = keys.pop(), o = keys.reduce((a, k) => (a[k] ??= {}), S.P.project);
+  if (value === undefined) delete o[last]; else o[last] = value;
+  if (keys.length && !Object.keys(o).length) delete S.P.project[keys[0]];
+  S.dirty.add('project.json');
+  emit('project'); emit('structure'); // custom head code is part of the preview
+}
+
 // ---------- selection / tools ----------
 export function select(ids, additive = false) {
   ids = [ids].flat().filter(Boolean);

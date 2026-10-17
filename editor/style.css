@@ -126,6 +126,10 @@ input, textarea { user-select: text; }
 .prefs-accents button.on { border-color: var(--text-strong); }
 .prefs-accents input[type=color] { width: 30px; height: 22px; padding: 0 2px; }
 .prefs-note { color: var(--text-dim); margin: 16px 0 8px; }
+.prefs-in { height: 22px; background: var(--field); border: 1px solid var(--field-border); border-radius: 3px; color: var(--text); padding: 0 6px; font: inherit; }
+.prefs-in:focus, .prefs-code:focus { outline: 1px solid var(--accent-hi); border-color: var(--accent-hi); }
+.prefs-col { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.prefs-code { min-height: 90px; resize: vertical; background: var(--field); border: 1px solid var(--field-border); border-radius: 3px; color: var(--text); padding: 6px; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .prefs-actions { display: flex; gap: 8px; }
 .prefs-toolbar { display: flex; gap: 8px; margin-bottom: 8px; position: sticky; top: 0; background: var(--panel); padding: 4px 0; }
 .prefs-toolbar input { flex: 1; height: 22px; }
