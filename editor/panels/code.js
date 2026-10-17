@@ -73,6 +73,7 @@ export function mount(root) {
       getSelection().removeAllRanges(); getSelection().addRange(r);
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') e.stopPropagation();
   };
-  S.on('show-tab', name => { visible = name === 'code'; if (visible) update(); });
+  // visible = laid out in some dock area as its active tab (any area can host it)
+  new ResizeObserver(() => { const v = el.offsetWidth > 0; if (v && !visible) { visible = true; update(); } visible = v; }).observe(el);
   for (const ev of ['load', 'structure', 'props', 'page', 'assets', 'anim']) S.on(ev, refresh);
 }

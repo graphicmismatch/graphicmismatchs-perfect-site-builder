@@ -7,10 +7,31 @@ HTML/CSS/JS.
 Zero dependencies. You need Node ≥ 22.
 
 ```sh
-node cli.js serve example          # open http://127.0.0.1:4000 — edit the demo project
+node cli.js                        # Project Hub at http://127.0.0.1:4000 — create / open / add projects
+node cli.js serve example          # same, with the demo project opened (editor at /editor/)
 node cli.js build example          # -> example/dist (static, host anywhere)
 node cli.js new my-site            # start a new project
 ```
+
+## Project Hub
+
+The first screen lists your projects with their path, page and asset counts, and when you last opened each one.
+- **New project:** start from the Empty or Showcase template, in a folder you pick with the built-in browser.
+- **Add:** register a project folder that already exists.
+- **Remove:** take a project off the list; its files stay on disk.
+
+The list and your preferences are saved in `~/.config/perfect-site-builder/`, so they carry over between projects.
+In the editor, use File ▸ Open Project Hub / Open Recent to switch projects.
+
+## Configurable UI
+
+- **Dock layout:** drag any panel tab to reorder it, move it to another area, or split an area.
+  - Right-click a tab to Maximize it (Shift+Space), Close it, or Move it elsewhere.
+  - The Window menu reopens panels you closed.
+- **Layouts:** the toolbar dropdown offers Default, 2 by 3, 4 Split, Tall and Wide. You can also save and delete your own.
+- **Preferences** (Ctrl+,):
+  - Dark or light theme, accent colour and UI font size.
+  - A shortcut editor: click a binding and press new keys. Conflicts are flagged.
 
 ## The editor
 
@@ -27,7 +48,7 @@ The layout follows Unity's default editor:
 | Console / Generated Code | Logs from the editor and the page, and the exact HTML/CSS the build will write. |
 
 Shortcuts work as in Unity:
-- Q W E R T switch tools.
+- Q W E R T switch tools (every shortcut can be rebound in Preferences).
 - F frames the selection.
 - Ctrl+D duplicates.
 - Ctrl+Z / Ctrl+Shift+Z undo and redo.

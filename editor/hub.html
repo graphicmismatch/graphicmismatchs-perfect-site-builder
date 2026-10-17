@@ -1,1 +1,31 @@
-<!doctype html><meta charset="utf-8"><title>Project Hub</title><p>hub stub</p>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Project Hub · graphicmismatch's perfect site builder</title>
+  <link rel="stylesheet" href="/editor/style.css">
+  <link rel="stylesheet" href="/editor/hub.css">
+</head>
+<body class="hub">
+  <header class="hb-top">
+    <span class="hb-logo" aria-hidden="true"></span>
+    <h1>graphicmismatch's perfect site builder</h1>
+    <button class="hb-btn hb-ghost" id="prefs" title="Preferences">Preferences</button>
+  </header>
+  <main class="hb-main">
+    <div class="hb-bar">
+      <h2>Projects</h2>
+      <input id="search" type="search" placeholder="Search projects" aria-label="Search projects" spellcheck="false">
+      <label class="hb-sort">Sort <select id="sort" aria-label="Sort by"><option value="opened">Last opened</option><option value="name">Name</option></select></label>
+      <button class="hb-btn" id="add" title="Add an existing project folder">Add…</button>
+      <button class="hb-btn hb-primary" id="new" title="New project (N or Ctrl+N)" aria-keyshortcuts="N Control+N">New project</button>
+    </div>
+    <div class="hb-head" aria-hidden="true"><span></span><span>Name / location</span><span>Contents</span><span>Last opened</span><span></span></div>
+    <div id="list" class="hb-list" role="listbox" aria-label="Projects"></div>
+  </main>
+  <div id="toasts" class="hb-toasts" role="status" aria-live="polite"></div>
+  <script type="module" src="/editor/hub.js"></script>
+</body>
+</html>

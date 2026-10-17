@@ -1,6 +1,7 @@
 // Hierarchy: page (scene) tree with selection, drag & drop reparenting, inline rename, copy/paste, asset drops.
 import * as S from '../state.js';
 import { menu, menuAt, createItems, newPagePrompt, deletePage, buildSite } from './toolbar.js';
+import { shortcut as sc } from '../preferences.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const svg = (d, extra = '') => `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round">${d ? `<path d="${d}"/>` : ''}${extra}</svg>`;
@@ -167,7 +168,7 @@ async function assetNode(path, parentId, index) {
 
 // ---------- menus ----------
 const sceneMenu = () => [
-  { label: 'Save', shortcut: 'Ctrl+S', action: S.save },
+  { label: 'Save', shortcut: sc('save'), action: S.save },
   { label: 'Build Site', action: buildSite },
   '-',
   { label: 'New Page…', action: newPagePrompt },
@@ -186,9 +187,9 @@ function rowMenu(onRow) {
     { label: 'Paste', shortcut: 'Ctrl+V', action: () => paste(), disabled: !clip.length },
     { label: 'Paste As Child', action: () => paste(true), disabled: !clip.length || !a },
     '-',
-    { label: 'Rename', shortcut: 'F2', action: () => rename(), disabled: !sel },
-    { label: 'Duplicate', shortcut: 'Ctrl+D', action: () => S.duplicate(), disabled: !nonRoot },
-    { label: 'Delete', shortcut: 'Del', action: () => S.deleteNodes(), disabled: !nonRoot },
+    { label: 'Rename', shortcut: sc('rename'), action: () => rename(), disabled: !sel },
+    { label: 'Duplicate', shortcut: sc('duplicate'), action: () => S.duplicate(), disabled: !nonRoot },
+    { label: 'Delete', shortcut: sc('delete'), action: () => S.deleteNodes(), disabled: !nonRoot },
     '-',
     { label: 'Select Children', action: () => S.select(S.selected().flatMap(n => [...S.walk(n)].slice(1).map(([c]) => c.id))), disabled: !a?.children.length },
     { label: a && !a.active ? 'Set Active' : 'Set Inactive', action: () => { const v = !a.active; S.selected().forEach(n => S.setProp(n.id, 'active', v)); }, disabled: !sel || a === S.root() },

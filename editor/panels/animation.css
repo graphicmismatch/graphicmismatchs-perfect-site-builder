@@ -3,11 +3,11 @@
 .panel.anim[hidden] { display: none; }
 .anim button { background: none; border: 1px solid transparent; border-radius: 3px; color: var(--text); padding: 0 5px; height: 20px; line-height: 18px; }
 .anim button:hover { background: var(--hover); }
-.anim button.on { background: var(--accent); border-color: #1f4466; }
-.anim .btn { background: #585858; border-color: #303030; }
+.anim button.on { background: var(--accent); border-color: color-mix(in srgb, var(--accent) 60%, #000); color: var(--sel-text); }
+.anim .btn { background: var(--btn); border-color: var(--btn-border); }
 .an-left { display: flex; align-items: center; gap: 2px; padding: 0 4px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--header); min-width: 0; }
 .an-tools input[data-a=frame] { width: 56px; margin-left: auto; text-align: right; }
-.an-sep { width: 1px; height: 16px; background: #555; margin: 0 3px; }
+.an-sep { width: 1px; height: 16px; background: var(--line); margin: 0 3px; }
 .an-recbtn { color: #e05656 !important; font-size: 14px; }
 .an-recbtn.on { background: var(--red) !important; color: #fff !important; }
 .an-clipbar { background: var(--panel-2); gap: 4px; }
@@ -18,10 +18,10 @@
 .an-body { grid-column: 1 / -1; display: grid; grid-template-columns: var(--an-left) 1fr; align-items: start; overflow-y: auto; overflow-x: hidden; min-height: 0; }
 .an-list { border-right: 1px solid var(--border); min-height: 100%; }
 .an-tl { position: sticky; top: 0; width: 100%; display: block; }
-.an-row { height: 22px; display: flex; align-items: center; gap: 4px; padding: 0 4px; border-bottom: 1px solid #1e1e1e; white-space: nowrap; }
-.an-row.sel { background: #2c3e52; }
-.an-summary { background: #2e2e2e; }
-.an-group { background: #2b2b2b; font-weight: 600; }
+.an-row { height: 22px; display: flex; align-items: center; gap: 4px; padding: 0 4px; border-bottom: 1px solid var(--border-soft); white-space: nowrap; }
+.an-row.sel { background: color-mix(in srgb, var(--accent-hi) 25%, var(--panel)); }
+.an-summary { background: var(--well); }
+.an-group { background: var(--section); font-weight: 600; }
 .an-track { padding-left: 20px; }
 .an-fold { width: 12px; color: var(--text-dim); cursor: pointer; }
 .an-name { flex: 1; overflow: hidden; text-overflow: ellipsis; padding-left: 3px; }
@@ -44,7 +44,7 @@
 .an-keyinfo .an-bez { width: 150px; }
 .an-views { display: flex; gap: 2px; }
 /* record mode: red-tinted window (Unity) */
-.anim.rec .an-tools, .anim.rec .an-clipbar { background: #5a2b2b; }
+.anim.rec .an-tools, .anim.rec .an-clipbar { background: var(--record-bg); }
 .anim.rec input[data-a=frame] { background: var(--record); }
 /* empty state */
 .panel.anim-empty { display: flex; align-items: center; justify-content: center; }
@@ -52,7 +52,7 @@
 .an-msg { text-align: center; color: var(--text-dim); }
 .an-msg b { color: var(--text); }
 /* popovers */
-.an-pop { position: fixed; z-index: 1000; background: #2b2b2b; border: 1px solid #111; box-shadow: 0 4px 16px #0008; padding: 6px; color: var(--text); font: var(--font); }
+.an-pop { position: fixed; z-index: 1000; background: var(--menu); border: 1px solid var(--menu-border); box-shadow: 0 4px 16px var(--shadow); padding: 6px; color: var(--text); font: var(--font); }
 .an-form { display: flex; flex-direction: column; gap: 5px; min-width: 260px; }
 .an-form label { display: flex; align-items: center; gap: 6px; }
 .an-form label span { width: 64px; color: var(--text-dim); }
@@ -68,3 +68,5 @@
 .an-tleaf i { color: var(--text-dim); font-style: normal; }
 .an-tleaf b { width: 14px; text-align: center; color: var(--ok); }
 .an-tleaf.off { color: var(--text-dim); }
+/* light theme: the dopesheet/curves canvases are drawn with dark-theme colors (animation.js); invert them to match */
+:root[data-theme=light] .anim canvas { filter: invert(1) hue-rotate(180deg); }

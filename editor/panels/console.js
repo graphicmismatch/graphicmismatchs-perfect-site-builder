@@ -15,7 +15,8 @@ const keyOf = e => `${e.level}|${e.source ?? ''}|${e.msg}`;
 const store = (k, v) => { try { localStorage['psbCon' + k] = JSON.stringify(v); } catch {} };
 const stored = (k, d) => { try { return JSON.parse(localStorage['psbCon' + k] ?? 'null') ?? d; } catch { return d; } };
 
-let entries = [], selected = null, queued = false;
+let entries = [], selected = null, queued = false, unseen = false;
+const alert = () => document.querySelector('#dock [data-tab=console]')?.classList.toggle('alert', unseen);
 const opts = stored('Opts', { collapse: false, clearOnPlay: true, info: true, warn: true, error: true });
 
 export function mount(el) {
@@ -105,10 +106,11 @@ export function mount(el) {
   S.on('log', e => {
     entries.push(e);
     if (entries.length > MAX) entries.splice(0, entries.length - MAX);
-    if (e.level === 'error' && el.hidden) document.querySelector('[data-tab=console]')?.classList.add('alert');
+    if (e.level === 'error' && !el.offsetWidth) { unseen = true; alert(); }
     schedule();
   });
-  S.on('show-tab', name => name === 'console' && document.querySelector('[data-tab=console]')?.classList.remove('alert'));
+  S.on('show-tab', name => { if (name === 'console') { unseen = false; alert(); } });
+  S.on('layout', alert); // dock rebuilds recreate the tab buttons
   S.on('play', () => { if (S.S.playing && opts.clearOnPlay) { entries = []; selected = null; schedule(); } });
   syncBar();
   render();

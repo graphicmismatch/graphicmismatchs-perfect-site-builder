@@ -248,7 +248,7 @@ Project writes (`PUT/DELETE /api/file`, `/api/rename`, `/api/build`) must send `
 (S.api does); a tab whose project is no longer the open one gets 409.
 
 **Preferences** — `editor/prefs.js`: `load()`, `get(key, default)`, `set(key, value|undefined)` (debounced save),
-`all()`, `onChange(fn)`, `apply(doc)`, `DEFAULTS`. Keys: `theme` ('dark'|'light'), `accent` (hex), `uiScale`,
+`all()`, `onChange(fn)`, `apply(doc)`, `DEFAULTS`. Keys: `theme` ('dark'|'light'), `accent` (hex),
 `fontSize`, `layout` (current dock layout), `layouts` ({name: layout} saved layouts), `shortcuts` ({action: key combo}
 overrides); panels namespace their own keys (`scene.grid`, …). Theme tokens are defined in `editor/style.css` under
 `:root[data-theme=dark|light]`; panel CSS must use the tokens, never hard-coded chrome colors.
@@ -270,7 +270,7 @@ Requests with a Host other than `127.0.0.1:PORT`/`localhost:PORT` get 403; non-G
 
 ## Editor (`editor/`)
 
-Unity default layout: toolbar (top), Hierarchy (left), Scene/Web (center), Inspector (right, full height),
+Dockable layout (`editor/layout.js`; default = Unity's): toolbar (top), Hierarchy (left), Scene/Web (center), Inspector (right, full height),
 bottom tabs Project | Console | Animation | Generated Code. Each `editor/panels/<name>.js` exports `mount(el)` and owns
 `panels/<name>.css` (already linked). Theme tokens are CSS variables in `editor/style.css` (`--panel`, `--accent`, …).
 `main.js` mounts panels in order: toolbar, hierarchy, scene, inspector, project, console, animation, code; handles the
@@ -283,6 +283,7 @@ S.S: { P, page, selection[], tool, resolution, playing, behaviourMeta, anim{clip
 on(ev, fn) -> unsubscribe     emit(ev, ...args)     log(msg, level='info'|'warn'|'error', extra)
 events: load structure props(ids) selection tool page anim assets log(entry) play resolution saved preview-ready show-tab frame
         rename (F2 -> hierarchy) asset-select(projectPath) asset-ping(assetPath) (inspector <-> project) breakpoint
+        layout (dock layout changed; panels may have been re-parented)
 root() node(id) parentOf(id) parentSize(id) selected() active() def(type) propsOf(component) assetUrl(path)
 view(id) breakpoints() editNames() setBreakpoint(name) setBreakpoints(list) isOverridden(id, path) revertOverride(id, path?)
 edit(label, fn, { kind, ids, merge, files })   undo() redo()

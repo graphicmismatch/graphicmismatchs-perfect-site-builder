@@ -14,23 +14,17 @@
   <link rel="stylesheet" href="/editor/panels/animation.css">
   <link rel="stylesheet" href="/editor/panels/code.css">
 </head>
-<body>
+<body class="editor">
   <header id="toolbar"></header>
-  <section class="area" id="area-left"><nav class="tabs"><button class="on">Hierarchy</button></nav><div class="panel" data-panel="hierarchy"></div></section>
-  <div class="split v" data-var="--left-w" data-dir="1"></div>
-  <section class="area" id="area-center"><div class="panel" data-panel="scene"></div></section>
-  <div class="split v" data-var="--right-w" data-dir="-1" style="grid-row: 2 / 5"></div>
-  <section class="area" id="area-right"><nav class="tabs"><button class="on">Inspector</button></nav><div class="panel" data-panel="inspector"></div></section>
-  <div class="split h" data-var="--bottom-h" data-dir="-1"></div>
-  <section class="area" id="area-bottom">
-    <nav class="tabs" data-tabs>
-      <button data-tab="project" class="on">Project</button><button data-tab="console">Console</button><button data-tab="animation">Animation</button><button data-tab="code">Generated Code</button>
-    </nav>
+  <main id="dock">
+    <div class="panel" data-panel="hierarchy"></div>
+    <div class="panel" data-panel="scene"></div>
+    <div class="panel" data-panel="inspector"></div>
     <div class="panel" data-panel="project"></div>
-    <div class="panel" data-panel="console" hidden></div>
-    <div class="panel" data-panel="animation" hidden></div>
-    <div class="panel" data-panel="code" hidden></div>
-  </section>
+    <div class="panel" data-panel="console"></div>
+    <div class="panel" data-panel="animation"></div>
+    <div class="panel" data-panel="code"></div>
+  </main>
   <footer id="status"></footer>
   <script type="module" src="/editor/main.js"></script>
 </body>

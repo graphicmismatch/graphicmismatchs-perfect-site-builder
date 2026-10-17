@@ -528,8 +528,8 @@ export function mount(root) {
   el.classList.add('sc');
   if (cfg.res) S.S.resolution = [...cfg.res];
   el.innerHTML = `
-    <nav class="tabs"><button data-mode-tab="scene">Scene</button><button data-mode-tab="web">Web</button></nav>
     <div class="sc-bar">
+      <nav class="sc-modes" title="Scene: edit with gizmos · Web: the page as visitors see it"><button data-mode-tab="scene">Scene</button><button data-mode-tab="web">Web</button></nav>
       <select class="sc-res" title="Resolution">${RES.map(([w, h, n]) => `<option value="${w}x${h}">${w}x${h}${n ? ' ' + n : ''}</option>`).join('')}<option value="custom">Custom…</option></select>
       <span class="sc-custom" hidden><input type="number" class="sc-w" min="1" title="Width"> × <input type="number" class="sc-h" min="1" title="Height"></span>
       <span class="sc-scene">
@@ -642,7 +642,7 @@ export function mount(root) {
   };
   S.on('breakpoint', () => { fitRes(); bpUI(); });
   S.on('load', bpUI);
-  el.querySelector('.tabs').onclick = e => e.target.dataset.modeTab && setMode(e.target.dataset.modeTab);
+  el.querySelector('.sc-modes').onclick = e => e.target.dataset.modeTab && setMode(e.target.dataset.modeTab);
   togUI(); scaleUI(); resUI(); bpUI();
 
   // view input

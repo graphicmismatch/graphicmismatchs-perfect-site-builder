@@ -1,7 +1,7 @@
 // User preferences shared by the Project Hub and the editor. Stored by the server in
 // ~/.config/perfect-site-builder/prefs.json, so they follow the user across projects and ports.
 const H = { 'x-psb': '1', 'content-type': 'application/json' };
-export const DEFAULTS = { theme: 'dark', accent: '#3a79bb', uiScale: 1, fontSize: 12 };
+export const DEFAULTS = { theme: 'dark', accent: '#3a79bb', fontSize: 12 };
 let P = {}, timer;
 const subs = new Set();
 

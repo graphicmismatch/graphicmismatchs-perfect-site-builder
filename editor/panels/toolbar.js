@@ -1,6 +1,9 @@
 // Main toolbar: menu bar, transform tools, play/pause/step, page dropdown, save/build.
 // Also exports the shared popup menu helper (hierarchy uses it).
 import * as S from '../state.js';
+import * as layout from '../layout.js';
+import * as prefs from '../prefs.js';
+import { openPreferences, shortcut as sc } from '../preferences.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const svg = (d, extra = '') => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d ? `<path d="${d}"/>` : ''}${extra}</svg>`;
@@ -14,6 +17,7 @@ export const ICONS = {
   pause: svg('', '<rect x="6" y="5" width="4" height="14" fill="currentColor"/><rect x="14" y="5" width="4" height="14" fill="currentColor"/>'),
   step: svg('', '<path d="M5 4l11 8-11 8z" fill="currentColor"/><rect x="17" y="5" width="3" height="14" fill="currentColor"/>'),
   scene: svg('M12 2l9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10'),
+  layout: svg('', '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M9 4v16M9 13h12"/>'),
   save: svg('M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8'),
   build: svg('M21 16V8l-9-5-9 5v8l9 5 9-5zM3.3 7L12 12l8.7-5M12 22V12'),
 };
@@ -103,10 +107,23 @@ export async function buildSite() {
   building = true; refreshFiles();
   try { await S.build(); } finally { building = false; refreshFiles(); }
 }
-export const resetLayout = () => {
-  for (const v of ['--left-w', '--right-w', '--bottom-h']) { document.documentElement.style.removeProperty(v); try { delete localStorage['psb' + v]; } catch {} }
-  dispatchEvent(new Event('resize'));
-};
+
+// ---------- projects (File > Open Recent) ----------
+let recent = [];
+const H = { 'x-psb': '1', 'content-type': 'application/json' };
+const loadRecent = () => fetch('/api/hub/projects').then(r => r.json()).then(d => {
+  recent = d.projects.filter(p => p.exists && p.path !== d.open).sort((a, b) => (b.lastOpened ?? '').localeCompare(a.lastOpened ?? '')).slice(0, 10);
+}).catch(() => {});
+async function openProject(path) {
+  if (S.S.dirty.size) {
+    if (!confirm(`Save changes to "${S.S.P.project.name}" before opening another project?\n(Cancel keeps this project open.)`)) return;
+    await S.save();
+    if (S.S.dirty.size) return S.log('Not switching projects: some files failed to save', 'error');
+  }
+  const r = await fetch('/api/hub/open', { method: 'POST', headers: H, body: JSON.stringify({ path }) });
+  if (!r.ok) return S.log(`Open ${path} failed: ${await r.text()}`, 'error');
+  location.href = '/editor/';
+}
 
 // ---------- menus ----------
 const allIds = () => [...S.walk(S.root())].slice(1).map(([n]) => n.id);
@@ -129,33 +146,39 @@ const MENUS = {
     { label: 'New Page…', action: newPagePrompt },
     { label: 'Delete Page…', action: () => deletePage(), disabled: Object.keys(S.S.P.pages).length < 2 },
     '-',
-    { label: 'Save', shortcut: 'Ctrl+S', action: S.save },
-    { label: 'Build Site', action: buildSite },
+    { label: 'Save', shortcut: sc('save'), action: S.save },
+    { label: 'Build Site', shortcut: sc('build'), action: buildSite },
+    '-',
+    { label: 'Open Project Hub', action: () => { location.href = '/'; } },
+    { label: 'Open Recent', disabled: !recent.length, sub: recent.map(p => ({ label: `${p.name} — ${p.path}`, action: () => openProject(p.path) })) },
   ],
   Edit: () => {
     const sel = S.S.selection.length > 0;
     return [
-      { label: 'Undo', shortcut: 'Ctrl+Z', action: S.undo },
-      { label: 'Redo', shortcut: 'Ctrl+Y', action: S.redo },
+      { label: 'Undo', shortcut: sc('undo'), action: S.undo },
+      { label: 'Redo', shortcut: sc('redo'), action: S.redo },
       '-',
-      { label: 'Select All', shortcut: 'Ctrl+A', action: () => S.select(allIds()) },
+      { label: 'Select All', shortcut: sc('selectAll'), action: () => S.select(allIds()) },
       { label: 'Deselect All', action: () => S.select([]), disabled: !sel },
       '-',
-      { label: 'Rename', shortcut: 'F2', action: () => S.emit('rename'), disabled: !sel },
-      { label: 'Duplicate', shortcut: 'Ctrl+D', action: () => S.duplicate(), disabled: !nonRoot() },
-      { label: 'Delete', shortcut: 'Del', action: () => S.deleteNodes(), disabled: !nonRoot() },
+      { label: 'Rename', shortcut: sc('rename'), action: () => S.emit('rename'), disabled: !sel },
+      { label: 'Duplicate', shortcut: sc('duplicate'), action: () => S.duplicate(), disabled: !nonRoot() },
+      { label: 'Delete', shortcut: sc('delete'), action: () => S.deleteNodes(), disabled: !nonRoot() },
       '-',
-      { label: 'Frame Selected', shortcut: 'F', action: () => S.emit('frame'), disabled: !sel },
+      { label: 'Frame Selected', shortcut: sc('frame'), action: () => S.emit('frame'), disabled: !sel },
       '-',
       { label: 'Breakpoint', sub: [
-        { label: 'Base', shortcut: 'Alt+1', checked: !S.S.breakpoint, action: () => S.setBreakpoint(null) },
-        ...S.breakpoints().map((b, i) => ({ label: `${b.name} (≤${b.maxWidth}px)`, shortcut: i < 8 ? `Alt+${i + 2}` : '', checked: S.S.breakpoint === b.name, action: () => S.setBreakpoint(b.name) })),
+        { label: 'Base', shortcut: sc('bp.0'), checked: !S.S.breakpoint, action: () => S.setBreakpoint(null) },
+        ...S.breakpoints().map((b, i) => ({ label: `${b.name} (≤${b.maxWidth}px)`, shortcut: i < 5 ? sc(`bp.${i + 1}`) : '', checked: S.S.breakpoint === b.name, action: () => S.setBreakpoint(b.name) })),
         '-',
         { label: 'Edit Breakpoints…', action: () => S.emit('edit-breakpoints') },
       ] },
       '-',
-      { label: S.S.playing ? 'Stop' : 'Play', shortcut: 'Ctrl+P', action: () => S.setPlaying(!S.S.playing) },
-      { label: 'Pause', checked: paused, action: togglePause },
+      { label: S.S.playing ? 'Stop' : 'Play', shortcut: sc('play'), action: () => S.setPlaying(!S.S.playing) },
+      { label: 'Pause', shortcut: sc('pause'), checked: paused, action: togglePause },
+      { label: 'Step', shortcut: sc('step'), action: step },
+      '-',
+      { label: 'Preferences…', shortcut: sc('prefs'), action: () => openPreferences() },
     ];
   },
   WebObject: () => {
@@ -169,10 +192,9 @@ const MENUS = {
   },
   Component: componentItems,
   Window: () => [
-    ...[['project', 'Project'], ['console', 'Console'], ['animation', 'Animation'], ['code', 'Generated Code']]
-      .map(([t, label]) => ({ label, action: () => S.emit('show-tab', t) })),
+    { label: 'Layouts', sub: layout.layoutMenu() },
     '-',
-    { label: 'Reset Layout', action: resetLayout },
+    ...layout.windowItems(),
   ],
 };
 
@@ -196,8 +218,8 @@ function applyPause() {
     }
   } catch (e) { S.log(`Pause: ${e.message}`, 'warn'); }
 }
-function togglePause() { paused = !paused; applyPause(); }
-function step() {
+export function togglePause() { paused = !paused; applyPause(); }
+export function step() {
   if (!S.S.playing) return;
   if (!paused) { paused = true; applyPause(); return; }
   pauseT += 1000 / 60; // one frame: runtimes compute dt from the rAF timestamp
@@ -216,6 +238,7 @@ export function mount(root) {
         <button data-act="play" title="Play (Ctrl+P)">${ICONS.play}</button><button data-act="pause" title="Pause">${ICONS.pause}</button><button data-act="step" title="Step">${ICONS.step}</button>
       </div></div>
       <div class="tb-right">
+        <button class="tb-btn tb-layout" data-act="layout" title="Editor layout">${ICONS.layout}<span></span><b>▾</b></button>
         <button class="tb-btn tb-page" data-act="page" title="Current page">${ICONS.scene}<span></span><b>▾</b></button>
         <button class="tb-btn" data-act="save" title="Save (Ctrl+S)">${ICONS.save}<span>Save</span></button>
         <button class="tb-btn primary" data-act="build" title="Save and build the static site">${ICONS.build}<span>Build Site</span></button>
@@ -235,9 +258,21 @@ export function mount(root) {
   bar.onpointerover = e => { const b = e.target.closest('button'); if (b && openName && openName !== b.dataset.menu) open(b); };
 
   el.querySelector('.tools').onclick = e => { const b = e.target.closest('[data-tool]'); if (b) S.setTool(b.dataset.tool); };
-  const pageBtn = el.querySelector('[data-act=page]');
+  const pageBtn = el.querySelector('[data-act=page]'), layoutBtn = el.querySelector('[data-act=layout]');
+  const lname = () => { layoutBtn.querySelector('span').textContent = layout.layoutName(); };
+  S.on('layout', lname); lname();
+  loadRecent(); S.on('load', loadRecent);
+  // tooltips follow rebound shortcuts
+  const tips = () => {
+    TOOLS.forEach(([t, , tip]) => { el.querySelector(`[data-tool=${t}]`).title = `${tip} (${sc('tool.' + t)})`; });
+    el.querySelector('[data-act=play]').title = `Play (${sc('play')})`;
+    el.querySelector('[data-act=pause]').title = `Pause (${sc('pause')})`;
+    el.querySelector('[data-act=step]').title = `Step (${sc('step')})`;
+  };
+  prefs.onChange(k => k === 'shortcuts' && tips()); tips();
   el.querySelector('.tb').onclick = e => {
     const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'layout') return stack.length && owner === layoutBtn ? closeMenus() : menuAt(layout.layoutMenu(), layoutBtn);
     if (!act || !S.S.P) return;
     if (act === 'play') S.setPlaying(!S.S.playing);
     else if (act === 'pause') togglePause();

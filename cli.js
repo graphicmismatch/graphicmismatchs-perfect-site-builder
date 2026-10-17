@@ -165,7 +165,8 @@ async function openProject(dir) {
 async function hubApi(req, res, p, q) {
   if (p === '/api/hub/projects') return sendJSON(res, { projects: await projectList(), open: root, home: os.homedir() });
   if (p === '/api/hub/ls') { // directory browser for New / Add
-    const dir = absDir(q.get('path') || os.homedir());
+    let dir = absDir(q.get('path') || os.homedir());
+    if (!(await fsp.stat(dir).catch(() => null))?.isDirectory()) dir = os.homedir(); // e.g. a remembered folder was deleted
     const ents = await fsp.readdir(dir, { withFileTypes: true }).catch(() => []);
     const dirs = ents.filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => ({ name: e.name, project: isProject(path.join(dir, e.name)) }))
       .sort((a, b) => a.name.localeCompare(b.name));
