@@ -69,6 +69,10 @@ Shows the selected object's RectTransform and components.
 - Each component's menu can reset it, remove it, or move it up or down.
 - Right-click a field to revert a breakpoint or prefab override. Overridden fields are marked (a blue bar for
   breakpoints, bold for prefab overrides). In record mode, keyed fields are tinted red.
+- A field that another component fixes is greyed out and can't be edited, with the reason under it: Height with a
+  Content Size Fitter shows *(affected by Content Size Fitter)*, Width and Pos inside a layout group show *(affected by
+  parent's Vertical Layout Group)*, Text Size with a `font-size` in Style shows *(affected by Style)*. Change or remove
+  what drives it to edit the field again.
 
 When several objects are selected, the Inspector shows the first one, and RectTransform edits apply to all of them.
 

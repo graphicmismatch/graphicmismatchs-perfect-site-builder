@@ -21,11 +21,12 @@ everyone working on the code. Read it fully before changing anything.
 ```
 project.json                 { "name": "...", "breakpoints": [{ "name": "Tablet", "maxWidth": 1024 }, ...],
                                "inject": { "head": "<html>", "bodyEnd": "<html>" },
-                               "siteUrl": "https://example.com/", "cleanUrls": false, "minify": false,
+                               "siteUrl": "https://example.com/", "cleanUrls": false, "minify": false, "keep": [".git/"],
                                "tokens": { "colors": { "brand": "#ff3366" }, "fonts": { "heading": "fonts/H.ttf" },
                                            "textStyles": { "h1": { "font": "$heading", "size": 48, "weight": "800",
                                                                    "lineHeight": 1.1, "letterSpacing": 0 } } } }
-pages/<name>.json            one node tree per page (= a Unity scene) -> dist/<name>.html + <name>.css
+pages/<name>.json            one node tree per page (= a Unity scene) -> dist/<name>.html + <name>.css; <name> may hold
+                             folders (pages/a/b.json -> a/b.html, prefix '../')
 assets/**                    images, video, audio, json, fonts, text (copied to dist/assets/)
 components/<Name>.html       custom components (template/style/props/script) -> dist/components/<Name>.js
 behaviours/<Name>.js         MonoBehaviour-style scripts -> dist/behaviours/<Name>.js
@@ -124,7 +125,7 @@ Editor: Project Settings ▸ Design Tokens; `files.js` `renameToken(kind, from, 
 |---|---|---|
 | `number` | number (opts `min`,`max`,`step`; min+max → slider) | drag-label number field |
 | `int` | integer | same, rounded |
-| `string` | string (opt `asset: 'font'` → also accepts a font asset) | text input |
+| `string` | string (opt `asset: 'font'` → a CSS font-family list whose entries may be font assets, each gets `@font-face`) | text input |
 | `text` | multiline string (HTML allowed) | textarea |
 | `code` | string (`lang`: html/css/js) | monospace textarea |
 | `bool` | boolean | checkbox |
@@ -197,6 +198,8 @@ Definition shape is documented at the top of that file. `componentDef(type, cust
 - Page data for the runtime: `<script type="application/json" id="gpsb-data">{ tree, clips, pages, behaviours, customs, editor }</script>`
   (tree has defaults filled and global bindings resolved; `clips` = clips used by Animators, or all clips in editor mode).
 - `nodeStyle(node, parent, ctx)`, `nodeAttrs(node, ctx)`, `nodeTag`, `propsOf(component, ctx)`, `decl(styleObj)`.
+- `drivenBy(node, parent, ctx, path)` → `[{ type, parent }]` / `[{ textStyle }]` / null: what fixes a number/bool property so
+  editing it changes nothing (the Inspector greys such fields out with "(affected by X)").
 
 ## Page runtime (`lib/runtime.js`, `window.GPSB`)
 
@@ -393,7 +396,7 @@ POST /api/rename?from=&to=     POST /api/build -> { out, pages, warnings[] }
 GET  /api/events               SSE { file } on external changes (editor hot-reloads components/behaviours/assets)
 ```
 `build()` refuses an output folder that contains the project, sits inside a source folder, or is non-empty without
-being a previous build (`gpsb/runtime.js`, or `psb/runtime.js` from before the rename); it fails on broken pages/clips/project.json and skips broken components (warning).
+being a previous build (`gpsb/runtime.js`, or `psb/runtime.js` from before the rename), ignoring and keeping the paths in `project.json` `keep` (gitignore-style: `name/` a folder, `name` a file, nested paths allowed; `[".git/"]` for a deploy repo); it fails on broken pages/clips/project.json and skips broken components (warning).
 Requests with a Host other than `127.0.0.1:PORT`/`localhost:PORT` get 403; non-GET requests need header `x-gpsb: 1`
 (`S.api` sends it).
 

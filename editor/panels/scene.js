@@ -18,6 +18,13 @@ const HOOK = `<script>(() => {
   for (const [k, l] of [['log', 'info'], ['info', 'info'], ['warn', 'warn'], ['error', 'error']]) { const o = console[k]; console[k] = (...a) => { o.apply(console, a); f(str(a), l); }; }
   addEventListener('error', e => f(e.message + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''), 'error'));
   addEventListener('unhandledrejection', e => f('Unhandled rejection: ' + (e.reason && e.reason.stack || e.reason), 'error'));
+  // links and forms that leave the site open in a new tab (most sites refuse to be shown in a frame), and so do links to
+  // files that aren't pages (a PDF); page links stay here and the editor follows them
+  const home = new URL(document.baseURI).origin; // not location.origin: that is "null" in a srcdoc frame
+  const away = u => { try { return new URL(u, document.baseURI).origin !== home; } catch { return false; } };
+  const notPage = a => !(a.getAttribute('href') || '').startsWith('#') && !/\.html$/.test(new URL(a.href).pathname);
+  addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (a && !a.target && (away(a.href) || notPage(a))) { a.target = '_blank'; a.rel = 'noopener'; } }, true);
+  addEventListener('submit', e => { const fm = e.target; if (!fm.target && away(fm.action)) fm.target = '_blank'; }, true);
 })();</script>`;
 
 const r3 = n => Math.round(n * 1000) / 1000;
@@ -295,9 +302,27 @@ function rebuild() {
     clearTimeout(propsTimer);
     const my = ++gen, f = frames[1 - front], [W, H] = S.S.resolution;
     Object.assign(f.style, { width: W + 'px', height: H + 'px' });
-    f.onload = () => waitGPSB(f, my, 0);
+    f.onload = () => (f === frames[front] ? followed(f) : waitGPSB(f, my, 0)); // the live frame loading = it navigated
     f.srcdoc = S.previewHTML().replace('</head>', HOOK + '\n</head>');
   });
+}
+// A link, button or form in the live preview loaded another document. A page of this project (or a collection item)
+// becomes the edited page, still playing; anything else (an asset such as a PDF) opens in a new tab and the preview
+// goes back to the page being edited.
+function followed(f) {
+  let url = null, page = null;
+  try { url = f.contentWindow.location.href; page = decodeURIComponent(f.contentWindow.location.pathname).match(/^\/project\/(.+)\.html$/)?.[1]; } catch { /* another site */ }
+  const P = S.S.P, item = page?.match(/^(.+)\/([\w-]+)$/);
+  if (page && P.pages[page] && !S.S.prefabEdit) return page === S.S.page ? rebuild() : S.setPage(page);
+  if (item && P.pages[item[1]] && !P.pages[page] && !S.S.prefabEdit) {
+    S.setPage(item[1]);
+    const i = S.pageItems()?.findIndex(x => x.slug === item[2]) ?? -1;
+    if (i >= 0) S.setCollectionItem(i);
+    return;
+  }
+  if (url && url !== 'about:blank') open(url, '_blank', 'noopener');
+  else if (!url) S.log('The preview went to another site; links and forms to other sites open in a new tab', 'warn');
+  rebuild();
 }
 function waitGPSB(f, my, n) {
   if (my !== gen) return;

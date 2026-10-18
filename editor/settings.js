@@ -68,10 +68,17 @@ function publishing(body) {
     <h3>Publishing</h3>
     <label class="prefs-row"><span>Clean URLs</span><span><input type="checkbox" data-k="cleanUrls"> about/ instead of about.html</span></label>
     <label class="prefs-row"><span>Minify</span><span><input type="checkbox" data-k="minify"> compact HTML and CSS (scripts stay readable modules)</span></label>
+    <label class="prefs-row"><span>Keep in output</span><input class="prefs-in" id="ps-keep" placeholder=".git/, CNAME" spellcheck="false"></label>
     <p class="prefs-note">Every build also writes robots.txt and, with a Site URL, sitemap.xml (pages with Page Meta ▸ noindex
       are left out). A page named <b>404</b> is served by hosts for missing addresses. Files in the project's
-      <b>public/</b> folder are copied to the site root as they are (CNAME, _redirects, .well-known/, your own robots.txt).</p>`;
+      <b>public/</b> folder are copied to the site root as they are (CNAME, _redirects, .well-known/, your own robots.txt).
+      <b>Keep in output</b> lists files and folders in the output folder that builds never delete: end a folder with /
+      (<b>.git/</b> when the output folder is the repository you publish from), write a file as is (<b>CNAME</b>); paths may
+      be nested (<b>docs/notes.txt</b>).</p>`;
   bind(body);
+  const keep = body.querySelector('#ps-keep'); // comma-separated in the field, a list in project.json
+  keep.value = (P().keep ?? []).join(', ');
+  keep.onchange = () => { const l = keep.value.split(',').map(s => s.trim()).filter(Boolean); S.setProjectSetting('keep', l.length ? l : undefined); };
 }
 
 // ---------- design tokens ----------

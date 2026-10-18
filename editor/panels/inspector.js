@@ -1,6 +1,7 @@
 // Inspector: node mode (header, RectTransform, components, Add Component) and asset mode (preview).
 import * as S from '../state.js';
 import { reanchor } from '/lib/rect.js';
+import { drivenBy } from '/lib/render.js';
 import { withDefaults } from '/lib/components.js';
 import { componentPath, clearOverride } from '/lib/node.js';
 import { h, nice, fmt, fmtSize, field, numInput, scrub, menu, popup, listNav, closePopup, accept, hidden } from '../fields.js';
@@ -78,6 +79,7 @@ function mark(row, id, paths, b) {
     row.classList.toggle('ovr', !b?.state?.() && paths.some(p => S.isOverridden(id, p)));
     row.classList.toggle('pfo', paths.some(p => S.isPrefabOverridden(id, p))); // differs from its prefab (bold, like Unity)
   });
+  if (typeof b?.path === 'string') driven(row, id, b.path);
   row.addEventListener('contextmenu', e => {
     if (!e.target.closest('.f-lab, .rt-lab, .v-lab, .ev-head, .ls-head, .in-head')) return;
     const items = [];
@@ -87,6 +89,20 @@ function mark(row, id, paths, b) {
     if (!items.length) return;
     e.preventDefault(); e.stopPropagation();
     menu(items, e.clientX, e.clientY);
+  });
+}
+// A value another component fixes (a Content Size Fitter on Height, Style css on Text Size...) would change nothing:
+// grey it out, disable it and say what drives it
+const drivenName = o => (o.textStyle ? `text style ${o.textStyle}` : o.parent ? `parent's ${nice(o.type)}` : nice(o.type));
+function driven(row, id, path) {
+  const note = h('div', { class: 'in-driven' });
+  live.push(() => {
+    const n = S.view(id), p = S.parentOf(id), by = n ? drivenBy(n, p ? S.view(p.id) : null, S.ctx(), path) : null;
+    row.classList.toggle('driven', !!by);
+    if (by) { note.textContent = `(affected by ${by.map(drivenName).join(', ')})`; if (!note.isConnected) row.append(note); } else note.remove();
+    for (const i of row.querySelectorAll('input, select, textarea, button')) { // only re-enable what this disabled
+      if (by && !i.disabled) { i.disabled = true; i.dataset.driven = '1'; } else if (!by && i.dataset.driven) { i.disabled = false; delete i.dataset.driven; }
+    }
   });
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -245,10 +261,7 @@ function rectSection(ids, n) {
   v2('Scale', 'rect.scale', 'rt-sc', sc01);
   fb(sub, { type: 'int', step: 1, help: 'Stacking order among siblings; higher draws on top. 0 = hierarchy order.' }, pb(ids, 'rect.zIndex', 0), 'Z Index', 'rt-z');
 
-  const inLayout = S.parentOf(id)?.components.some(c => S.def(c.type)?.childStyle) && !n.components.find(c => c.type === 'LayoutElement')?.props?.ignoreLayout;
-  return section('rect', 'Rect Transform', icon('rect'), null,
-    inLayout ? h('div', { class: 'in-note' }, 'Position driven by the parent layout group.') : null,
-    h('div', { class: 'rt-top' }, btn, top), sub);
+  return section('rect', 'Rect Transform', icon('rect'), null, h('div', { class: 'rt-top' }, btn, top), sub);
 }
 
 // mini diagram: ax/ay = preset index per axis (-1 custom)

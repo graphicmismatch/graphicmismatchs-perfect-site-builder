@@ -68,7 +68,7 @@ See [Publishing](publishing.md) for site URLs, clean URLs, 404 pages and more.
 
 ```
 project.json              name, breakpoints, design tokens, publishing settings
-pages/*.json              one file per page
+pages/**/*.json           one file per page (pages/blog/post.json -> blog/post.html)
 assets/**                 images, video, audio, fonts, JSON and text files
 animations/*.anim.json    animation clips
 prefabs/*.prefab.json     reusable objects

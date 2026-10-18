@@ -142,6 +142,27 @@ const ft = newNode('Ft', [{ type: 'Text', props: {} }]);
 setOverride(ft, 'Phone', 'Text.font', 'fonts/X.ttf');
 pg.children.push(ft);
 assert.match(renderPage(pg, makeCtx()).css, /@font-face \{\n {2}font-family: "gpsb-fonts-x-ttf"/);
+// Style css: the node's own declarations, after every other component's (whatever the order), kept inline at runtime
+pg = canvasNode();
+const so = newNode('So', [{ type: 'Style', props: { css: 'columns: 4; margin: 3px; background: url("a;b.png") /* c */' } }, { type: 'Text', props: {} }]);
+so.active = false;
+let soStyle = nodeStyle(so, pg, makeCtx());
+assert.deepEqual([soStyle.columns, soStyle.margin, soStyle.background, soStyle.display], ['4', '3px', 'url("a;b.png")', 'none']); // Text's margin: 0 loses; inactive still hides
+so.active = true;
+// breakpoint overrides: css diffs like any declaration, hover/rules are re-emitted in the @media block
+setOverride(so, 'Phone', 'Style.css', 'columns: 1;');
+setOverride(so, 'Phone', 'Style.hover', 'color: red;');
+pg.children.push(so);
+const soCss = renderPage(pg, makeCtx({ breakpoints: [{ name: 'Phone', maxWidth: 600 }] })).css;
+const soMedia = soCss.slice(soCss.indexOf('@media'));
+for (const d of ['columns: 1;', 'margin: 0;', 'background: unset;']) assert.ok(soMedia.includes(d), d);
+assert.match(soCss, /@media \(max-width: 600px\) \{[^@]*\.so:hover \{ color: red !important; \}/);
+// a font list: each asset gets @font-face, the rest is plain CSS fallback
+pg = canvasNode();
+pg.children.push(newNode('Fl', [{ type: 'Text', props: { font: 'fonts/A.ttf, fonts/B.otf, monospace' } }]));
+const flCss = renderPage(pg, makeCtx()).css;
+assert.match(flCss, /font-family: "gpsb-fonts-a-ttf", "gpsb-fonts-b-otf", monospace;/);
+assert.match(flCss, /font-family: "gpsb-fonts-b-otf";\n {2}src:/);
 // overrides under an empty Repeat: no .undefined rule
 pg = canvasNode();
 const emptyRep = newNode('List', [{ type: 'Repeat', props: { source: 'none.json' } }]), ghost = newNode('Ghost');
@@ -299,4 +320,51 @@ const d2 = renderDocument(tpl, cctx, { name: 'second', scope: { item: its[2].ite
 assert.equal((d2.match(/class="gpsb-text">[ab]</g) ?? []).length, 2); // Repeat over an array of the item
 assert.equal(collectionItems(canvasNode(), cctx), null);
 
+// build: project.json `keep` paths survive rebuilds (`x/` a folder, `x` a file, nested ok), everything else is cleared;
+// kept paths may sit in an otherwise empty output folder
+{
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const { build, create } = await import('../cli.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpsb-keep-')), out = path.join(dir, 'out'), o = (...p) => path.join(out, ...p);
+  await create(dir);
+  fs.mkdirSync(o('.git'), { recursive: true });
+  const setKeep = keep => fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({ name: 'k', keep }));
+  setKeep(['.git']); // a file entry doesn't match the folder
+  await assert.rejects(build(dir, out), /not empty/);
+  setKeep(['.git/', 'CNAME', 'docs/notes.txt', 'docs/']);
+  await build(dir, out);
+  fs.writeFileSync(o('CNAME'), 'x');
+  fs.mkdirSync(o('docs'));
+  fs.writeFileSync(o('stray.txt'), '');
+  setKeep(['.git/', 'CNAME', 'assets/notes.txt', 'docs']); // `docs` is a file entry now: the docs/ folder goes
+  fs.writeFileSync(o('assets', 'notes.txt'), 'n');
+  fs.writeFileSync(o('assets', 'other.txt'), '');
+  await build(dir, out);
+  const has = p => fs.existsSync(o(p));
+  assert.deepEqual(['.git', 'CNAME', 'assets/notes.txt', 'index.html', 'stray.txt', 'docs', 'assets/other.txt'].map(has), [true, true, true, true, false, false, false]);
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+// drivenBy: values another piece overrides, so editing them changes nothing
+{
+  const { drivenBy } = await import('../lib/render.js');
+  const ctx = makeCtx({ tokens: { textStyles: { h1: { size: 40 } } } }), row = canvasNode();
+  row.components.push({ type: 'VerticalLayoutGroup', props: { controlWidth: true } });
+  const t = newNode('T', [{ type: 'Text', props: { size: 16 } }, { type: 'ContentSizeFitter', props: { vertical: 'preferred' } }, { type: 'Style', props: { css: 'font-size: 2rem;' } }]);
+  const by = p => drivenBy(t, row, ctx, p);
+  assert.deepEqual(by('Text.size'), [{ type: 'Style', parent: false }]);
+  assert.deepEqual(by('rect.size.y'), [{ type: 'ContentSizeFitter', parent: false }]);
+  assert.deepEqual(by('rect.size.x'), [{ type: 'VerticalLayoutGroup', parent: true }]);
+  assert.deepEqual(by('rect.pos.x'), [{ type: 'VerticalLayoutGroup', parent: true }]); // positioned by the layout group
+  assert.equal(by('Text.lineHeight'), null); // still has an effect
+  t.components[2].props.css += ' letter-spacing: 1px;';
+  assert.deepEqual(by('Text.letterSpacing'), [{ type: 'Style', parent: false }]); // unset: judged at its default
+  assert.equal(drivenBy(t, null, ctx, 'Text.size') && 1, 1);
+  t.components[2].props.css = '';
+  assert.equal(by('Text.size'), null);
+  t.components[0].props.textStyle = 'h1';
+  assert.deepEqual(by('Text.size'), [{ textStyle: 'h1' }]);
+  const free = newNode('F', [{ type: 'Text', props: {} }]);
+  assert.equal(drivenBy(free, canvasNode(), ctx, 'rect.size.x'), null);
+  assert.equal(drivenBy(free, canvasNode(), ctx, 'rect.pos.y'), null);
+}
 console.log('core ok');

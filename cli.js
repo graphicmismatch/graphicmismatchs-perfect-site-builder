@@ -122,20 +122,36 @@ async function hashFile(file) {
 const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, text: P.text, clips: P.clips, breakpoints: P.project.breakpoints, inject: P.project.inject, tokens: P.project.tokens, ...extra });
 
 // The output folder is deleted before every build: refuse anything that is not a previous build or a fresh folder.
-async function checkOut(root, out) {
+// project.json `keep`: paths in the output folder that builds leave alone, gitignore-style: `name/` is a folder,
+// `name` a file; paths may be nested (`.git/`, `CNAME`, `.well-known/`, `docs/notes.txt`)
+const keepOf = project => (Array.isArray(project.keep) ? project.keep : []).filter(k => typeof k === 'string')
+  .map(k => k.trim().replace(/^\/+/, '')).filter(k => k && !k.split('/').includes('..'))
+  .map(k => ({ path: k.replace(/\/+$/, ''), dir: k.endsWith('/') }));
+const isKept = (keep, rel, dir) => keep.some(k => k.path === rel && k.dir === dir);
+const holdsKept = (keep, rel) => keep.some(k => k.path.startsWith(rel + '/')); // a folder with kept paths inside
+// delete everything in `dir` except kept paths (folders holding kept paths are cleared around them)
+async function clearOut(dir, keep, rel = '') {
+  for (const e of await fsp.readdir(dir, { withFileTypes: true }).catch(() => [])) {
+    const r = rel ? `${rel}/${e.name}` : e.name, p = path.join(dir, e.name);
+    if (isKept(keep, r, e.isDirectory())) continue;
+    if (e.isDirectory() && holdsKept(keep, r)) await clearOut(p, keep, r);
+    else await fsp.rm(p, { recursive: true, force: true });
+  }
+}
+async function checkOut(root, out, keep) {
   const inside = (a, b) => a === b || a.startsWith(b + path.sep);
   if (inside(root, out)) throw new Error(`refusing to build into ${out}: it contains the project`);
   for (const d of ['pages', 'assets', 'components', 'behaviours', 'animations'])
     if (inside(out, path.join(root, d))) throw new Error(`refusing to build into ${out}: it is inside the project's ${d}/ folder`);
-  const ents = await fsp.readdir(out).catch(() => []);
+  const ents = (await fsp.readdir(out, { withFileTypes: true }).catch(() => [])).filter(e => !isKept(keep, e.name, e.isDirectory()) && !(e.isDirectory() && holdsKept(keep, e.name)));
   if (ents.length && !['gpsb', 'psb'].some(d => fs.existsSync(path.join(out, d, 'runtime.js')))) // psb/: built before the rename
     throw new Error(`refusing to build into ${out}: it is not empty and does not look like a previous build`);
 }
 
 export async function build(root, out = path.join(root, 'dist')) {
   root = path.resolve(root); out = path.resolve(out);
-  await checkOut(root, out);
-  const P = await loadProject(root);
+  const P = await loadProject(root), keep = keepOf(P.project);
+  await checkOut(root, out, keep);
   const extensionVersions = {};
   for (const [n, e] of Object.entries(P.extensions)) extensionVersions[n] = await hashFile(path.join(root, e.path));
   await loadExtensions(root, P, extensionVersions);
@@ -148,7 +164,7 @@ export async function build(root, out = path.join(root, 'dist')) {
     expandPrefabs(tree, P.prefabs);
     for (const [n] of walk(tree)) if (n._missing) warnings.push(`pages/${name}.json: ${n.name} uses ${n._missing === 'cycle' ? 'a prefab that contains itself' : 'a missing prefab'} (${n.prefab})`);
   }
-  await fsp.rm(out, { recursive: true, force: true });
+  await clearOut(out, keep); // the previous build
   await fsp.mkdir(path.join(out, 'gpsb'), { recursive: true });
   for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f !== 'compile.js') await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'gpsb', f));
   for (const d of ['assets', 'behaviours', 'extensions']) if (fs.existsSync(path.join(root, d))) await fsp.cp(path.join(root, d), path.join(out, d), { recursive: true });
@@ -200,13 +216,15 @@ export function siteUrl(project) {
 // so it uses root-relative URLs (the site URL's path, default /).
 function pageOutput(name, clean, site) {
   if (name === '404') { const root = site ? new URL(site).pathname : '/'; return { file: '404.html', prefix: root, cssHref: `${root}404.css`, cssFile: '404.css' }; }
-  if (clean && name !== 'index') return { file: `${name}/index.html`, prefix: '../', cssHref: `${name}.css`, cssFile: `${name}.css` };
-  return { file: `${name}.html`, prefix: '', cssHref: `${name}.css`, cssFile: `${name}.css` };
+  const up = '../'.repeat(name.split('/').length - 1), css = name.split('/').pop() + '.css'; // nested pages (pages/a/b.json)
+  if (clean && name !== 'index') return { file: `${name}/index.html`, prefix: up + '../', cssHref: css, cssFile: css };
+  return { file: `${name}.html`, prefix: up, cssHref: css, cssFile: css };
 }
 // one item of a collection page: post/<slug>.html, or post/<slug>/index.html with clean URLs
 function itemOutput(page, slugv, clean) {
-  return clean ? { file: `${page}/${slugv}/index.html`, prefix: '../../', cssHref: `${page}.css`, cssFile: `${page}.css` }
-    : { file: `${page}/${slugv}.html`, prefix: '../', cssHref: `${slugv}.css`, cssFile: `${slugv}.css` };
+  const up = '../'.repeat(page.split('/').length), css = page.split('/').pop() + '.css'; // the template may be nested too
+  return clean ? { file: `${page}/${slugv}/index.html`, prefix: up + '../', cssHref: css, cssFile: css }
+    : { file: `${page}/${slugv}.html`, prefix: up, cssHref: `${slugv}.css`, cssFile: `${slugv}.css` };
 }
 
 // Optional build.js in the project root (Node only, never copied to the site):
@@ -263,7 +281,7 @@ async function projectList() {
 }
 
 // ---------- dev server (hub + editor) ----------
-let root = null, watcher = null; // project currently open in the editor
+let root = null, watcher = null; // project currently open in the editor; watcher: { close() } for all its fs watchers
 const notOpen = () => Object.assign(new Error('no project open'), { code: 409 });
 function safe(rel, write = false) {
   if (!root) throw notOpen();
@@ -305,12 +323,35 @@ async function openProject(dir) {
   root = dir;
   await register(dir, true);
   watcher?.close();
-  let t;
-  watcher = fs.watch(root, { recursive: true }, (_, f) => {
-    if (!f || f.startsWith('dist') || f.startsWith('.')) return;
+  watcher = watchProject(dir);
+}
+
+// Hot reload: tell editors about changed project files. Only the source folders are watched recursively (plus the root
+// itself for project.json/build.js): the output folder and .git can be big and change under a recursive watcher (a
+// rebuild, a commit), which made it fail. A watcher that errors is restarted.
+const SOURCES = ['pages', 'assets', 'components', 'behaviours', 'extensions', 'animations', 'prefabs', 'public'];
+function watchProject(dir) {
+  const ws = new Map(); // folder ('' = root) -> FSWatcher
+  let t, closed = false;
+  const changed = f => {
+    if (f.split(path.sep).some(p => p.startsWith('.'))) return;
     clearTimeout(t);
     t = setTimeout(() => { for (const c of clients) c.write(`data: ${JSON.stringify({ file: f.split(path.sep).join('/') })}\n\n`); }, 100);
-  });
+  };
+  const watch = d => {
+    if (closed || ws.has(d) || (d && !fs.existsSync(path.join(dir, d)))) return;
+    try {
+      const w = fs.watch(path.join(dir, d), { recursive: !!d }, (_, f) => {
+        if (!f) return;
+        changed(d ? path.join(d, f) : f);
+        if (!d && SOURCES.includes(f)) watch(f); // a source folder created later
+      });
+      w.on('error', () => { w.close(); ws.delete(d); setTimeout(() => watch(d), 500); });
+      ws.set(d, w);
+    } catch { /* the folder went away; watched again if it comes back */ }
+  };
+  ['', ...SOURCES].forEach(watch);
+  return { close: () => { closed = true; for (const w of ws.values()) w.close(); } };
 }
 
 async function hubApi(req, res, p, q) {
@@ -389,21 +430,21 @@ function serve(initial) {
         const out = compileComponent(comp[1], src);
         return send(res, 200, out[comp[1] + (comp[2] ?? '') + '.js'] ?? '', MIME.js);
       }
-      const it = p.match(/^\/project\/([\w-]+)\/([\w-]+)\.html$/); // collection item (preview links)
+      const it = p.match(/^\/project\/([\w-]+(?:\/[\w-]+)*)\/([\w-]+)\.html$/); // collection item (preview links)
       if (it && fs.existsSync(safe(`pages/${it[1]}.json`))) {
         const P = await loadProject(root), tree = P.pages[it[1]], extensionVersions = statExtVersions(P);
         await loadExtensions(root, P, extensionVersions);
         if (tree) expandPrefabs(tree, P.prefabs);
-        const cx = ctxFor(P, { assetVersions: statVersions(P), extensionVersions, prefix: '../', collections: collectionsOf(P) });
+        const cx = ctxFor(P, { assetVersions: statVersions(P), extensionVersions, prefix: '../'.repeat(it[1].split('/').length), collections: collectionsOf(P) });
         const item = tree && collectionItems(tree, cx)?.find(x => x.slug === it[2]);
         if (item) return send(res, 200, renderDocument(tree, cx, { name: it[2], cssHref: null, scope: { item: item.item, index: item.index } }).html, MIME.html);
       }
-      const page = p.match(/^\/project\/([\w-]+)\.html$/)?.[1];
+      const page = p.match(/^\/project\/([\w-]+(?:\/[\w-]+)*)\.html$/)?.[1];
       if (page && fs.existsSync(safe(`pages/${page}.json`))) { // a page rendered on the fly (Links / IFrames in the editor preview)
         const P = await loadProject(root), extensionVersions = statExtVersions(P);
         await loadExtensions(root, P, extensionVersions);
         if (P.pages[page]) expandPrefabs(P.pages[page], P.prefabs);
-        if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P), extensionVersions, collections: collectionsOf(P) }), { name: page, cssHref: null }).html, MIME.html);
+        if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P), extensionVersions, collections: collectionsOf(P), prefix: '../'.repeat(page.split('/').length - 1) }), { name: page.split('/').pop(), cssHref: null }).html, MIME.html);
       }
       if (p.startsWith('/project/')) return sendFile(res, safe(p.slice(9)));
       if (p === '/api/project') { if (!root) throw notOpen(); return sendJSON(res, { root, ...await loadProject(root) }); }

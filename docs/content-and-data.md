@@ -7,7 +7,9 @@ letter spacing and wrapping. Set **Tag** to `h1`–`h6`, `p`, `span` or `label` 
 understand the page. Text can contain inline HTML such as `<b>`, `<em>`, `<a href>` or `<br>`.
 
 - **Fonts:** type any CSS font family (`Georgia, serif`), or drop a font file from `assets/` onto the Font field. Font
-  files get an `@font-face` rule automatically. The Canvas's Font is the default for the whole page.
+  files get an `@font-face` rule automatically. A list mixes both, for fallbacks:
+  `fonts/Game.ttf, fonts/Mono.ttf, monospace` uses Mono for characters Game lacks. The Canvas's Font is the default
+  for the whole page.
 - **Text styles:** pick a project text style (Text ▸ Text Style) to set font, size, weight, line height and letter
   spacing in one go. See [Design tokens](prefabs-and-tokens.md#design-tokens).
 - **Long text:** use WebObject ▸ Text Block, which wraps and grows downwards, or Markdown.
@@ -52,7 +54,8 @@ To send a form somewhere, add a **Form** component to a parent object:
 
 - **HTML** inserts any markup you write.
 - **Style** adds CSS to one object: declarations, hover declarations, full rules (where `&` means this object) and
-  extra class names.
+  extra class names. Its declarations override every other component's, and they stay in place when an animation, a
+  script or a breakpoint restyles the object. Breakpoint overrides of any Style field work.
 - **Element** sets the HTML tag (`section`, `nav`, `header`, `ul`, …), id, tooltip, role and ARIA attributes.
 
 ## Markdown

@@ -109,7 +109,8 @@ export function assetKind(v) {
 }
 const fits = (kind, want) => kind && (want === 'any' ? kind !== 'anim' : kind === want);
 export function thumb(kind, value) {
-  if (kind === 'image' && value) return h('img', { class: 'th', src: S.assetUrl(value), loading: 'lazy', draggable: 'false' });
+  // a {{binding}} (inside a Repeat) has no file to show
+  if (kind === 'image' && value && !value.includes('{{')) return h('img', { class: 'th', src: S.assetUrl(value), loading: 'lazy', draggable: 'false' });
   return h('span', { class: 'th', html: icon(kind ?? 'file') });
 }
 export function pickAsset(kind, current, onPick, anchor) {
@@ -162,7 +163,7 @@ export function scrub(label, b, sc = {}) {
   label.classList.add('scrub');
   const step = sc.step ?? (sc.min != null && sc.max != null ? (sc.max - sc.min) / 200 : 1);
   label.onpointerdown = e => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || label.closest('.driven')) return; // fixed by another component: nothing to scrub
     e.preventDefault();
     const start = +b.get() || 0;
     let acc = 0;

@@ -19,6 +19,16 @@ The build refuses to write into a folder that holds the project or its sources, 
 a previous build, so it can't overwrite your work by accident. A page or clip that can't be read fails the build, and
 a broken custom component is skipped with a warning.
 
+**Keep in output** (Project Settings ▸ Publishing, `keep` in `project.json`) lists files and folders in the output
+folder that builds never delete. As in `.gitignore`, a folder ends with `/` and a file doesn't, and paths may be nested:
+
+```json
+"keep": [".git/", "CNAME", ".well-known/", "docs/notes.txt"]
+```
+
+Add `.git/` to make the output folder a repository of its own that you push to your host, such as a GitHub Pages repo.
+An entry only matches its own kind: `.git` (no slash) would not keep the `.git` folder.
+
 ## Project settings
 
 **File ▸ Project Settings…** has four sections.
@@ -33,6 +43,7 @@ The project name.
   `sitemap.xml`, points `robots.txt` at it, and makes sites served from a sub-path work.
 - **Clean URLs**: pages are written as `about/index.html`, so their address is `/about/` instead of `/about.html`.
 - **Minify**: compact HTML and CSS. Your text, code and scripts are left as they are.
+- **Keep in output**: files and folders in the output folder that builds leave alone, e.g. `.git/`, `CNAME` (see Building).
 
 ### Design Tokens
 
