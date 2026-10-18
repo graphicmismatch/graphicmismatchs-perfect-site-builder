@@ -15,6 +15,15 @@ node cli.js new my-site            # start a new project
 
 After `npm link` (or a global install) the same commands are available as `gpsb`, e.g. `gpsb serve example`.
 
+## Documentation
+
+The [docs](docs/README.md) folder has user guides ([getting started](docs/getting-started.md), [the editor](docs/editor.md),
+[layout](docs/layout.md), [content and data](docs/content-and-data.md), [events](docs/events.md),
+[animation](docs/animation.md), [prefabs and tokens](docs/prefabs-and-tokens.md), [publishing](docs/publishing.md))
+and developer guides for writing your own [behaviours](docs/behaviours.md), [custom components](docs/components.md)
+and [extension components](docs/extensions.md), with the [prop types](docs/prop-types.md) and the
+[runtime API](docs/runtime-api.md) they share.
+
 ## Project Hub
 
 The first screen lists your projects with their path, page and asset counts, and when you last opened each one.
@@ -102,6 +111,8 @@ Shortcuts work as in Unity:
 
 ## Custom components (HTML + CSS + JS)
 
+Full guide: [docs/components.md](docs/components.md).
+
 `components/Card.html` turns into a native custom element. Its CSS is scoped with Shadow DOM. Its props appear in the Inspector.
 
 ```html
@@ -121,6 +132,8 @@ Shortcuts work as in Unity:
 ```
 
 ## Behaviours (MonoBehaviour-style scripts)
+
+Full guide: [docs/behaviours.md](docs/behaviours.md).
 
 ```js
 // behaviours/Spin.js
@@ -152,7 +165,7 @@ Record mode works as in Unity. Press the red button, then move things in the Sce
 ## Content pages
 
 - **File ▸ New Flowing Page** starts a page whose sections stack and grow with their content. It has a centred content
-  column and text that wraps, for articles, docs and marketing copy. Add more with WebObject ▸ UI ▸ Section / Content
+  column and text that wraps, for articles, docs and marketing copy. Add more with WebObject ▸ Section / Content
   Column / Text Block / Markdown.
 - **Markdown** renders a `.md` file or inline text: headings, lists, tables, code, links to pages and images from assets.
 - **Collection pages:** point a page's Canvas ▸ Collection at a JSON array (e.g. blog posts). The build writes one page
@@ -187,6 +200,8 @@ A page named `404` becomes the host's not-found page. Files in `public/` are cop
 Images can be real `<img>` tags (Image ▸ Element) with alt text and lazy loading. Position animations run on the GPU.
 
 ## Extending
+
+Full guide to extension components: [docs/extensions.md](docs/extensions.md).
 
 - **Extension components** (`extensions/<Name>.js`) are added like built-in components: they show up in Add Component,
   get Inspector fields from their props, can be animated, and work in the build, the editor and the published site.
