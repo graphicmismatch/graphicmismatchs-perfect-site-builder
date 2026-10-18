@@ -1040,7 +1040,7 @@
                   "props": {
                     "css": "padding: 0 20px;",
                     "hover": "",
-                    "rules": "& .psb-text { display: flex; justify-content: space-between; }\n& .psb-text span { color: #6b7090; font-size: 14px; }"
+                    "rules": "& .gpsb-text { display: flex; justify-content: space-between; }\n& .gpsb-text span { color: #6b7090; font-size: 14px; }"
                   }
                 }
               ],

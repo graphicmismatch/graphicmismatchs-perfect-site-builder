@@ -10,7 +10,7 @@ export const props = {
 };
 
 export default class ${name} {
-  // injected: this.el, this.node, this.props, this.PSB, this.find(path), this.apply(), this.animator, this.setActive(bool)
+  // injected: this.el, this.node, this.props, this.GPSB, this.find(path), this.apply(), this.animator, this.setActive(bool)
   start() {}
 
   update(dt) {}
@@ -21,6 +21,29 @@ export default class ${name} {
     console.log('${name}.doSomething', arg, this.props.speed);
   }
 }
+`;
+
+export const extensionTemplate = name => `// ${name}: an extension component. Add it with Add Component > Extensions > ${name}.
+// It works like a built-in: props show in the Inspector, can be animated and overridden per breakpoint.
+// This file runs at build time (Node) and in the browser, so keep browser-only code inside init / patch.
+// Hooks: style, attrs, inner, rules, head, patch, init, state (see CONTRACT.md "Extension components").
+export default ({ esc }) => ({
+  category: 'Extensions',
+  props: {
+    text: { type: 'string', default: 'Hello' },
+    src: { type: 'string', default: '', help: 'optional URL of JSON { "text": "..." } loaded on the published page' },
+  },
+  // HTML written into the page at build time (and shown in the editor)
+  inner: p => \`<span class="ext-text">\${esc(p.text)}</span>\`,
+  // a prop changed (Inspector, animation, breakpoint): update the element
+  patch: (el, p) => { const t = el.querySelector(':scope > .ext-text'); if (t) t.textContent = p.text; },
+  // published page / Play mode, once per element: fetch data, start widgets, listen to events
+  init({ el, GPSB, ci }) {
+    const n = GPSB.nodeFor(el), p = n.components[ci].props;
+    if (!p.src) return;
+    fetch(p.src).then(r => r.json()).then(d => { p.text = String(d.text ?? ''); GPSB.applyNode(n, undefined, el); });
+  },
+});
 `;
 
 export const componentTemplate = name => `<template>
@@ -43,7 +66,7 @@ export const componentTemplate = name => `<template>
 </script>
 
 <script>
-  import { Component } from '../psb/component.js';
+  import { Component } from '../gpsb/component.js';
   export default class extends Component {
     rendered() {
       this.$('h3').onclick = () => this.emit('picked', this.props.title);
@@ -80,7 +103,8 @@ export async function createClip(name) {
 }
 
 // Rewrite references in every page (and clip) after a rename. map(str) -> str | undefined.
-function retarget(map, label) {
+// keyMap (same shape) also renames breakpoint override keys (property paths such as 'behaviour:Spin.speed').
+function retarget(map, label, keyMap) {
   const files = [];
   const fix = (o, pk) => {
     let hit = 0;
@@ -92,16 +116,44 @@ function retarget(map, label) {
     return hit;
   };
   S.edit(label, () => {
-    for (const [name, tree] of Object.entries(S.S.P.pages)) if (fix(tree)) files.push(`pages/${name}.json`);
+    for (const [name, tree] of Object.entries(S.S.P.pages)) {
+      let hit = fix(tree);
+      if (keyMap) for (const [n] of S.walk(tree)) for (const [bp, o] of Object.entries(n.overrides ?? {})) {
+        if (!Object.keys(o).some(k => (keyMap(k) ?? k) !== k)) continue;
+        n.overrides[bp] = Object.fromEntries(Object.entries(o).map(([k, v]) => [keyMap(k) ?? k, v]));
+        hit++;
+      }
+      if (hit) files.push(`pages/${name}.json`);
+    }
     for (const [name, clip] of Object.entries(S.S.P.clips)) if (fix(clip)) files.push(`animations/${name}.anim.json`);
   }, { files: [] });
   files.forEach(f => S.S.dirty.add(f));
   if (files.length) { S.log(`Updated references in ${files.join(', ')} (unsaved)`); S.emit('anim'); }
 }
 
+// ---------- design tokens ----------
+// where a token is used: colours/fonts are "$name" values, text styles are Text.textStyle names
+const tokenMatch = (kind, name) => kind === 'textStyles' ? (v, o, k) => k === 'textStyle' && v === name : v => v === '$' + name;
+export function tokenUses(kind, name) {
+  let n = 0;
+  const m = tokenMatch(kind, name);
+  const count = (o, pk) => { for (const k in o) { const v = o[k]; if (typeof v === 'string') n += m(v, o, k, pk) ? 1 : 0; else if (v && typeof v === 'object') count(v, k); } };
+  for (const t of Object.values(S.S.P.pages)) count(t);
+  for (const c of Object.values(S.S.P.clips)) count(c);
+  return n;
+}
+export function renameToken(kind, from, to) {
+  const m = tokenMatch(kind, from), out = kind === 'textStyles' ? to : '$' + to;
+  retarget((v, o, k, pk) => (m(v, o, k, pk) ? out : undefined), `Rename token ${from}`);
+}
+
+// component type a -> b in a type, property path ('behaviour:Spin.speed', 'behaviour:Spin[1].speed') or event call
+const typeRef = (a, b) => v => (v === a ? b : v.startsWith(a + '.') || v.startsWith(a + '[') ? b + v.slice(a.length) : undefined);
+
 // from/to are project-relative paths; kind: 'asset' | 'folder' | 'component' | 'behaviour' | 'anim'
 export async function renamePath(from, to, kind) {
   if (from === to) return;
+  if (kind === 'prefab') return S.renamePrefab(from.slice(8, -12), to.slice(8, -12));
   if (kind === 'anim') {
     const a = from.slice(11, -10), b = to.slice(11, -10);
     if (S.S.P.clips[b]) throw new Error(`${b} exists`);
@@ -124,11 +176,14 @@ export async function renamePath(from, to, kind) {
         if (v.includes(`{{`)) return v.replace(/\{\{(\s*)([^{}:]+?):/g, (m, sp, p) => (p === a ? `{{${sp}${b}:` : kind === 'folder' && p.startsWith(a + '/') ? `{{${sp}${b}${p.slice(a.length)}:` : m));
       }, 'Rename asset');
     } else if (kind === 'component') {
-      const a = 'component:' + from.slice(11, -5), b = 'component:' + to.slice(11, -5);
-      retarget(v => (v === a ? b : undefined), 'Rename component');
+      const m = typeRef('component:' + from.slice(11, -5), 'component:' + to.slice(11, -5));
+      retarget(m, 'Rename component', m);
     } else if (kind === 'behaviour') {
-      const a = 'behaviour:' + from.slice(11, -3), b = 'behaviour:' + to.slice(11, -3);
-      retarget(v => (v === a ? b : v.startsWith(a + '.') ? b + v.slice(a.length) : undefined), 'Rename behaviour');
+      const m = typeRef('behaviour:' + from.slice(11, -3), 'behaviour:' + to.slice(11, -3));
+      retarget(m, 'Rename behaviour', m);
+    } else if (kind === 'extension') { // plain names: only component types, track props and override keys
+      const a = from.slice(11, -3), b = to.slice(11, -3), m = typeRef(a, b);
+      retarget((v, o, k) => (k === 'type' && v === a ? b : k === 'prop' && v !== a ? m(v) : undefined), 'Rename extension', v => (v === a ? undefined : m(v)));
     }
     await S.reloadMeta();
   }

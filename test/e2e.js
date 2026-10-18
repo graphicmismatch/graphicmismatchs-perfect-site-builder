@@ -32,19 +32,19 @@ async function main() {
   cleanups.push(() => server.close());
 
   const page = await chrome();
-  const id = name => page.eval(`PSB.find(${JSON.stringify(name)})?.id`);
-  const style = (name, prop) => page.eval(`getComputedStyle(PSB.el(PSB.find(${JSON.stringify(name)}).id))[${JSON.stringify(prop)}]`);
+  const id = name => page.eval(`GPSB.find(${JSON.stringify(name)})?.id`);
+  const style = (name, prop) => page.eval(`getComputedStyle(GPSB.el(GPSB.find(${JSON.stringify(name)}).id))[${JSON.stringify(prop)}]`);
 
   // ---- built site: index ----
   await page.open(`http://127.0.0.1:${SITE_PORT}/index.html`);
-  const ready = await page.until(`window.PSB?.behaviour && PSB.behaviour(PSB.find('Ring')?.id, 'Spin')`);
+  const ready = await page.until(`window.GPSB?.behaviour && GPSB.behaviour(GPSB.find('Ring')?.id, 'Spin')`);
   check('index: runtime + behaviours boot', !!ready);
-  check('index: Repeat renders one Card per site.json feature', await page.eval(`PSB.els(PSB.find('Feature Card').id).length`) === site.features.length);
-  check('index: Repeat clones get their own node data (PSB.nodeFor)', await page.eval(`(() => { const els = PSB.els(PSB.find('Feature Card').id); return new Set(els.map(e => JSON.stringify(PSB.nodeFor(e).components.map(c => c.props)))).size === els.length && PSB.nodeFor(els[0]) === PSB.nodeFor(els[0]); })()`));
-  check('index: Repeat renders one Post per site.json post', await page.eval(`PSB.els(PSB.find('Post').id).length`) === site.posts.length);
-  check('index: {{data/site.json:...}} binding resolved', (await page.eval(`PSB.el(PSB.find('Eyebrow').id).textContent`)) === site.hero.eyebrow);
-  const card = await page.eval(`(() => { const c = document.querySelector('psb-card'); return c?.shadowRoot ? { h3: c.shadowRoot.querySelector('h3')?.textContent, img: c.shadowRoot.querySelector('img')?.getAttribute('src') } : null; })()`);
-  check('index: custom element has a populated shadowRoot', card?.h3 === site.features[0].title && card?.img?.endsWith(site.features[0].icon), JSON.stringify(card));
+  check('index: Repeat renders one Card per site.json feature', await page.eval(`GPSB.els(GPSB.find('Feature Card').id).length`) === site.features.length);
+  check('index: Repeat clones get their own node data (GPSB.nodeFor)', await page.eval(`(() => { const els = GPSB.els(GPSB.find('Feature Card').id); return new Set(els.map(e => JSON.stringify(GPSB.nodeFor(e).components.map(c => c.props)))).size === els.length && GPSB.nodeFor(els[0]) === GPSB.nodeFor(els[0]); })()`));
+  check('index: Repeat renders one Post per site.json post', await page.eval(`GPSB.els(GPSB.find('Post').id).length`) === site.posts.length);
+  check('index: {{data/site.json:...}} binding resolved', (await page.eval(`GPSB.el(GPSB.find('Eyebrow').id).textContent`)) === site.hero.eyebrow);
+  const card = await page.eval(`(() => { const c = document.querySelector('gpsb-card'); return c?.shadowRoot ? { h3: c.shadowRoot.querySelector('h3')?.textContent, img: c.shadowRoot.querySelector('img')?.getAttribute('src') } : null; })()`);
+  check('index: custom element has a populated shadowRoot', card?.h3 === site.features[0].title && card?.img?.split('?')[0].endsWith(site.features[0].icon) && /\?v=[0-9a-f]{10}$/.test(card?.img ?? ''), JSON.stringify(card));
 
   const ring1 = await style('Ring', 'transform'), orb1 = await style('Orbiter', 'transform');
   await sleep(700);
@@ -55,37 +55,37 @@ async function main() {
   for (let i = 0; i < 6; i++) { sprites.add(await style('Chomper', 'backgroundImage')); await sleep(70); }
   check('index: sprite swap animation changes Image.sprite', sprites.size > 1, `${sprites.size} distinct`);
 
-  const typed = await page.eval(`(() => { const e = PSB.el(PSB.find('Subtitle').id); return e.querySelector('.caret') ? e.textContent : null; })()`);
+  const typed = await page.eval(`(() => { const e = GPSB.el(GPSB.find('Subtitle').id); return e.querySelector('.caret') ? e.textContent : null; })()`);
   check('index: Typewriter (started by a clip event) typed the subtitle', typed?.startsWith(site.hero.subtitle.slice(0, 20)), typed);
 
-  const speed0 = await page.eval(`PSB.behaviour(PSB.find('Ring').id, 'Spin').props.speed`);
-  await page.eval(`PSB.el(PSB.find('Spin Button').id).click()`);
-  check('index: Button.onClick calls a behaviour method', await page.eval(`PSB.behaviour(PSB.find('Ring').id, 'Spin').props.speed`) === speed0 * 2);
+  const speed0 = await page.eval(`GPSB.behaviour(GPSB.find('Ring').id, 'Spin').props.speed`);
+  await page.eval(`GPSB.el(GPSB.find('Spin Button').id).click()`);
+  check('index: Button.onClick calls a behaviour method', await page.eval(`GPSB.behaviour(GPSB.find('Ring').id, 'Spin').props.speed`) === speed0 * 2);
   const panelId = await id('Inspector Panel');
-  const shown0 = await page.eval(`getComputedStyle(PSB.el('${panelId}')).display`);
-  await page.eval(`PSB.el(PSB.find('Panel Button').id).click()`);
+  const shown0 = await page.eval(`getComputedStyle(GPSB.el('${panelId}')).display`);
+  await page.eval(`GPSB.el(GPSB.find('Panel Button').id).click()`);
   await sleep(100);
-  const shown1 = await page.eval(`getComputedStyle(PSB.el('${panelId}')).display`);
+  const shown1 = await page.eval(`getComputedStyle(GPSB.el('${panelId}')).display`);
   check('index: Button.onClick setActive toggles a panel', shown0 === 'none' && shown1 !== 'none', `${shown0} -> ${shown1}`);
-  const c = await page.eval(`(() => { const c = document.querySelector('psb-counter'); c.shadowRoot.querySelector('.inc').click(); c.shadowRoot.querySelector('.inc').click(); return c.shadowRoot.querySelector('.value').textContent; })()`);
+  const c = await page.eval(`(() => { const c = document.querySelector('gpsb-counter'); c.shadowRoot.querySelector('.inc').click(); c.shadowRoot.querySelector('.inc').click(); return c.shadowRoot.querySelector('.value').textContent; })()`);
   check('index: Counter component script is interactive', c === '2', c);
   const unit = await page.eval(`(async () => {
-    const { define } = await import('./psb/component.js');
+    const { define } = await import('./gpsb/component.js');
     const host = document.createElement('div');
     document.body.append(host);
     // parsed before define -> upgrade path
-    host.innerHTML = '<psb-e2e-t n="4" on items="[1,2]" label="a&lt;b" html="&lt;i&gt;x&lt;/i&gt;"></psb-e2e-t>';
+    host.innerHTML = '<gpsb-e2e-t n="4" on items="[1,2]" label="a&lt;b" html="&lt;i&gt;x&lt;/i&gt;"></gpsb-e2e-t>';
     const changes = [];
-    define('psb-e2e-t', { template: '<p title="{{label}}">{{label}} {{n}} {{items.1}}</p><div>{{{html}}}</div>', style: 'p{color:red}',
+    define('gpsb-e2e-t', { template: '<p title="{{label}}">{{label}} {{n}} {{items.1}}</p><div>{{{html}}}</div>', style: 'p{color:red}',
       props: { n: { type: 'int', default: 1 }, on: { type: 'bool', default: false }, off: { type: 'bool', default: true }, items: { type: 'list', default: [] },
         label: { type: 'string', default: '' }, html: { type: 'text', default: '' }, bad: { type: 'vec2', default: [0, 0] } } },
-      class extends (await import('./psb/component.js')).Component { propChanged(k, v) { changes.push(k + '=' + v); } });
+      class extends (await import('./gpsb/component.js')).Component { propChanged(k, v) { changes.push(k + '=' + v); } });
     const el = host.firstChild, p = () => el.shadowRoot.querySelector('p');
     const a = { props: { ...el.props }, text: p().textContent, title: p().title, raw: el.shadowRoot.querySelector('i')?.textContent, style: el.shadowRoot.querySelector('style').textContent };
     el.setAttribute('n', '7'); el.setAttribute('bad', '{oops');
     await Promise.resolve();
     // created after define
-    const el2 = document.createElement('psb-e2e-t'); el2.setAttribute('off', 'false'); host.append(el2);
+    const el2 = document.createElement('gpsb-e2e-t'); el2.setAttribute('off', 'false'); host.append(el2);
     const r = { ...a, after: p().textContent, bad: el.props.bad, changes, off: el2.props.off, def: el2.shadowRoot.querySelector('p').textContent };
     host.remove();
     return r;
@@ -98,10 +98,10 @@ async function main() {
 
   // ---- built site: about ----
   await page.open(`http://127.0.0.1:${SITE_PORT}/about.html`);
-  await page.until(`window.PSB?.behaviour`);
+  await page.until(`window.GPSB?.behaviour`);
   await sleep(500);
-  check('about: Card child node projected into its <slot>', await page.eval(`document.querySelector('psb-card').shadowRoot.querySelector('slot').assignedElements().length`) === 1);
-  const bp = () => page.eval(`(() => { const q = n => PSB.el(PSB.find(n).id); return { brand: q('Brand').textContent.trim(), title: getComputedStyle(q('About Title')).fontSize, about: getComputedStyle(q('Nav About')).display, active: PSB.breakpoints().join() }; })()`);
+  check('about: Card child node projected into its <slot>', await page.eval(`document.querySelector('gpsb-card').shadowRoot.querySelector('slot').assignedElements().length`) === 1);
+  const bp = () => page.eval(`(() => { const q = n => GPSB.el(GPSB.find(n).id); return { brand: q('Brand').textContent.trim(), title: getComputedStyle(q('About Title')).fontSize, about: getComputedStyle(q('Nav About')).display, active: GPSB.breakpoints().join() }; })()`);
   const desk = await bp();
   await page.resize(390, 844); await sleep(400);
   const phone = await bp();
@@ -114,7 +114,7 @@ async function main() {
   // ---- editor ----
   const cfg = path.join(ROOT, '.tmp', 'e2e-config'); // keep the user's real project list / prefs untouched
   fs.rmSync(cfg, { recursive: true, force: true });
-  const ed = spawn(process.execPath, ['cli.js', 'serve', 'example', '--port', String(EDITOR_PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PSB_CONFIG_DIR: cfg } });
+  const ed = spawn(process.execPath, ['cli.js', 'serve', 'example', '--port', String(EDITOR_PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GPSB_CONFIG_DIR: cfg } });
   cleanups.push(() => ed.kill());
   await new Promise((ok, err) => { ed.stdout.on('data', d => /editor:/.test(d) && ok()); ed.on('exit', c => err(new Error(`editor server exited ${c}`))); });
   await page.open(`http://127.0.0.1:${EDITOR_PORT}/`);
@@ -133,11 +133,11 @@ async function main() {
 async function chrome(W = 1440, H = 900) {
   const bin = ['/usr/bin/google-chrome', '/snap/bin/chromium', '/usr/bin/chromium'].find(f => fs.existsSync(f));
   if (!bin) throw new Error('no chrome found');
-  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'psb-e2e-'));
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'gpsb-e2e-'));
   const port = 9300 + Math.floor(Math.random() * 500);
   const proc = spawn(bin, ['--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--mute-audio', '--autoplay-policy=no-user-gesture-required',
     `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, `--window-size=${W},${H}`, 'about:blank'], { stdio: 'ignore' });
-  cleanups.push(() => { proc.kill('SIGKILL'); fs.rmSync(profile, { recursive: true, force: true }); });
+  cleanups.push(() => { proc.kill('SIGKILL'); fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
   let target;
   for (let i = 0; i < 50 && !target; i++) {
     await sleep(100);

@@ -1,6 +1,7 @@
 // Inspector: node mode (header, RectTransform, components, Add Component) and asset mode (preview).
 import * as S from '../state.js';
 import { reanchor } from '/lib/rect.js';
+import { drivenBy } from '/lib/render.js';
 import { withDefaults } from '/lib/components.js';
 import { componentPath, clearOverride } from '/lib/node.js';
 import { h, nice, fmt, fmtSize, field, numInput, scrub, menu, popup, listNav, closePopup, accept, hidden } from '../fields.js';
@@ -8,8 +9,8 @@ import { icon, compIcon } from '../icons.js';
 import { openCode, createScript, createComponent, validName } from '../files.js';
 
 let el, live = [], sig = '', assetPath = null, clipboard = null, presetN = 0;
-const fold = (() => { try { return JSON.parse(localStorage.psbFold || '{}'); } catch { return {}; } })();
-const saveFold = () => { try { localStorage.psbFold = JSON.stringify(fold); } catch {} };
+const fold = (() => { try { return JSON.parse(localStorage.gpsbFold || '{}'); } catch { return {}; } })();
+const saveFold = () => { try { localStorage.gpsbFold = JSON.stringify(fold); } catch {} };
 
 export function mount(root) {
   el = root;
@@ -22,7 +23,7 @@ export function mount(root) {
   S.on('anim', () => !assetPath && refresh());
   S.on('breakpoint', () => !assetPath && render());
   // drop a component/behaviour from the Project panel to add it (like dropping a script in Unity)
-  accept(el, 'application/x-psb-component', t => S.S.selection.length && S.addComponent(S.S.selection.at(-1), t), () => !assetPath && S.S.selection.length > 0);
+  accept(el, 'application/x-gpsb-component', t => S.S.selection.length && S.addComponent(S.S.selection.at(-1), t), () => !assetPath && S.S.selection.length > 0);
   render();
 }
 
@@ -74,12 +75,34 @@ function val(id, path) {
 // Prefab-style override marker: bold label + blue bar; right-click the label to revert. Animation tints win.
 function mark(row, id, paths, b) {
   paths = [paths].flat();
-  live.push(() => row.classList.toggle('ovr', !b?.state?.() && paths.some(p => S.isOverridden(id, p))));
+  live.push(() => {
+    row.classList.toggle('ovr', !b?.state?.() && paths.some(p => S.isOverridden(id, p)));
+    row.classList.toggle('pfo', paths.some(p => S.isPrefabOverridden(id, p))); // differs from its prefab (bold, like Unity)
+  });
+  if (typeof b?.path === 'string') driven(row, id, b.path);
   row.addEventListener('contextmenu', e => {
-    if (!e.target.closest('.f-lab, .rt-lab, .v-lab, .ev-head, .ls-head, .in-head') || !paths.some(p => S.isOverridden(id, p))) return;
+    if (!e.target.closest('.f-lab, .rt-lab, .v-lab, .ev-head, .ls-head, .in-head')) return;
+    const items = [];
+    if (paths.some(p => S.isOverridden(id, p))) items.push({ label: `Revert to Base (${S.S.breakpoint})`, action: () => (paths.length === 1 ? S.revertOverride(id, paths[0])
+      : S.edit(`Revert ${paths} ${id}`, () => paths.forEach(p => clearOverride(S.node(id), S.S.breakpoint, p)), { kind: 'props', ids: [id] })) });
+    if (paths.some(p => S.isPrefabOverridden(id, p))) items.push({ label: `Revert to Prefab (${S.instanceRoot(id)?.prefab})`, action: () => paths.forEach(p => S.revertPrefabOverride(id, p)) });
+    if (!items.length) return;
     e.preventDefault(); e.stopPropagation();
-    menu([{ label: `Revert to Base (${S.S.breakpoint})`, action: () => (paths.length === 1 ? S.revertOverride(id, paths[0])
-      : S.edit(`Revert ${paths} ${id}`, () => paths.forEach(p => clearOverride(S.node(id), S.S.breakpoint, p)), { kind: 'props', ids: [id] })) }], e.clientX, e.clientY);
+    menu(items, e.clientX, e.clientY);
+  });
+}
+// A value another component fixes (a Content Size Fitter on Height, Style css on Text Size...) would change nothing:
+// grey it out, disable it and say what drives it
+const drivenName = o => (o.textStyle ? `text style ${o.textStyle}` : o.parent ? `parent's ${nice(o.type)}` : nice(o.type));
+function driven(row, id, path) {
+  const note = h('div', { class: 'in-driven' });
+  live.push(() => {
+    const n = S.view(id), p = S.parentOf(id), by = n ? drivenBy(n, p ? S.view(p.id) : null, S.ctx(), path) : null;
+    row.classList.toggle('driven', !!by);
+    if (by) { note.textContent = `(affected by ${by.map(drivenName).join(', ')})`; if (!note.isConnected) row.append(note); } else note.remove();
+    for (const i of row.querySelectorAll('input, select, textarea, button')) { // only re-enable what this disabled
+      if (by && !i.disabled) { i.disabled = true; i.dataset.driven = '1'; } else if (!by && i.dataset.driven) { i.disabled = false; delete i.dataset.driven; }
+    }
   });
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -132,6 +155,18 @@ function renderNode() {
   });
   el.append(head);
   mark(head, n.id, 'active');
+  const inst = S.instanceRoot(n.id);
+  if (inst) { // Unity's prefab bar: what this belongs to + Open / Select / Apply / Revert / Unpack
+    const has = !!inst.prefabOverrides && Object.keys(inst.prefabOverrides).length > 0;
+    const btn = (label, title, fn, off = false) => h('button', { class: 'btn', title, disabled: off || null, onclick: fn }, label);
+    el.append(h('div', { class: 'in-prefab' + (inst._missing ? ' missing' : '') },
+      h('span', { class: 'in-pf-l' }, inst._missing ? `Missing prefab ${inst.prefab}` : inst === n ? `Prefab ${inst.prefab}` : `Part of prefab ${inst.prefab} (${inst.name})`),
+      btn('Open', 'Edit the prefab on its own; every instance updates', () => S.openPrefab(inst.prefab), !!inst._missing),
+      inst !== n ? btn('Select', 'Select the instance root', () => S.select(inst.id)) : null,
+      btn('Apply', "Write this instance's overrides into the prefab (every instance updates)", () => confirm(`Apply this instance's changes to "${inst.prefab}"? Every instance updates (this can't be undone).`) && S.applyInstance(inst.id), !has),
+      btn('Revert', 'Drop all overrides of this instance', () => S.revertInstance(inst.id), !has),
+      btn('Unpack', 'Turn the instance into plain objects (no longer linked)', () => S.unpack(inst.id))));
+  }
   if (S.S.breakpoint) el.append(overridesRow(n.id));
   if (ids.length > 1) el.append(h('div', { class: 'in-multi' }, `${ids.length} objects selected · showing ${n.name}. RectTransform edits apply to all.`));
 
@@ -189,10 +224,11 @@ function rectSection(ids, n) {
       }
     },
   });
-  const cell = (lab, b, key, sc = { step: 1 }) => {
+  const fitBtn = axis => h('button', { class: 'rt-fit', title: `Fit ${axis ? 'height' : 'width'} to children`, onclick: () => S.fitToChildren(ids, [axis]) }, '⤢');
+  const cell = (lab, b, key, sc = { step: 1 }, fit) => {
     const l = h('label', { class: 'rt-lab' }, lab), ni = numInput(b, sc);
     scrub(l, b, sc);
-    const c = h('div', { class: 'rt-cell' }, l, ni.el);
+    const c = h('div', { class: 'rt-cell' }, fit == null ? l : h('div', { class: 'rt-labrow' }, l, fitBtn(fit)), ni.el);
     c.dataset.k = key;
     live.push(ni.update);
     mark(c, id, b.paths ?? b.path, b);
@@ -202,8 +238,8 @@ function rectSection(ids, n) {
   const top = h('div', { class: 'rt-grid' },
     stretch[x] ? cell('Left', offB(x, 0), 'rt-l') : cell('Pos X', pb(ids, 'rect.pos.x', 0), 'rt-px'),
     stretch[y] ? cell('Top', offB(y, 0), 'rt-t') : cell('Pos Y', pb(ids, 'rect.pos.y', 0), 'rt-py'),
-    stretch[x] ? cell('Right', offB(x, 1), 'rt-r') : cell('Width', pb(ids, 'rect.size.x', 0), 'rt-w'),
-    stretch[y] ? cell('Bottom', offB(y, 1), 'rt-b') : cell('Height', pb(ids, 'rect.size.y', 0), 'rt-h'));
+    stretch[x] ? cell('Right', offB(x, 1), 'rt-r', undefined, x) : cell('Width', pb(ids, 'rect.size.x', 0), 'rt-w', undefined, x),
+    stretch[y] ? cell('Bottom', offB(y, 1), 'rt-b', undefined, y) : cell('Height', pb(ids, 'rect.size.y', 0), 'rt-h', undefined, y));
 
   const btn = h('button', { class: 'rt-preset', title: 'Anchor presets' });
   const drawBtn = () => { const r = S.view(id)?.rect; if (r) btn.innerHTML = presetSvg(axisOf(r, 0), axisOf(r, 1)); };
@@ -223,11 +259,9 @@ function rectSection(ids, n) {
   fb(sub, { type: 'vec2', ...sc01 }, anchorB(ids, 'pivot'), 'Pivot', 'rt-pv');
   fb(sub, { type: 'number', step: 1 }, pb(ids, 'rect.rotation', 0), 'Rotation', 'rt-rot');
   v2('Scale', 'rect.scale', 'rt-sc', sc01);
+  fb(sub, { type: 'int', step: 1, help: 'Stacking order among siblings; higher draws on top. 0 = hierarchy order.' }, pb(ids, 'rect.zIndex', 0), 'Z Index', 'rt-z');
 
-  const inLayout = S.parentOf(id)?.components.some(c => S.def(c.type)?.childStyle) && !n.components.find(c => c.type === 'LayoutElement')?.props?.ignoreLayout;
-  return section('rect', 'Rect Transform', icon('rect'), null,
-    inLayout ? h('div', { class: 'in-note' }, 'Position driven by the parent layout group.') : null,
-    h('div', { class: 'rt-top' }, btn, top), sub);
+  return section('rect', 'Rect Transform', icon('rect'), null, h('div', { class: 'rt-top' }, btn, top), sub);
 }
 
 // mini diagram: ax/ay = preset index per axis (-1 custom)
@@ -323,8 +357,9 @@ function compSection(n, c, ci) {
   if (!props.length && !missing && !err) body.push(h('div', { class: 'in-note' }, d?.behaviour ? 'No exposed props. Export `props` from the script to show fields here.' : 'No properties.'));
   const wrap = h('div');
   for (const [k, sc] of props) {
-    const b = pb([id], `${cp}.${k}`, sc.default);
-    add(wrap, field(sc, b, nice(k)), `${ci}.${k}`, b);
+    const b = pb([id], `${cp}.${k}`, sc.default), w = add(wrap, field(sc, b, nice(k)), `${ci}.${k}`, b);
+    if (t === 'Canvas' && k === 'height') // the page grows to its content
+      w.el.append(h('button', { class: 'rt-fit f-fit', title: 'Fit the page height to its content', onclick: () => S.fitToChildren(id) }, '⤢'));
   }
   body.push(wrap);
   if (d?.behaviour || d?.custom) body.push(h('div', { class: 'in-src' }, h('a', { onclick: () => openCode(d.behaviour ? S.S.P.behaviours[t.slice(10)]?.path : `components/${t.slice(10)}.html`) }, 'Edit Script')));
@@ -495,7 +530,7 @@ function renderAsset(p) {
     body.append(data === null || data === undefined ? h('div', { class: 'in-warn', html: icon('warn') }, h('span', {}, 'Invalid JSON (could not parse).')) : jsonTree(data, rel));
     usage('Bind any text prop: ', code(`{{${rel}:key.path}}`), '. Click a key to copy its binding. Arrays drive a ', h('i', {}, 'Repeat'), ' (Source = this file, Path = the array key; use ', code('{{item.x}}'), ' inside).');
   } else if (m.kind === 'font') {
-    const fam = 'psb-prev-' + rel.replace(/\W/g, '_');
+    const fam = 'gpsb-prev-' + rel.replace(/\W/g, '_');
     new FontFace(fam, `url("${url}")`).load().then(f => document.fonts.add(f)).catch(e => S.log(`Font ${rel}: ${e.message}`, 'warn'));
     body.append(h('div', { class: 'as-font', style: `font-family:"${fam}"` }, h('div', { style: 'font-size:28px' }, 'Aa Bb Cc 123'), h('div', {}, 'The quick brown fox jumps over the lazy dog.')));
     usage('Drag onto a Text or Canvas ', h('i', {}, 'Font'), ' field, or type ', code(rel), '.');
@@ -518,7 +553,7 @@ function renderAsset(p) {
       if (bm.error) body.prepend(h('div', { class: 'in-warn', html: icon('warn') }, h('span', {}, bm.error)));
       body.prepend(h('div', { class: 'as-kv' }, ...kv({ Props: Object.keys(bm.props ?? {}).join(', ') || '—', Methods: (bm.methods ?? []).join(', ') || '—' })));
       usage('Add Component › Scripts › ', h('b', {}, m.name), ', or drag it onto the Inspector. Call methods from events: ', code(`behaviour:${m.name}.${(bm.methods ?? []).find(x => x !== 'start' && x !== 'update') ?? 'method'}`), '.');
-    } else usage('Path: ', code(rel ?? p), m.kind === 'text' ? ' · load at runtime with ' : '', m.kind === 'text' ? code(`PSB.assets.text('${rel}')`) : '');
+    } else usage('Path: ', code(rel ?? p), m.kind === 'text' ? ' · load at runtime with ' : '', m.kind === 'text' ? code(`GPSB.assets.text('${rel}')`) : '');
     S.api.get(p).then(t => { sizeOf(t); pre.textContent = t.length > 20000 ? t.slice(0, 20000) + '\n…' : t; }, e => (pre.textContent = e.message));
   }
 }

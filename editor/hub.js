@@ -29,7 +29,7 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const join = (L, name) => (L.path.endsWith(L.sep) ? L.path : L.path + L.sep) + name;
 
 async function api(url, body) {
-  const r = await fetch(url, body && { method: 'POST', headers: { 'x-psb': '1', 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await fetch(url, body && { method: 'POST', headers: { 'x-gpsb': '1', 'content-type': 'application/json' }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error((await r.text()) || `${r.status} ${r.statusText}`);
   return r.json();
 }

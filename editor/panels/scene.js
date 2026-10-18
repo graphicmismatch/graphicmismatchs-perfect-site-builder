@@ -6,18 +6,25 @@ import { activeBreakpoints } from '/lib/node.js';
 
 const RES = [[1920, 1080], [1280, 720], [1366, 768], [1440, 900], [390, 844, 'phone'], [768, 1024, 'tablet']];
 const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 4];
-const cfg = { grid: true, gizmos: true, snap: false, inc: 10, scale: 1, res: null };
-try { Object.assign(cfg, JSON.parse(localStorage.psbScene || '{}')); } catch {}
-const saveCfg = () => { try { localStorage.psbScene = JSON.stringify(cfg); } catch {} };
+const cfg = { grid: true, gizmos: true, snap: false, guides: true, inc: 10, scale: 1, res: null };
+try { Object.assign(cfg, JSON.parse(localStorage.gpsbScene || '{}')); } catch {}
+const saveCfg = () => { try { localStorage.gpsbScene = JSON.stringify(cfg); } catch {} };
 const ROT = `url("data:image/svg+xml,${encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><g fill='none' stroke-linecap='round'><path d='M5 11a5 5 0 1 0 5-5' stroke='white' stroke-width='4'/><path d='M5 11a5 5 0 1 0 5-5' stroke='black' stroke-width='1.6'/></g><path d='M10 2v8l4-4z' stroke='white' stroke-width='1'/></svg>")}") 10 10, crosshair`;
 
 // page console/errors -> editor console (end of <head>: before any deferred module or body script runs)
 const HOOK = `<script>(() => {
-  const f = frameElement && frameElement.psbLog; if (!f) return;
+  const f = frameElement && frameElement.gpsbLog; if (!f) return;
   const str = a => a.map(x => typeof x === 'string' ? x : x instanceof Error ? x.stack || x.message : (() => { try { return JSON.stringify(x) ?? String(x); } catch { return String(x); } })()).join(' ');
   for (const [k, l] of [['log', 'info'], ['info', 'info'], ['warn', 'warn'], ['error', 'error']]) { const o = console[k]; console[k] = (...a) => { o.apply(console, a); f(str(a), l); }; }
   addEventListener('error', e => f(e.message + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''), 'error'));
   addEventListener('unhandledrejection', e => f('Unhandled rejection: ' + (e.reason && e.reason.stack || e.reason), 'error'));
+  // links and forms that leave the site open in a new tab (most sites refuse to be shown in a frame), and so do links to
+  // files that aren't pages (a PDF); page links stay here and the editor follows them
+  const home = new URL(document.baseURI).origin; // not location.origin: that is "null" in a srcdoc frame
+  const away = u => { try { return new URL(u, document.baseURI).origin !== home; } catch { return false; } };
+  const notPage = a => !(a.getAttribute('href') || '').startsWith('#') && !/\.html$/.test(new URL(a.href).pathname);
+  addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (a && !a.target && (away(a.href) || notPage(a))) { a.target = '_blank'; a.rel = 'noopener'; } }, true);
+  addEventListener('submit', e => { const fm = e.target; if (!fm.target && away(fm.action)) fm.target = '_blank'; }, true);
 })();</script>`;
 
 const r3 = n => Math.round(n * 1000) / 1000;
@@ -61,9 +68,10 @@ function elMatrix(e) {
   const w = e.ownerDocument.defaultView;
   let m = new DOMMatrix();
   for (; e; e = e.offsetParent) {
-    const cs = w.getComputedStyle(e), p = e.offsetParent, abs = cs.position === 'absolute'; // computed left/top are sub-pixel exact
-    const l = new DOMMatrix().translateSelf((abs ? parseFloat(cs.left) : e.offsetLeft) + (p ? p.clientLeft - p.scrollLeft : 0),
-      (abs ? parseFloat(cs.top) : e.offsetTop) + (p ? p.clientTop - p.scrollTop : 0));
+    // computed left/top are sub-pixel exact; the border box starts after the margin (Style CSS like `margin: 0 auto`)
+    const cs = w.getComputedStyle(e), p = e.offsetParent, abs = cs.position === 'absolute';
+    const l = new DOMMatrix().translateSelf((abs ? parseFloat(cs.left) + (parseFloat(cs.marginLeft) || 0) : e.offsetLeft) + (p ? p.clientLeft - p.scrollLeft : 0),
+      (abs ? parseFloat(cs.top) + (parseFloat(cs.marginTop) || 0) : e.offsetTop) + (p ? p.clientTop - p.scrollTop : 0));
     if (cs.transform !== 'none') {
       const [ox, oy] = cs.transformOrigin.split(' ').map(parseFloat);
       l.translateSelf(ox, oy).multiplySelf(new DOMMatrix(cs.transform)).translateSelf(-ox, -oy);
@@ -73,14 +81,14 @@ function elMatrix(e) {
   return m;
 }
 function info(id) {
-  const e = win?.PSB?.el(id);
+  const e = win?.GPSB?.el(id);
   if (!e?.offsetParent) return null; // inactive / missing
   const M = stage().multiplySelf(elMatrix(e)), [w, h] = box(e);
   return { e, M, w, h, q: [[0, 0], [w, 0], [w, h], [0, h]].map(([x, y]) => M.transformPoint({ x, y })) };
 }
 // parent's layout space (padding box, unscrolled) -> view
 function parentFrame(id) {
-  const p = S.parentOf(id), e = p && win?.PSB?.el(p.id);
+  const p = S.parentOf(id), e = p && win?.GPSB?.el(p.id);
   if (!e) return null;
   return { M: stage().multiplySelf(elMatrix(e)).translateSelf(e.clientLeft - e.scrollLeft, e.clientTop - e.scrollTop), P: box(e) };
 }
@@ -201,7 +209,7 @@ const hit = v => geo()?.h.find(h => h.test(v));
 // ---------- overlay ----------
 function draw() {
   let s = '';
-  if (win?.PSB && S.root()) {
+  if (win?.GPSB && S.root()) {
     const [W, H] = S.S.resolution, a = stage().transformPoint({ x: 0, y: 0 });
     s += `<rect class="cv" x="${f1(a.x)}" y="${f1(a.y)}" width="${f1(W * zoom)}" height="${f1(pageH * zoom)}"/>`;
     if (pageH > H) s += line({ x: a.x, y: a.y + H * zoom }, { x: a.x + W * zoom, y: a.y + H * zoom }, 'fold');
@@ -214,6 +222,7 @@ function draw() {
       const hk = drag?.key ?? hotKey;
       s += g.h.map(h => h.svg(h.key === hk ? ' hot' : '')).reverse().join('');
     }
+    if (drag?.guides?.length) s += drag.guides.join('');
     if (drag?.k === 'marquee' && drag.cur) {
       const { v, cur } = drag;
       s += `<rect class="marq" x="${f1(Math.min(v.x, cur.x))}" y="${f1(Math.min(v.y, cur.y))}" width="${f1(Math.abs(cur.x - v.x))}" height="${f1(Math.abs(cur.y - v.y))}"/>`;
@@ -293,15 +302,33 @@ function rebuild() {
     clearTimeout(propsTimer);
     const my = ++gen, f = frames[1 - front], [W, H] = S.S.resolution;
     Object.assign(f.style, { width: W + 'px', height: H + 'px' });
-    f.onload = () => waitPSB(f, my, 0);
+    f.onload = () => (f === frames[front] ? followed(f) : waitGPSB(f, my, 0)); // the live frame loading = it navigated
     f.srcdoc = S.previewHTML().replace('</head>', HOOK + '\n</head>');
   });
 }
-function waitPSB(f, my, n) {
+// A link, button or form in the live preview loaded another document. A page of this project (or a collection item)
+// becomes the edited page, still playing; anything else (an asset such as a PDF) opens in a new tab and the preview
+// goes back to the page being edited.
+function followed(f) {
+  let url = null, page = null;
+  try { url = f.contentWindow.location.href; page = decodeURIComponent(f.contentWindow.location.pathname).match(/^\/project\/(.+)\.html$/)?.[1]; } catch { /* another site */ }
+  const P = S.S.P, item = page?.match(/^(.+)\/([\w-]+)$/);
+  if (page && P.pages[page] && !S.S.prefabEdit) return page === S.S.page ? rebuild() : S.setPage(page);
+  if (item && P.pages[item[1]] && !P.pages[page] && !S.S.prefabEdit) {
+    S.setPage(item[1]);
+    const i = S.pageItems()?.findIndex(x => x.slug === item[2]) ?? -1;
+    if (i >= 0) S.setCollectionItem(i);
+    return;
+  }
+  if (url && url !== 'about:blank') open(url, '_blank', 'noopener');
+  else if (!url) S.log('The preview went to another site; links and forms to other sites open in a new tab', 'warn');
+  rebuild();
+}
+function waitGPSB(f, my, n) {
   if (my !== gen) return;
-  if (f.contentWindow?.PSB) return swap(f);
+  if (f.contentWindow?.GPSB) return swap(f);
   if (n > 300) return S.log('Preview runtime did not start', 'error');
-  setTimeout(() => waitPSB(f, my, n + 1), 20);
+  setTimeout(() => waitGPSB(f, my, n + 1), 20);
 }
 function swap(f) {
   const old = frames[front], [, H] = S.S.resolution;
@@ -322,7 +349,7 @@ function picks(v) {
   if (!doc) return ids;
   const f = stage().inverse().transformPoint(v);
   for (const e of doc.elementsFromPoint(f.x, f.y)) {
-    const id = e.closest('[data-psb]')?.dataset.psb;
+    const id = e.closest('[data-gpsb]')?.dataset.gpsb;
     if (id && id !== rootId && !ids.includes(id) && S.node(id)) ids.push(id);
   }
   return ids;
@@ -405,10 +432,64 @@ function up(e) {
   hoverAt(vpt(e));
 }
 
+// ---------- smart guides: edges/centres of the moved boxes snap to siblings' and the parent's (screen space) ----------
+const GUIDE_PX = 6;
+const aabb = q => { const xs = q.map(p => p.x), ys = q.map(p => p.y); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+function guideLines(targets) {
+  const ids = new Set(targets.map(t => t.id)), parents = new Set(targets.map(t => S.parentOf(t.id)?.id)), xs = [], ys = [];
+  const addBox = ([x0, y0, x1, y1]) => { xs.push(x0, (x0 + x1) / 2, x1); ys.push(y0, (y0 + y1) / 2, y1); };
+  for (const pid of parents) {
+    const p = S.node(pid); if (!p) continue;
+    const pi = info(pid); if (pi) addBox(aabb(pi.q));
+    for (const c of p.children) if (!ids.has(c.id)) { const ci = info(c.id); if (ci) addBox(aabb(ci.q)); }
+  }
+  return { xs, ys, box: aabb(targets.flatMap(t => [[0, 0], [t.w, 0], [t.w, t.h], [0, t.h]].map(([x, y]) => t.M.transformPoint({ x, y })))) };
+}
+// screen delta (dx, dy) -> snapped delta + the guide lines to draw
+function snapDelta(d, dx, dy, e) {
+  d.guides = [];
+  if (!cfg.guides || e.altKey || snapping(e)) return [dx, dy];
+  d.lines ??= guideLines(d.targets);
+  const [x0, y0, x1, y1] = d.lines.box, best = (cands, own) => {
+    let m = null;
+    for (const o of own) for (const c of cands) { const diff = c - o; if (Math.abs(diff) < GUIDE_PX && (!m || Math.abs(diff) < Math.abs(m.diff))) m = { diff, at: c }; }
+    return m;
+  };
+  const bx = d.ax[0] ? best(d.lines.xs, [x0 + dx, (x0 + x1) / 2 + dx, x1 + dx]) : null, by = d.ax[1] ? best(d.lines.ys, [y0 + dy, (y0 + y1) / 2 + dy, y1 + dy]) : null;
+  if (bx) { dx += bx.diff; d.guides.push(line({ x: bx.at, y: -1e4 }, { x: bx.at, y: 1e4 }, 'guide')); }
+  if (by) { dy += by.diff; d.guides.push(line({ x: -1e4, y: by.at }, { x: 1e4, y: by.at }, 'guide')); }
+  return [dx, dy];
+}
+
+// ---------- align / distribute (WebObject > Align): screen-space boxes, moved in each node's parent space ----------
+export function align(kind) {
+  const ts = movable().map(snap0).filter(Boolean);
+  if (!ts.length) return;
+  const bs = ts.map(t => aabb([[0, 0], [t.w, 0], [t.w, t.h], [0, t.h]].map(([x, y]) => t.M.transformPoint({ x, y }))));
+  const pi = ts.length === 1 && info(S.parentOf(ts[0].id)?.id); // one object: align within its parent
+  const ref = pi ? aabb(pi.q) : [Math.min(...bs.map(b => b[0])), Math.min(...bs.map(b => b[1])), Math.max(...bs.map(b => b[2])), Math.max(...bs.map(b => b[3]))];
+  const label = 'Align#' + ++seq, moves = bs.map(() => [0, 0]);
+  if (kind === 'distributeX' || kind === 'distributeY') {
+    if (ts.length < 3) return S.log('Distribute needs 3 or more objects', 'warn');
+    const i = kind === 'distributeX' ? 0 : 1, order = bs.map((b, k) => k).sort((a, b) => bs[a][i] - bs[b][i]);
+    const total = bs[order.at(-1)][i + 2] - bs[order[0]][i], sizes = order.reduce((s, k) => s + bs[k][i + 2] - bs[k][i], 0), gap = (total - sizes) / (order.length - 1);
+    let at = bs[order[0]][i];
+    for (const k of order) { moves[k][i] = at - bs[k][i]; at += bs[k][i + 2] - bs[k][i] + gap; }
+  } else bs.forEach((b, k) => {
+    const [i, f] = { left: [0, 0], center: [0, 0.5], right: [0, 1], top: [1, 0], middle: [1, 0.5], bottom: [1, 1] }[kind];
+    moves[k][i] = (ref[i] + (ref[i + 2] - ref[i]) * f) - (b[i] + (b[i + 2] - b[i]) * f);
+  });
+  ts.forEach((t, k) => {
+    const o = t.M.transformPoint({ x: 0, y: 0 }), a = t.Mpi.transformPoint(o), b = t.Mpi.transformPoint({ x: o.x + moves[k][0], y: o.y + moves[k][1] });
+    if (moves[k][0] || moves[k][1]) put(t.id, 'pos', [t.r.pos[0] + b.x - a.x, t.r.pos[1] + b.y - a.y], label);
+  });
+}
+
 const TOOLS = {
   move(d, v, e) {
+    const [dx, dy] = snapDelta(d, v.x - d.v.x, v.y - d.v.y, e), w = { x: d.v.x + dx, y: d.v.y + dy };
     for (const t of d.targets) {
-      const a = t.Mpi.transformPoint(d.v), b = t.Mpi.transformPoint(v), dl = [b.x - a.x, b.y - a.y];
+      const a = t.Mpi.transformPoint(d.v), b = t.Mpi.transformPoint(w), dl = [b.x - a.x, b.y - a.y];
       put(t.id, 'pos', t.r.pos.map((p, i) => (!d.ax[i] ? p : snapping(e) ? snapv(p + dl[i]) : p + dl[i])));
     }
   },
@@ -502,10 +583,15 @@ const natural = p => new Promise(ok => {
 async function drop(e) {
   if (mode !== 'scene') return;
   e.preventDefault();
-  const v = vpt(e), parentId = picks(v)[0] ?? S.root().id, pe = win?.PSB?.el(parentId);
+  const v = vpt(e), parentId = picks(v)[0] ?? S.root().id, pe = win?.GPSB?.el(parentId);
   const local = pe ? stage().multiplySelf(elMatrix(pe)).translateSelf(pe.clientLeft - pe.scrollLeft, pe.clientTop - pe.scrollTop).inverse().transformPoint(v) : { x: 0, y: 0 };
   const P = pe ? box(pe) : S.S.resolution, dt = e.dataTransfer, paths = [];
-  const asset = dt.getData('application/x-psb-asset');
+  const asset = dt.getData('application/x-gpsb-asset');
+  if (asset?.startsWith('prefab:')) { // a prefab from the Project window: an instance where it was dropped
+    const n = S.instantiate(asset.slice(7), parentId);
+    if (n) S.setProp(n.id, 'rect.pos', [r3(local.x - 0.5 * P[0]), r3(local.y - 0.5 * P[1])], { label: 'Place prefab' });
+    return;
+  }
   try { if (asset) paths.push(asset); else for (const f of dt.files) paths.push(await S.upload(f)); }
   catch (err) { return S.log(`Import failed: ${err.message}`, 'error'); }
   for (const p of paths) {
@@ -532,11 +618,13 @@ export function mount(root) {
       <nav class="sc-modes" title="Scene: edit with gizmos · Web: the page as visitors see it"><button data-mode-tab="scene">Scene</button><button data-mode-tab="web">Web</button></nav>
       <select class="sc-res" title="Resolution">${RES.map(([w, h, n]) => `<option value="${w}x${h}">${w}x${h}${n ? ' ' + n : ''}</option>`).join('')}<option value="custom">Custom…</option></select>
       <span class="sc-custom" hidden><input type="number" class="sc-w" min="1" title="Width"> × <input type="number" class="sc-h" min="1" title="Height"></span>
+      <select class="sc-item" title="Collection page: the item shown here (the build writes one page per item)" hidden></select>
       <span class="sc-scene">
         <select class="sc-zoom" title="Zoom (wheel)"><option value="">100%</option><option value="fit">Fit</option>${ZOOMS.map(z => `<option value="${z}">${z * 100}%</option>`).join('')}</select>
         <button class="btn" data-k="grid" title="Show grid">Grid</button>
         <button class="btn" data-k="gizmos" title="Show anchor gizmos (rect tool)">Anchors</button>
         <button class="btn" data-k="snap" title="Snap to increment (or hold Ctrl while dragging)">Snap</button>
+        <button class="btn" data-k="guides" title="Smart guides: snap to other objects' edges and centres while moving (hold Alt to skip)">Guides</button>
         <input type="number" class="sc-inc" min="0.01" step="any" title="Snap increment (px); rotation snaps to 15°">
       </span>
       <span class="sc-bps" title="Breakpoint being edited (lit = active at the current preview width)"></span>
@@ -551,7 +639,7 @@ export function mount(root) {
   const $ = s => el.querySelector(s);
   view = $('.sc-view'); world = $('.sc-world'); sizer = $('.sc-sizer'); svg = $('.sc-ov'); zoomSel = $('.sc-zoom');
   frames = [...el.querySelectorAll('iframe')];
-  for (const f of frames) f.psbLog = (msg, level) => S.log(msg, level, { source: 'page' });
+  for (const f of frames) f.gpsbLog = (msg, level) => S.log(msg, level, { source: 'page' });
 
   // toolbar
   const resSel = $('.sc-res'), custom = $('.sc-custom'), wIn = $('.sc-w'), hIn = $('.sc-h'), inc = $('.sc-inc'), scale = $('.sc-scale');
@@ -644,6 +732,17 @@ export function mount(root) {
   S.on('load', bpUI);
   el.querySelector('.sc-modes').onclick = e => e.target.dataset.modeTab && setMode(e.target.dataset.modeTab);
   togUI(); scaleUI(); resUI(); bpUI();
+  const itemSel = el.querySelector('.sc-item');
+  const itemUI = () => {
+    const items = S.pageItems();
+    itemSel.hidden = !items;
+    if (!items) return;
+    const sig = items.map(x => x.slug).join('\n');
+    if (itemSel.dataset.sig !== sig) { itemSel.dataset.sig = sig; itemSel.innerHTML = items.length ? items.map((x, i) => `<option value="${i}">${x.slug.replace(/[<&]/g, '')}</option>`).join('') : '<option>no items</option>'; }
+    itemSel.value = String(Math.min(S.S.collectionItem, items.length - 1));
+  };
+  itemSel.onchange = () => S.setCollectionItem(+itemSel.value);
+  for (const ev of ['structure', 'page', 'load', 'assets']) S.on(ev, itemUI);
 
   // view input
   view.addEventListener('pointerdown', down);
@@ -669,7 +768,7 @@ export function mount(root) {
   view.addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = false; view.style.cursor = ''; e.stopPropagation(); } });
   view.addEventListener('blur', () => (spaceDown = false));
   view.addEventListener('dragover', e => {
-    if (mode !== 'scene' || ![...e.dataTransfer.types].some(t => t === 'application/x-psb-asset' || t === 'Files')) return;
+    if (mode !== 'scene' || ![...e.dataTransfer.types].some(t => t === 'application/x-gpsb-asset' || t === 'Files')) return;
     e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
   });
   view.addEventListener('drop', drop);
@@ -684,14 +783,15 @@ export function mount(root) {
     rebuild();
   });
   S.on('props', ids => {
-    const PSB = win?.PSB;
-    if (PSB) for (const id of ids) {
+    const GPSB = win?.GPSB;
+    if (GPSB) for (const id of ids) {
       const n = S.node(id);
-      if (n) try { PSB.applyNode(n, S.parentOf(id)); } catch (e) { console.warn(e); }
+      if (n) try { GPSB.applyNode(n, S.parentOf(id)); } catch (e) { console.warn(e); }
     }
     if (!S.S.playing) rebuildLater(); // playing: keep the running page, patch only
   });
   S.on('frame', frameSel);
+  S.on('align', align);
   S.on('tool', () => { hotKey = null; });
   S.on('page', () => { hover = null; });
   setMode('scene');

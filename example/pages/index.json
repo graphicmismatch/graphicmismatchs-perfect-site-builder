@@ -919,7 +919,7 @@
                   "props": {
                     "css": "",
                     "hover": "",
-                    "rules": "& .caret { color: #3ee6c4; margin-left: 1px; animation: psb-blink 1s steps(1) infinite; }\n@keyframes psb-blink { 50% { opacity: 0; } }"
+                    "rules": "& .caret { color: #3ee6c4; margin-left: 1px; animation: gpsb-blink 1s steps(1) infinite; }\n@keyframes gpsb-blink { 50% { opacity: 0; } }"
                   }
                 }
               ],

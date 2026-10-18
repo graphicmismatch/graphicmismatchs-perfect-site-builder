@@ -7,7 +7,7 @@ everyone working on the code. Read it fully before changing anything.
 - **Zero dependencies.** Node ≥ 22 stdlib only. Browser code uses native ES modules, no bundler, no CDN.
 - Match the surrounding style: 2-space indent, single quotes, semicolons, terse comments, small functions.
 - **Y axis is top-down everywhere.** anchor/pivot y=0 is the top edge, +pos.y moves down. (Unity is Y-up; we deliberately differ.)
-- `lib/` is isomorphic (Node + browser) and is copied 1:1 to `dist/psb/` and served at `/project/psb/` and `/lib/`.
+- `lib/` is isomorphic (Node + browser) and is copied 1:1 to `dist/gpsb/` and served at `/project/gpsb/` and `/lib/`.
   Relative imports between lib files only. No Node APIs in lib (except `compile.js`, which is not shipped).
 - Shared files (`lib/rect.js node.js components.js render.js runtime.js compile.js`, `cli.js`, `editor/state.js`):
   small **surgical Edit-tool changes only** (no full rewrites), and list every such change in your final report.
@@ -19,20 +19,38 @@ everyone working on the code. Read it fully before changing anything.
 ## Project on disk
 
 ```
-project.json                 { "name": "...", "breakpoints": [{ "name": "Tablet", "maxWidth": 1024 }, ...] }
-pages/<name>.json            one node tree per page (= a Unity scene) -> dist/<name>.html + <name>.css
+project.json                 { "name": "...", "breakpoints": [{ "name": "Tablet", "maxWidth": 1024 }, ...],
+                               "inject": { "head": "<html>", "bodyEnd": "<html>" },
+                               "siteUrl": "https://example.com/", "cleanUrls": false, "minify": false, "keep": [".git/"],
+                               "tokens": { "colors": { "brand": "#ff3366" }, "fonts": { "heading": "fonts/H.ttf" },
+                                           "textStyles": { "h1": { "font": "$heading", "size": 48, "weight": "800",
+                                                                   "lineHeight": 1.1, "letterSpacing": 0 } } } }
+pages/<name>.json            one node tree per page (= a Unity scene) -> dist/<name>.html + <name>.css; <name> may hold
+                             folders (pages/a/b.json -> a/b.html, prefix '../')
 assets/**                    images, video, audio, json, fonts, text (copied to dist/assets/)
 components/<Name>.html       custom components (template/style/props/script) -> dist/components/<Name>.js
 behaviours/<Name>.js         MonoBehaviour-style scripts -> dist/behaviours/<Name>.js
+extensions/<Name>.js         extension components (same format as built-ins) -> dist/extensions/ (subfolders: helpers)
 animations/<Name>.anim.json  animation clips (inlined into pages that use them)
+prefabs/<Name>.prefab.json   prefab node trees (expanded into pages at build time; not shipped)
+build.js                     optional build hooks (Node only, not shipped)
+public/**                    copied to the site root as-is, after everything else (CNAME, _redirects, .well-known/…)
 ```
+
+Build output (`cli.js build`): `<page>.html` + `<page>.css` (or `<page>/index.html` + `<page>/<page>.css` with
+`cleanUrls`; `index` always at the root). Every site-relative URL a page uses goes through `ctx.prefix` (`''`, `'../'`,
+or for the `404` page the site URL's path, default `/`, because hosts serve it for any missing path); the prefix and
+`cleanUrls` are passed to the runtime in the page data. `robots.txt` always; `sitemap.xml` when `siteUrl` is set
+(every page except `404` and `PageMeta.noindex` pages). `minify` drops the renderer's indentation and compacts the
+generated CSS; text content, raw HTML/Style code and JS modules are never rewritten. `pageUrl(name, clean)` in
+`lib/render.js` gives a page's URL relative to the site root.
 
 ## Node
 
 ```json
 { "id": "a1b2c3", "name": "Hero Title", "active": true,
   "rect": { "anchorMin": [0.5,0.5], "anchorMax": [0.5,0.5], "pivot": [0.5,0.5],
-            "pos": [0,0], "size": [100,100], "rotation": 0, "scale": [1,1] },
+            "pos": [0,0], "size": [100,100], "rotation": 0, "scale": [1,1], "zIndex": 0 },
   "components": [ { "type": "Text", "props": { "text": "Hi" } } ],
   "children": [] }
 ```
@@ -45,10 +63,59 @@ animations/<Name>.anim.json  animation clips (inlined into pages that use them)
   Helpers: `lib/rect.js` → `rectStyle`, `rectPixels(rt, W, H)`, `reanchor(rt, W, H, {anchorMin, anchorMax, pivot})`.
 - Children of a node with a layout group (anything whose def has `childStyle`) are `position: relative` and ignore pos
   (unless they have `LayoutElement.ignoreLayout`).
-- Sibling order = DOM order = draw order (later on top).
+- `rect._layoutPos` (runtime only, set by the animator while `rect.pos` animates): laid out there, moved to `rect.pos` with
+  `translate()` (no relayout per frame); removed on `stop()`. Never saved.
+- Sibling order = DOM order = draw order (later on top). `rect.zIndex` (int, default 0, optional in old files) overrides it:
+  non-zero → CSS `z-index` (higher on top; negative goes behind siblings at 0). Animatable (stepped) and overridable per breakpoint.
 - `overrides` (optional): `{ "<breakpoint>": { "<property path>": value } }` — responsive overrides, see below.
 - Component `type`: built-in name (`Image`), `component:<Name>` (components/Name.html), `behaviour:<Name>` (behaviours/Name.js).
   Multiple components per node; one of each built-in type, any number of behaviours.
+
+## Content pages
+
+- Flowing layout: a layout group on the Canvas stacks top-level sections (children are `position: relative`) and the
+  page grows with its content. Presets `Section`, `Content Column`, `Text Block`, `Markdown`; File ▸ New Flowing
+  Page (`newPage(name, 'flow')`). `LayoutElement.maxWidth` in a vertical layout: `width: 100%` + auto side margins.
+- `Markdown` (`lib/markdown.js` `markdown(src, { href, asset, html })`): `text` or a `.md`/`.txt` asset (`src`;
+  `ctx.text` holds text assets ≤ 512 KB from `loadProject`); links go through `ctx.href`, relative images through
+  `ctx.asset`, headings get slug ids, raw HTML is escaped unless `html`.
+- Collection pages: `Canvas.collection` (JSON asset), `collectionPath`, `slugField`. `collectionItems(root, ctx)` →
+  `[{ slug, item, index }]` (slugified, made unique). The build writes `<page>/<slug>.html` (or
+  `<page>/<slug>/index.html` with clean URLs) for each item instead of the template, rendered with scope
+  `{ item, index }` (`renderDocument(root, ctx, { scope })`), and lists them in the sitemap. `ctx.collections` (template
+  names) makes `href('post/<slug>')` resolve; the runtime gets it in the page data. A `Repeat` without `source` reads
+  `path` from the current scope (`item.tags`). The dev server renders `/project/<page>/<slug>.html`; the editor previews
+  `S.S.collectionItem` (Scene toolbar dropdown; `pageItems()`, `setCollectionItem(i)`).
+
+## Prefabs (`lib/prefab.js`)
+
+`prefabs/<Name>.prefab.json` is a node subtree. A page (or another prefab) stores an instance as a reference:
+`{ id, name, active, rect, prefab: 'Name', prefabOverrides?: { '<key>|<path>': value }, overrides? }`; name, active, rect
+and the root's breakpoint `overrides` belong to the instance. `expandPrefabs(tree, prefabs)` materialises instances in
+place (build, dev server, editor): components and children come from the prefab, descendants get the deterministic id
+`<instance id>-<prefab node id>` (nested: `<outer>-<inner>-<x>`), references between the prefab's own nodes are
+remapped, then overrides are applied. Override key = id suffix ('' = the instance root) + `|` + path, or
+`<suffix>|@<breakpoint>|<path>` for a breakpoint override. Marks (never saved or shipped): `_inst` (outermost instance id
+on every descendant), `_pf` (prefab name on instance roots), `_missing` (`missing` | `cycle`). `collapsePrefabs` gives
+the stored form; `bakeInstance` (Apply), `unpackInstance`, `stripMarks` (page data), `overrideKey`, `OWN`.
+Editor (`state.js`): `instanceRoot(id)`, `isPrefabOverridden`, `structureLocked(id, own?)` (children/components of an
+instance can't change: open the prefab or unpack), `createPrefab`, `instantiate`, `openPrefab` / `closePrefab`
+(`S.S.prefabEdit = { name, tree }`; `root()` is then a stage canvas holding the prefab, edits go to
+`prefabs/<Name>.prefab.json`, closing refreshes every instance), `applyInstance`, `revertInstance`,
+`revertPrefabOverride`, `unpack`, `renamePrefab`, `deletePrefab`, `prefabUses`, `refreshInstances`. `setProp` inside an
+instance records an override. `cloneTree` keeps the id shape of prefab content. Pages are expanded on load and
+collapsed on save.
+
+## Design tokens
+
+`project.json` `tokens` (names `[\w-]+`). A `color` prop holding `"$name"` renders as `var(--gpsb-color-name)`; a font
+prop (`string` with `asset: 'font'`, e.g. `Text.font`, `Canvas.font`) holding `"$name"` renders as
+`var(--gpsb-font-name)` (`fontFamily()`); the page CSS starts with `:root { --gpsb-color-*; --gpsb-font-* }`
+(font-asset tokens get `@font-face`). `Text.textStyle` names a text style whose non-empty fields (`font`, `size`,
+`weight`, `italic`, `lineHeight`, `letterSpacing`) replace the Text's own. Values are resolved in `propsOf`, so
+overrides and animation keys can hold tokens too (colour tokens animate as steps). The runtime gets
+`tokens.textStyles` in the page data. A prop schema `tokens: 'textStyles'` makes the Inspector show a picker.
+Editor: Project Settings ▸ Design Tokens; `files.js` `renameToken(kind, from, to)`, `tokenUses(kind, name)`.
 
 ## Prop types (component schemas)
 
@@ -58,7 +125,7 @@ animations/<Name>.anim.json  animation clips (inlined into pages that use them)
 |---|---|---|
 | `number` | number (opts `min`,`max`,`step`; min+max → slider) | drag-label number field |
 | `int` | integer | same, rounded |
-| `string` | string (opt `asset: 'font'` → also accepts a font asset) | text input |
+| `string` | string (opt `asset: 'font'` → a CSS font-family list whose entries may be font assets, each gets `@font-face`) | text input |
 | `text` | multiline string (HTML allowed) | textarea |
 | `code` | string (`lang`: html/css/js) | monospace textarea |
 | `bool` | boolean | checkbox |
@@ -68,7 +135,7 @@ animations/<Name>.anim.json  animation clips (inlined into pages that use them)
 | `asset:image|video|audio|json|font|anim|any` | path relative to `assets/` (anim: clip name) | object field, drop target, picker |
 | `href` | page name, URL, or `#anchor` | text + page dropdown |
 | `node` | node id | object field, drop a hierarchy node |
-| `event` | `[{ target: nodeId, call: string, arg: string }]` | Unity UnityEvent list |
+| `event` | `[{ target: nodeId, call: string, arg: string }]` (opt `on`: DOM event, default `click`; on a form control an empty `arg` passes its value) | Unity UnityEvent list |
 | `list` | array of `of` type | reorderable list |
 
 Strings may contain JSON bindings resolved at build time: `{{data/site.json:hero.title}}` (asset path `:` dot path,
@@ -78,7 +145,7 @@ Strings may contain JSON bindings resolved at build time: `{{data/site.json:hero
 
 `lib/node.js` `getProp(node, path)` / `setProp(node, path, value)`:
 `name`, `active`, `rect.pos`, `rect.pos.x`, `rect.size.y`, `rect.anchorMin.x`, `rect.anchorMax.y`, `rect.pivot.x`,
-`rect.rotation`, `rect.scale.x`, `<Type>.<prop>` (first component of that type; `<Type>[n].<prop>` = n-th, 0-based,
+`rect.rotation`, `rect.scale.x`, `rect.zIndex`, `<Type>.<prop>` (first component of that type; `<Type>[n].<prop>` = n-th, 0-based,
 `componentPath(node, i)` builds it, e.g. `Image.color`, `Image.sprite`,
 `Text.text`, `CanvasGroup.alpha`), `component:Card.title`, `behaviour:Spin.speed`. Vector index: `.x .y .z .w` or `.0 .1`.
 
@@ -90,7 +157,7 @@ Tablet and Phone apply, Phone last. `lib/node.js`: `sortBreakpoints`, `activeBre
 `withOverrides(node, names)`, `effectiveTree(root, names)`, `setOverride` (merges `rect.pos.x` into an existing
 `rect.pos`), `clearOverride`, `isOverridden`.
 - Build: `@media (max-width: Npx)` blocks containing only the declarations that differ from the next-wider level.
-- Runtime: `applyNode` always renders `PSB.effective(node)`; on a breakpoint change, overridden nodes and every element the
+- Runtime: `applyNode` always renders `GPSB.effective(node)`; on a breakpoint change, overridden nodes and every element the
   runtime styled inline are re-applied (so text/attribute overrides work too). Animation writes base values; an override of
   the same property wins.
 - Editor: `S.S.breakpoint` = breakpoint being edited (null = base). While set, `S.setProp` stores overrides (record mode
@@ -99,43 +166,67 @@ Tablet and Phone apply, Phone last. `lib/node.js`: `sortBreakpoints`, `activeBre
 
 ## Built-in components (`lib/components.js`)
 
-Canvas, CanvasScaler, Image, Text, Button, Link, Video, Audio, HTML, Style, HorizontalLayoutGroup, VerticalLayoutGroup,
-GridLayoutGroup, LayoutElement, ContentSizeFitter, ScrollRect, Mask, CanvasGroup, Shadow, Animator, Repeat.
+Canvas, CanvasScaler, PageMeta, Image, RawImage, Text, Button, Toggle, ToggleGroup, Slider, Scrollbar, InputField, Dropdown,
+Link, Video, Audio, IFrame, Form, Element, HTML, Style, HorizontalLayoutGroup, VerticalLayoutGroup, GridLayoutGroup,
+LayoutElement, ContentSizeFitter, AspectRatioFitter, ScrollRect, Mask, RectMask2D, CanvasGroup, Shadow, Outline, Animator, Repeat.
+- Scroll views follow Unity: `Scroll View > Viewport (ScrollRect, native scrolling; its first child is the content) >
+  Content`, with Scrollbars outside the viewport (`ScrollRect.horizontalScrollbar/verticalScrollbar` = node ids). A
+  Scrollbar positions its `handle` node inside the handle's parent via `--gpsb-bar-start/size`; the runtime keeps
+  scroll position and scrollbars in sync both ways. Scrollbar value 1 = top for `bottomToTop` (Unity's default).
+- `Toggle.group` = a node with `ToggleGroup`: the toggles render as radios sharing a name (`allowSwitchOff` handled at runtime).
+- `Mask` clips to the rect, or to the node's Image sprite shape when it has one; `RectMask2D` = `clip-path: inset(padding)`.
+- `Form` makes the node a `<form>`; Button `type` submit/reset, control `name`s. Empty `action` = not sent (onSubmit only).
+- `PageMeta` (root only): `<html lang>`, favicon, canonical URL, og:title/description/image/url, `noindex`, `head` code.
+- `Image.element: img` renders `<img class="gpsb-img" alt loading decoding=async>` filling the rect at `z-index: -1` inside an
+  `isolation: isolate` element (children, Button tint, Mask and state sprites keep working); `background` (default) is a
+  CSS background. The Image preset uses `img`.
+- Toggle / Slider / InputField / Dropdown render the native control (`<input>`, `<select>`, `<textarea>`) inside the
+  node element, filling its rect, with browser default styling. User edits are written back into the element's node
+  data (`def.state`), so `GPSB.nodeFor(el)` reads the current value and re-applies keep it. Interactive runtime set-up
+  lives in `def.init({ el, GPSB, ci })` (run by `behaviours.js#boot`, not in the editor).
+- `Element` sets the HTML tag (section, nav, …), id, title, role and ARIA attributes. `Shadow` and `Outline` filters stack.
 Definition shape is documented at the top of that file. `componentDef(type, customs, behaviourMeta)` resolves any type;
 `withDefaults(def, props)` fills defaults.
 
 ## Rendering (`lib/render.js`)
 
-- `makeCtx({ pages, customs, behaviours, json, clips, editor, base })` → ctx with `asset(p)`, `font(p)`, `href(h)`.
+- `makeCtx({ pages, customs, behaviours, json, clips, editor, base, assetVersions })` → ctx with `asset(p)`, `font(p)`, `href(h)`.
+  `assetVersions` `{path: v}` appends `?v=` to asset URLs (build: content hash; dev server/editor: size+mtime) and is
+  passed to the runtime in the page data so it builds identical URLs. Versioned URLs are served `immutable`.
 - `renderPage(root, ctx)` → `{ body, css, data }`; `renderDocument(root, ctx, { name, cssHref })` → `{ html, css }`.
-- Every element: `class="<slug-of-name>"` (unique per page) and `data-psb="<node id>"`. Root also has `psb-canvas`.
-- Page data for the runtime: `<script type="application/json" id="psb-data">{ tree, clips, pages, behaviours, customs, editor }</script>`
+- Every element: `class="<slug-of-name>"` (unique per page) and `data-gpsb="<node id>"`. Root also has `gpsb-canvas`.
+- Page data for the runtime: `<script type="application/json" id="gpsb-data">{ tree, clips, pages, behaviours, customs, editor }</script>`
   (tree has defaults filled and global bindings resolved; `clips` = clips used by Animators, or all clips in editor mode).
 - `nodeStyle(node, parent, ctx)`, `nodeAttrs(node, ctx)`, `nodeTag`, `propsOf(component, ctx)`, `decl(styleObj)`.
+- `drivenBy(node, parent, ctx, path)` → `[{ type, parent }]` / `[{ textStyle }]` / null: what fixes a number/bool property so
+  editing it changes nothing (the Inspector greys such fields out with "(affected by X)").
 
-## Page runtime (`lib/runtime.js`, `window.PSB`)
+## Page runtime (`lib/runtime.js`, `window.GPSB`)
 
-Boots the Canvas Scaler, then (unless `data.editor`) `animator.js#boot(PSB)` and `await behaviours.js#boot(PSB)`, then
-dispatches `psb:ready` on window. API:
+Boots the Canvas Scaler, then (unless `data.editor`) `animator.js#boot(GPSB)` and `await behaviours.js#boot(GPSB)`, then
+dispatches `gpsb:ready` on window. API:
 
 ```
-PSB.data, PSB.ctx, PSB.editor, PSB.scale, PSB.canvas
-PSB.node(id) PSB.parent(id) PSB.el(id) PSB.els(id)       // els: all elements (Repeat clones share an id)
-PSB.find('Header/Logo' | 'Logo', fromNode?) -> node
-PSB.applyNode(node, parent?, els?)  // PURE: re-apply node data's style/attrs/patch to els (default: all elements
-                                    // with that id). Never writes the tree. Runtime code mutates PSB.node(id) in
-                                    // place then calls it; editor preview passes clones.
-PSB.setActive(id, bool)
-PSB.nodeFor(el)              // node data for one element: canonical node, or a per-clone copy inside a Repeat ({{item}} resolved)
-PSB.effective(node)          // node with the active breakpoint overrides     PSB.breakpoints() -> active names
-PSB.assets.url(p) .json(p) .text(p)
+GPSB.data, GPSB.ctx, GPSB.editor, GPSB.scale, GPSB.canvas
+GPSB.node(id) GPSB.parent(id) GPSB.el(id) GPSB.els(id)       // els: all elements (Repeat clones share an id)
+GPSB.find('Header/Logo' | 'Logo', fromNode?) -> node
+GPSB.applyNode(node, parent?, els?)  // PURE: re-apply node data's style/attrs/patch to els (default: all elements
+                                    // with that id). Never writes the tree. Runtime code mutates GPSB.node(id) in
+                                    // place then calls it; editor preview passes clones. Attributes and Style classes
+                                    // a prop change no longer produces (disabled, inert, target...) are removed.
+                                    // Inline styles are updated per changed property (not rewritten each frame).
+GPSB.setActive(id, bool | 'toggle')  // toggle is per element (Repeat clones toggle independently)
+GPSB.preload(url)            // load + decode an image and keep it referenced (sprite swaps never show a blank frame)
+GPSB.nodeFor(el)              // node data for one element: canonical node, or a per-clone copy inside a Repeat ({{item}} resolved)
+GPSB.effective(node)          // node with the active breakpoint overrides     GPSB.breakpoints() -> active names
+GPSB.assets.url(p) .json(p) .text(p)
 // added by animator.js:
-PSB.animator(id, el?) -> controller { play(clip?), stop(), pause(), resume(), seek(t), playing, time, clip, speed, el }
+GPSB.animator(id, el?) -> controller { play(clip?), stop(), pause(), resume(), seek(t), playing, time, clip, speed, el }
                        // one controller per Animator element (Repeat clones animate independently); without el, a
                        // proxy driving all of them
 // added by behaviours.js:
-PSB.invoke(targetId, call, arg, sourceId?)   // runs one event entry (see Events)
-PSB.behaviour(id, Name) -> instance
+GPSB.invoke(targetId, call, arg, sourceId?)   // runs one event entry (see Events)
+GPSB.behaviour(id, Name) -> instance
 ```
 
 ## Custom components (`components/<Name>.html`) — owner: runtime/components agent
@@ -149,7 +240,7 @@ PSB.behaviour(id, Name) -> instance
   { "title": { "type": "string", "default": "Hello" }, "image": { "type": "asset:image", "default": "" } }
 </script>
 <script>
-  import { Component } from '../psb/component.js';
+  import { Component } from '../gpsb/component.js';
   export default class extends Component {
     rendered() { this.$('h2').onclick = () => this.emit('picked', this.props.title); }
   }
@@ -157,8 +248,8 @@ PSB.behaviour(id, Name) -> instance
 ```
 
 - Compiled by `lib/compile.js` into `components/<Name>.js` (calls `define(tag, {template, style, props}, Cls)`)
-  and `components/<Name>.script.js` (the author script verbatim). Tag = `psb-<slug(Name)>`.
-- Rendered as `<psb-card class=… data-psb=… title="…" image="assets/…">children…</psb-card>`: props become
+  and `components/<Name>.script.js` (the author script verbatim). Tag = `gpsb-<slug(Name)>`.
+- Rendered as `<gpsb-card class=… data-gpsb=… title="…" image="assets/…">children…</gpsb-card>`: props become
   kebab-case attributes (asset props are already resolved to URLs; non-strings JSON-encoded). Node children are light DOM → `<slot>`.
 - `lib/component.js` exports `Component` (extends HTMLElement) and `define`. Component: open Shadow DOM, style injected,
   `:host { display: block }` default, `{{prop}}` interpolation in text and attribute values (HTML-escaped), re-render on
@@ -179,10 +270,10 @@ export default class Spin {
 ```
 
 Injected before `start()`: `this.el`, `this.node` (runtime node data; a per-element clone for Repeat clones),
-`this.props` (defaults merged), `this.PSB`, `this.find(path)` (node),
-`this.apply()` is `PSB.applyNode(this.node, parent, this.el)` (own element only). `this.animator` (controller of the nearest Animator on self/ancestors or null), `this.setActive(bool)`.
+`this.props` (defaults merged), `this.GPSB`, `this.find(path)` (node),
+`this.apply()` is `GPSB.applyNode(this.node, parent, this.el)` (own element only). `this.animator` (controller of the nearest Animator on self/ancestors or null), `this.setActive(bool)`.
 One instance per element. `update` driven by one shared rAF loop, dt in seconds.
-Modules are loaded from `behaviours/<Name>.js` relative to the page (`new URL('../behaviours/…', import.meta.url)` from psb/).
+Modules are loaded from `behaviours/<Name>.js` relative to the page (`new URL('../behaviours/…', import.meta.url)` from gpsb/).
 
 ## Events (`event` prop type, e.g. `Button.onClick`; animation events use the same `call` syntax)
 
@@ -215,25 +306,26 @@ Clip `animations/<Name>.anim.json`:
 - `lib/anim.js` (isomorphic): `sampleClip(clip, t) -> [{ path, prop, value }]`, `evalTrack(track, t)`, `ease(e, u)`,
   `lerpValue(a, b, u)`, `applyClip(animatorNode, clip, t) -> Map<id, clonedNode>` (clones of affected nodes with sampled
   values set — **editor preview only**).
-- Runtime animation (like Unity) overwrites values: write samples into the target element's `PSB.nodeFor(el)` in place
-  with `setProp`, then `PSB.applyNode(node, undefined, el)`. `Animator.*` and `Repeat.*` props are not animatable.
-- `lib/animator.js#boot(PSB)`: one controller per Animator node; `playOn` start/hover/click/visible/manual; speed;
-  loop or hold last frame; fires clip events through `PSB.invoke(animatorNodeId-relative target, call, arg)`;
-  exposes `PSB.animator(id)`.
+- Runtime animation (like Unity) overwrites values: write samples into the target element's `GPSB.nodeFor(el)` in place
+  with `setProp`, then `GPSB.applyNode(node, undefined, el)`. `Animator.*` and `Repeat.*` props are not animatable.
+- `lib/animator.js#boot(GPSB)`: one controller per Animator node; `playOn` start/hover/click/visible/manual; speed;
+  loop or hold last frame; fires clip events through `GPSB.invoke(animatorNodeId-relative target, call, arg)`;
+  exposes `GPSB.animator(id)`.
 - Editor (`panels/animation.js`): Unity Animation window — clip dropdown + Create New Clip (saves to `animations/`,
   adds to the Animator's `clips`), Add Property, dopesheet (keys as diamonds, drag/box-select/delete/copy/paste),
   Curves view, timeline ruler with playhead scrub, preview play/pause/loop, **record mode** (red) via
   `S.hooks.setProp` (changes made in Inspector/Scene write keys at `S.anim.time` instead of base values),
   `S.hooks.animState` (inspector tints keyed fields red / animated fields blue), key inspector (value + ease), events row.
-  Preview drives the Scene iframe through `S.previewWin.PSB.applyNode(clone, parentClone)`; re-apply after every
+  Preview drives the Scene iframe through `S.previewWin.GPSB.applyNode(clone, parentClone)`; re-apply after every
   `props`/`preview-ready` event (subscribers run in mount order; animation mounts after scene).
 
 ## Project Hub, preferences, user config
 
-`psb` / `psb hub` starts the server with no project open; `psb serve <dir>` also opens <dir>. `/` is always the
+`gpsb` / `gpsb hub` starts the server with no project open; `gpsb serve <dir>` also opens <dir>. `/` is always the
 **Project Hub** (`editor/hub.html`); the editor is at `/editor/` (302 to `/` while no project is open; the editor itself
-returns to `/` if `/api/project` answers 409). User config lives in `$PSB_CONFIG_DIR` or
-`~/.config/perfect-site-builder/`: `projects.json` (registry `[{path, added, lastOpened}]`) and `prefs.json`.
+returns to `/` if `/api/project` answers 409). User config lives in `$GPSB_CONFIG_DIR` or
+`~/.config/gpsb/`: `projects.json` (registry `[{path, added, lastOpened}]`) and `prefs.json` (copied once from the
+pre-rename `~/.config/perfect-site-builder/` if that exists and the new folder does not).
 
 ```
 GET  /api/hub/projects        -> { projects: [{path, name, exists, open, pages, assets, modified, added, lastOpened}], open, home }
@@ -244,7 +336,7 @@ POST /api/hub/remove {path}   forget it (files stay on disk)
 POST /api/hub/create {dir, name, template: 'empty'|'showcase'} -> { path }  (showcase = copy of example/)
 GET|PUT /api/prefs            the whole prefs object
 ```
-Project writes (`PUT/DELETE /api/file`, `/api/rename`, `/api/build`) must send `x-psb-project: encodeURIComponent(S.S.P.root)`
+Project writes (`PUT/DELETE /api/file`, `/api/rename`, `/api/build`) must send `x-gpsb-project: encodeURIComponent(S.S.P.root)`
 (S.api does); a tab whose project is no longer the open one gets 409.
 
 **Preferences** — `editor/prefs.js`: `load()`, `get(key, default)`, `set(key, value|undefined)` (debounced save),
@@ -253,19 +345,59 @@ Project writes (`PUT/DELETE /api/file`, `/api/rename`, `/api/build`) must send `
 overrides); panels namespace their own keys (`scene.grid`, …). Theme tokens are defined in `editor/style.css` under
 `:root[data-theme=dark|light]`; panel CSS must use the tokens, never hard-coded chrome colors.
 
+## Extending the output
+
+The output is meant to grow: dynamic components (runtime data, embeds, third-party widgets) plug in without changing
+the build. Anything below is a stable contract; changes to the build (minify, clean URLs, asset versions, ...) must
+keep it working.
+
+**Extension components** (`extensions/<Name>.js`, `Name` a JS identifier, not a built-in name). The default export is
+a component definition (format at the top of `lib/components.js`) or a factory `kit => definition` where `kit` =
+`{ esc, cssUrl, control, near, findComp, fontFamily }`, so the module needs no imports. The file must load in Node and
+the browser: browser-only work goes in `init` / `patch` / `state`. Registered with `registerComponent(name, def)`
+(`lib/components.js`; `isExtension`, `extensionNames`, `unregisterComponent`) and from then on indistinguishable from
+a built-in (Add Component, Inspector, animation, overrides, build, runtime). Default category: `Extensions`.
+- Build (`cli.js build`): imported with a content-hash version, registered before rendering, copied to `dist/extensions/`.
+  A load error fails the build (the pages would silently lose content).
+- Dev server / on-the-fly pages and editor: imported from `/project/extensions/` with a size+mtime version;
+  re-imported when the file changes (SSE `extensions/…` → `reloadMeta`).
+- Published runtime: page data `extensions: { Name: version }` lists the extensions the page uses; `runtime.js`
+  imports `../extensions/<Name>.js?v=…` relative to itself and registers them before applying or initialising anything.
+- Hooks for dynamic behaviour: `init({ el, GPSB, ci })` (published page / Play mode only, once per element),
+  `patch(el, p, ctx)` (after any prop change), `state` (user-edited values, see form controls), `head(p, ctx)` (HTML
+  added to `<head>`, deduplicated per page; e.g. a widget's script or stylesheet), `inner` (build-time HTML, also what
+  the editor shows).
+
+**Custom code**: `project.json` `inject.head` (every page's `<head>`) and `inject.bodyEnd` (end of every `<body>`, not
+in the editor's edit-mode preview), `PageMeta.head` (one page's `<head>`).
+
+**Build hooks** (`build.js`, optional, Node, never copied): `transformPage({ name, html, css, project })` → partial
+`{ html, css }`; `afterBuild({ out, root, project, pages })` (RSS, search index, upload). Errors fail the build.
+
+**Output contract** (what code added later can rely on):
+- every node element has `data-gpsb="<node id>"` and a class from its name (unique per page); the root has `gpsb-canvas`
+- page data in `<script type="application/json" id="gpsb-data">`; `window.GPSB` (see Page runtime) and `gpsb:ready`
+- unbundled ES modules: `gpsb/*.js` (runtime and lib), `components/<Name>.js`, `behaviours/<Name>.js`, `extensions/<Name>.js`
+- asset URLs always come from `ctx.asset` (`GPSB.ctx.asset` / `GPSB.assets.url` at runtime), never hand-built
+
 ## Dev server (`cli.js serve`)
 
 Binds 127.0.0.1 only. Every project path is resolved and rejected (403) if outside the project root.
 
 ```
 GET  /                         editor/hub.html (Project Hub)   GET /editor/  editor/index.html   GET /editor/* /lib/*  tool files
-GET  /project/psb/*            lib/*                      GET /project/components/<Name>.js|.script.js  compiled on the fly
-GET  /project/*                project files              GET /api/project  -> { root, project, pages, components, behaviours, clips, json, assets[{path,type,size}] }
-GET|PUT|DELETE /api/file?path= read / write (raw body, streamed) / delete a project file
-POST /api/rename?from=&to=     POST /api/build -> { out, pages }
+GET  /project/gpsb/*            lib/*                      GET /project/components/<Name>.js|.script.js  compiled on the fly
+GET  /project/<page>.html      that page rendered on the fly (Links / IFrames inside the editor preview)
+GET  /project/*                project files (Range requests supported)
+GET  /api/project  -> { root, project, pages, components, behaviours, clips, json, assets[{path,type,size}], errors[{file,error}] }
+                   (unparseable pages/clips are left out, a bad JSON asset is null, project.json falls back to defaults)
+GET|PUT|DELETE /api/file?path= read / write (raw body, streamed) / delete a project file (never the project folder itself)
+POST /api/rename?from=&to=     POST /api/build -> { out, pages, warnings[] }
 GET  /api/events               SSE { file } on external changes (editor hot-reloads components/behaviours/assets)
 ```
-Requests with a Host other than `127.0.0.1:PORT`/`localhost:PORT` get 403; non-GET requests need header `x-psb: 1`
+`build()` refuses an output folder that contains the project, sits inside a source folder, or is non-empty without
+being a previous build (`gpsb/runtime.js`, or `psb/runtime.js` from before the rename), ignoring and keeping the paths in `project.json` `keep` (gitignore-style: `name/` a folder, `name` a file, nested paths allowed; `[".git/"]` for a deploy repo); it fails on broken pages/clips/project.json and skips broken components (warning).
+Requests with a Host other than `127.0.0.1:PORT`/`localhost:PORT` get 403; non-GET requests need header `x-gpsb: 1`
 (`S.api` sends it).
 
 ## Editor (`editor/`)
@@ -290,15 +422,24 @@ edit(label, fn, { kind, ids, merge, files })   undo() redo()
 setProp(id, path, value, opts)     // ALWAYS use this for property edits (record mode hooks in);
                                    // opts.label groups many setProps into one undo step (drags, presets)
 select(ids, additive) setTool(t) PRESETS create(preset, parentId) addNode(node, parentId, index)
-deleteNodes(ids) duplicate(ids) reparent(id, newParentId, index) addComponent(id, type) removeComponent(id, i) moveComponent(id, i, to)
+deleteNodes(ids) duplicate(ids) cloneTree(node) reparent(id, newParentId, index) addComponent(id, type) removeComponent(id, i) moveComponent(id, i, to)
+// cloneTree: fresh ids, internal references remapped; remove/moveComponent keep <Type>[n] override/track paths on the same component
 setPage(name) newPage(name) previewHTML(editor) generatedCode() setPlaying(bool)
 api.get/put/del/rename/build   save() build() upload(file, dir) load() reloadMeta()
 ```
 
+- `fitToChildren(ids, axes)` (Inspector ⤢ on Width/Height or Right/Bottom, and Canvas Height): one-shot size that encloses
+  the children as rendered in the preview; anchors respected, stretched children skipped, the near edge stays put.
+- Productivity: `history()` / `jump(n)` (undo steps keep readable labels), arrow-key nudging (`nudge.*` shortcuts,
+  Scene/page focus only), system-clipboard copy/paste in `hierarchy.js` (`{"gpsb-nodes":1, nodes, prefabs}`),
+  `find.js` (Find & Replace through `setProp`, one undo step per page), Scene `align(kind)` (event `align`: left,
+  center, right, top, middle, bottom, distributeX, distributeY; one object aligns within its parent), smart guides
+  (`cfg.guides`, Alt skips), `recovery.js` (autosave pref `autosave` seconds; unsaved files mirrored to IndexedDB
+  `gpsb-recovery` per project root and offered back on load).
 - `structure` = the Scene rebuilds the iframe (`srcdoc = previewHTML()`); `props(ids)` = patch those nodes via
-  `previewWin.PSB.applyNode(...)` immediately, plus a debounced (~300 ms) full rebuild to catch tag/inner/layout changes.
-- Drag & drop between panels: `dataTransfer` types `application/x-psb-asset` (asset path, or clip name),
-  `application/x-psb-node` (node id) and `application/x-psb-component` (`component:X` / `behaviour:X`, drop on Inspector). OS file drops anywhere in Project/Scene/Hierarchy import via `S.upload`.
+  `previewWin.GPSB.applyNode(...)` immediately, plus a debounced (~300 ms) full rebuild to catch tag/inner/layout changes.
+- Drag & drop between panels: `dataTransfer` types `application/x-gpsb-asset` (asset path, or clip name),
+  `application/x-gpsb-node` (node id) and `application/x-gpsb-component` (`component:X` / `behaviour:X`, drop on Inspector). OS file drops anywhere in Project/Scene/Hierarchy import via `S.upload`.
 - `parentSize(id)` → `[w, h]` untransformed CSS px of the node's parent (preview element, else `S.resolution`).
   Use it for `reanchor` (Inspector anchor presets) and Scene gizmos.
 - **Keyboard: `main.js` (shell) owns ALL global shortcuts.** Others must not bind global keys. F emits `frame`

@@ -8,8 +8,12 @@ export const ACTIONS = [
   ['tool.scale', 'Tools', 'Scale Tool', ['R']], ['tool.rect', 'Tools', 'Rect Tool', ['T']],
   ['save', 'File', 'Save', ['Ctrl+S']], ['build', 'File', 'Build Site', ['Ctrl+B']], ['prefs', 'File', 'Preferences…', ['Ctrl+,']],
   ['undo', 'Edit', 'Undo', ['Ctrl+Z']], ['redo', 'Edit', 'Redo', ['Ctrl+Shift+Z', 'Ctrl+Y']],
-  ['duplicate', 'Edit', 'Duplicate', ['Ctrl+D']], ['delete', 'Edit', 'Delete', ['Delete', 'Backspace']],
-  ['selectAll', 'Edit', 'Select All', ['Ctrl+A']], ['rename', 'Edit', 'Rename', ['F2']], ['frame', 'Edit', 'Frame Selected', ['F']],
+  ['duplicate', 'Edit', 'Duplicate', ['Ctrl+D']],
+  ['nudge.left', 'Edit', 'Nudge Left (1px)', ['ArrowLeft']], ['nudge.right', 'Edit', 'Nudge Right (1px)', ['ArrowRight']],
+  ['nudge.up', 'Edit', 'Nudge Up (1px)', ['ArrowUp']], ['nudge.down', 'Edit', 'Nudge Down (1px)', ['ArrowDown']],
+  ['nudge.left10', 'Edit', 'Nudge Left (10px)', ['Shift+ArrowLeft']], ['nudge.right10', 'Edit', 'Nudge Right (10px)', ['Shift+ArrowRight']],
+  ['nudge.up10', 'Edit', 'Nudge Up (10px)', ['Shift+ArrowUp']], ['nudge.down10', 'Edit', 'Nudge Down (10px)', ['Shift+ArrowDown']], ['delete', 'Edit', 'Delete', ['Delete', 'Backspace']],
+  ['selectAll', 'Edit', 'Select All', ['Ctrl+A']], ['find', 'Edit', 'Find & Replace…', ['Ctrl+Shift+F']], ['rename', 'Edit', 'Rename', ['F2']], ['frame', 'Edit', 'Frame Selected', ['F']],
   ['play', 'Play Mode', 'Play / Stop', ['Ctrl+P']], ['pause', 'Play Mode', 'Pause', ['Ctrl+Shift+P']], ['step', 'Play Mode', 'Step', ['Ctrl+Alt+P']],
   ['bp.0', 'Breakpoints', 'Edit Base', ['Alt+1']],
   ...[1, 2, 3, 4, 5].map(i => [`bp.${i}`, 'Breakpoints', `Edit Breakpoint ${i} (widest first)`, [`Alt+${i + 1}`]]),
@@ -51,7 +55,7 @@ export function openPreferences(section = 'appearance') {
     <div class="prefs-win" role="dialog" aria-modal="true" aria-label="Preferences">
       <header><b>Preferences</b><button class="prefs-x" title="Close (Esc)">✕</button></header>
       <div class="prefs-main">
-        <nav>${[['appearance', 'Appearance'], ['shortcuts', 'Shortcuts']].map(([k, l]) => `<button data-sec="${k}">${l}</button>`).join('')}</nav>
+        <nav>${[['appearance', 'Appearance'], ['saving', 'Saving'], ['shortcuts', 'Shortcuts']].map(([k, l]) => `<button data-sec="${k}">${l}</button>`).join('')}</nav>
         <section class="prefs-body"></section>
       </div>
     </div>`;
@@ -80,6 +84,16 @@ export function openPreferences(section = 'appearance') {
     body.querySelector('[data-reset]').onclick = () => { for (const k of ['theme', 'accent', 'fontSize']) prefs.set(k, undefined); appearance(); };
   };
 
+  const saving = () => {
+    const v = prefs.get('autosave', 0);
+    body.innerHTML = `
+      <h3>Saving</h3>
+      <label class="prefs-row"><span>Autosave</span><select class="prefs-in" data-autosave>${[[0, 'Off'], [30, '30 seconds after the last change'], [60, '1 minute after the last change'], [300, '5 minutes after the last change']]
+        .map(([s, l]) => `<option value="${s}"${s === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      <p class="prefs-note">Independently of this, unsaved changes are kept in the browser every few seconds. If the editor closes
+        before you save (crash, closed tab), they are offered back the next time you open the project.</p>`;
+    body.querySelector('[data-autosave]').onchange = e => prefs.set('autosave', +e.target.value || undefined);
+  };
   const shortcuts = () => {
     const km = keymap(), q = filter.toLowerCase();
     const conflicts = id => keysOf(id).flatMap(k => km[k].filter(x => x !== id).map(x => `${k} is also ${ACTIONS.find(a => a.id === x).label}`));
@@ -110,7 +124,7 @@ export function openPreferences(section = 'appearance') {
   const show = s => {
     sec = s; capture = null;
     ov.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.sec === s));
-    (s === 'shortcuts' ? shortcuts : appearance)();
+    ({ shortcuts, saving }[s] ?? appearance)();
   };
 
   // capture-phase key handling: rebinding, Esc closes; nothing reaches the editor's global shortcuts while open

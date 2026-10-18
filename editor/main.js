@@ -4,6 +4,8 @@ import * as prefs from './prefs.js';
 import * as layout from './layout.js';
 import { keymap, comboOf, openPreferences } from './preferences.js';
 import { buildSite, togglePause, step } from './panels/toolbar.js';
+import { openFind } from './find.js';
+import './recovery.js';
 
 await prefs.load();
 const panelEls = Object.fromEntries([...document.querySelectorAll('#dock > .panel')].map(p => [p.dataset.panel, p]));
@@ -18,17 +20,26 @@ for (const name of ['toolbar', 'hierarchy', 'scene', 'inspector', 'project', 'co
 // ---------- global shortcuts: dispatched from the rebindable table in preferences.js ----------
 const typing = t => t?.isContentEditable || t?.matches?.('textarea, select, input:not([type=checkbox], [type=radio], [type=button], [type=range], [type=color])');
 const nonRoot = () => S.S.selection.some(id => id !== S.root().id);
+// arrow keys move the selection (only while the Scene or nothing in particular has focus: other panels use arrows)
+const nudge = (dx, dy) => () => {
+  const a = document.activeElement;
+  if (a && a !== document.body && !a.closest?.('[data-panel=scene]')) return;
+  const ids = S.S.selection.filter(id => id !== S.root().id && !S.parentOf(id)?.components.some(c => S.def(c.type)?.childStyle));
+  for (const id of ids) { const p = S.view(id).rect.pos; S.setProp(id, 'rect.pos', [p[0] + dx, p[1] + dy], { label: 'Nudge', merge: true }); }
+};
 const bp = i => () => { const b = S.breakpoints(); if (i === 0) S.setBreakpoint(null); else if (b[i - 1]) S.setBreakpoint(b[i - 1].name); };
 const RUN = {
   'tool.hand': () => S.setTool('hand'), 'tool.move': () => S.setTool('move'), 'tool.rotate': () => S.setTool('rotate'),
   'tool.scale': () => S.setTool('scale'), 'tool.rect': () => S.setTool('rect'),
   save: () => S.save(), build: buildSite, prefs: () => openPreferences(),
-  undo: S.undo, redo: S.redo,
+  undo: S.undo, redo: S.redo, find: () => openFind(),
   duplicate: () => nonRoot() && S.duplicate(), delete: () => nonRoot() && S.deleteNodes(),
   selectAll: () => S.select([...S.walk(S.root())].slice(1).map(([n]) => n.id)),
   rename: () => S.S.selection.length && S.emit('rename'), frame: () => S.emit('frame'),
   play: () => S.setPlaying(!S.S.playing), pause: togglePause, step,
   maximize: () => layout.toggleMaximize(),
+  'nudge.left': nudge(-1, 0), 'nudge.right': nudge(1, 0), 'nudge.up': nudge(0, -1), 'nudge.down': nudge(0, 1),
+  'nudge.left10': nudge(-10, 0), 'nudge.right10': nudge(10, 0), 'nudge.up10': nudge(0, -10), 'nudge.down10': nudge(0, 10),
   ...Object.fromEntries([0, 1, 2, 3, 4, 5].map(i => [`bp.${i}`, bp(i)])),
 };
 const IN_FIELDS = new Set(['save', 'prefs']), PLAY_FRAME = new Set(['save', 'play', 'pause', 'step']);

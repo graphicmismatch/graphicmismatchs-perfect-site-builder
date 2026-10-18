@@ -4,6 +4,8 @@ import * as S from '../state.js';
 import * as layout from '../layout.js';
 import * as prefs from '../prefs.js';
 import { openPreferences, shortcut as sc } from '../preferences.js';
+import { openProjectSettings } from '../settings.js';
+import { openFind } from '../find.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const svg = (d, extra = '') => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d ? `<path d="${d}"/>` : ''}${extra}</svg>`;
@@ -86,11 +88,41 @@ export function createItems(parentId) {
     ...(customs.length ? ['-', ...customs.map(n => ({ label: n, action: () => S.addNode(customNode(n), parentId) }))] : []),
   ];
 }
-export function newPagePrompt() {
+// Prefab submenu for the active node: create one from it, or work with the instance it belongs to
+export function prefabItems(a) {
+  const inst = a && S.instanceRoot(a.id), names = Object.keys(S.S.P.prefabs ?? {});
+  return [
+    { label: 'Create Prefab…', disabled: !a || a === S.root() || !!a._inst, action: () => {
+      const n = prompt('Prefab name:', a.name)?.trim();
+      if (n) S.createPrefab(a.id, n);
+    } },
+    { label: 'Prefab', disabled: !inst, sub: inst ? [
+      { label: `Open "${inst.prefab}"`, action: () => S.openPrefab(inst.prefab), disabled: !!inst._missing },
+      { label: 'Select Instance Root', action: () => S.select(inst.id), disabled: inst === a },
+      '-',
+      { label: 'Apply Overrides to Prefab', action: () => confirm(`Apply this instance's changes to "${inst.prefab}"? Every instance updates (this can't be undone).`) && S.applyInstance(inst.id), disabled: !inst.prefabOverrides || !Object.keys(inst.prefabOverrides).length },
+      { label: 'Revert Overrides', action: () => S.revertInstance(inst.id), disabled: !inst.prefabOverrides || !Object.keys(inst.prefabOverrides).length },
+      '-',
+      { label: 'Unpack', action: () => S.unpack(inst.id) },
+    ] : [] },
+    { label: 'Add Prefab', disabled: !names.length, sub: names.map(n => ({ label: n, action: () => S.instantiate(n, a && a !== S.root() ? a.id : undefined) })) },
+  ];
+}
+
+// newest first: redo steps (greyed check), the current state, then undo steps; picking one jumps there
+function historyItems() {
+  const h = S.history(), out = [];
+  for (let k = Math.min(15, h.redo.length); k >= 1; k--) out.push({ label: h.redo[k - 1], action: () => S.jump(k) }); // h.redo[0] = next redo
+  out.push({ label: 'Current state', checked: true, disabled: true });
+  h.undo.slice(0, 25).forEach((l, i) => out.push({ label: l, action: () => S.jump(-(i + 1)) }));
+  if (h.undo.length > 25) out.push({ label: `… ${h.undo.length - 25} older`, disabled: true });
+  return out.length > 1 ? out : [{ label: 'Nothing to undo', disabled: true }];
+}
+export function newPagePrompt(template = 'blank') {
   const name = prompt('New page name (letters, digits, - and _):', 'page' + (Object.keys(S.S.P.pages).length + 1))?.trim();
   if (!name) return;
   if (!/^[\w-]+$/.test(name)) return S.log(`Invalid page name "${name}"`, 'error');
-  S.newPage(name);
+  S.newPage(name, template);
 }
 export function deletePage(name = S.S.page) {
   const names = Object.keys(S.S.P.pages);
@@ -110,7 +142,7 @@ export async function buildSite() {
 
 // ---------- projects (File > Open Recent) ----------
 let recent = [];
-const H = { 'x-psb': '1', 'content-type': 'application/json' };
+const H = { 'x-gpsb': '1', 'content-type': 'application/json' };
 const loadRecent = () => fetch('/api/hub/projects').then(r => r.json()).then(d => {
   recent = d.projects.filter(p => p.exists && p.path !== d.open).sort((a, b) => (b.lastOpened ?? '').localeCompare(a.lastOpened ?? '')).slice(0, 10);
 }).catch(() => {});
@@ -143,11 +175,13 @@ function componentItems() {
 }
 const MENUS = {
   File: () => [
-    { label: 'New Page…', action: newPagePrompt },
+    { label: 'New Page…', action: () => newPagePrompt() },
+    { label: 'New Flowing Page…', action: () => newPagePrompt('flow') },
     { label: 'Delete Page…', action: () => deletePage(), disabled: Object.keys(S.S.P.pages).length < 2 },
     '-',
     { label: 'Save', shortcut: sc('save'), action: S.save },
     { label: 'Build Site', shortcut: sc('build'), action: buildSite },
+    { label: 'Project Settings…', action: () => openProjectSettings() },
     '-',
     { label: 'Open Project Hub', action: () => { location.href = '/'; } },
     { label: 'Open Recent', disabled: !recent.length, sub: recent.map(p => ({ label: `${p.name} — ${p.path}`, action: () => openProject(p.path) })) },
@@ -157,8 +191,10 @@ const MENUS = {
     return [
       { label: 'Undo', shortcut: sc('undo'), action: S.undo },
       { label: 'Redo', shortcut: sc('redo'), action: S.redo },
+      { label: 'Undo History', sub: historyItems() },
       '-',
       { label: 'Select All', shortcut: sc('selectAll'), action: () => S.select(allIds()) },
+      { label: 'Find & Replace…', shortcut: sc('find'), action: () => openFind() },
       { label: 'Deselect All', action: () => S.select([]), disabled: !sel },
       '-',
       { label: 'Rename', shortcut: sc('rename'), action: () => S.emit('rename'), disabled: !sel },
@@ -188,6 +224,16 @@ const MENUS = {
       { label: 'Create Empty Child', action: () => S.create('Create Empty', a.id), disabled: !a },
       '-',
       ...createItems(a?.id),
+      '-',
+      { label: 'Align', disabled: !nonRoot(), sub: [
+        ...[['left', 'Left'], ['center', 'Centre'], ['right', 'Right']].map(([k, l]) => ({ label: `Align ${l}`, action: () => S.emit('align', k) })), '-',
+        ...[['top', 'Top'], ['middle', 'Middle'], ['bottom', 'Bottom']].map(([k, l]) => ({ label: `Align ${l}`, action: () => S.emit('align', k) })), '-',
+        { label: 'Distribute Horizontally', action: () => S.emit('align', 'distributeX'), disabled: S.S.selection.length < 3 },
+        { label: 'Distribute Vertically', action: () => S.emit('align', 'distributeY'), disabled: S.S.selection.length < 3 },
+        { label: 'One object aligns within its parent', disabled: true },
+      ] },
+      '-',
+      ...prefabItems(a),
     ];
   },
   Component: componentItems,
@@ -205,15 +251,15 @@ function applyPause() {
   el.querySelector('[data-act=pause]').classList.toggle('on', paused);
   if (!w || !S.S.playing) return;
   try {
-    w.psbRaf ??= w.requestAnimationFrame;
+    w.gpsbRaf ??= w.requestAnimationFrame;
     if (paused) {
       w.requestAnimationFrame = cb => (held.push(cb), 0);
       pauseT = w.performance.now();
       frozen = [...w.document.getAnimations().filter(a => a.playState === 'running'), ...[...w.document.querySelectorAll('video, audio')].filter(m => !m.paused)];
       frozen.forEach(a => a.pause());
     } else {
-      w.requestAnimationFrame = w.psbRaf;
-      held.splice(0).forEach(cb => w.psbRaf.call(w, cb));
+      w.requestAnimationFrame = w.gpsbRaf;
+      held.splice(0).forEach(cb => w.gpsbRaf.call(w, cb));
       frozen.splice(0).forEach(a => a.play()?.catch?.(() => {}));
     }
   } catch (e) { S.log(`Pause: ${e.message}`, 'warn'); }
@@ -284,7 +330,8 @@ export function mount(root) {
       menuAt([
         ...Object.keys(S.S.P.pages).sort().map(n => ({ label: n, checked: n === S.S.page, action: () => S.setPage(n) })),
         '-',
-        { label: 'New Page…', action: newPagePrompt },
+        { label: 'New Page…', action: () => newPagePrompt() },
+    { label: 'New Flowing Page…', action: () => newPagePrompt('flow') },
         { label: `Delete "${S.S.page}"…`, action: () => deletePage(), disabled: Object.keys(S.S.P.pages).length < 2 },
       ], pageBtn);
     }

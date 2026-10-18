@@ -37,6 +37,7 @@
 .sc-ov .scc { fill: #c8c8c8; stroke: #333; }
 .sc-ov .ring { fill: none; stroke: #3d7ff0; stroke-width: 2.5; }
 .sc-ov .marq { fill: #4aa3ff22; stroke: #4aa3ff; }
+.sc-ov .guide { stroke: #ff3ea5; stroke-width: 1; }
 .sc-ov .hot { stroke: #ffe14d; }
 .sc-ov .hot.anc, .sc-ov .hot.hnd, .sc-ov .hot.axf, .sc-ov .hot.ayf, .sc-ov .hot.scc, .sc-ov .hot.mc { fill: #ffe14d; }
 /* play mode tint (Unity tints the editor chrome, not the page) */

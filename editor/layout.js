@@ -215,7 +215,7 @@ export function layoutMenu() {
 export const windowItems = () => Object.entries(TITLES).map(([t, l]) => ({ label: l, checked: isOpen(t), action: () => S.emit('show-tab', t) }));
 
 // ---------- tab drag & drop ----------
-const TYPE = 'application/x-psb-tab';
+const TYPE = 'application/x-gpsb-tab';
 function zone(e) {
   const a = e.target.closest?.('.area');
   if (!a || !dock.contains(a)) return null;
@@ -287,5 +287,5 @@ export function init(el, panelEls) {
   const end = () => { drag = null; mark(null); document.body.classList.remove('dock-dragging'); };
   dock.addEventListener('dragend', end);
   S.on('show-tab', show);
-  try { for (const k of ['psbTab', 'psb--left-w', 'psb--right-w', 'psb--bottom-h']) delete localStorage[k]; } catch {} // pre-prefs storage
+  try { for (const k of ['gpsbTab', 'gpsb--left-w', 'gpsb--right-w', 'gpsb--bottom-h']) delete localStorage[k]; } catch {} // pre-prefs storage
 }

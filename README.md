@@ -1,4 +1,4 @@
-# graphicmismatch's perfect site builder
+# graphicmismatch's perfect site builder (gpsb)
 
 A visual static site generator that works like Unity's uGUI. You lay out pages in a Unity-style editor using
 RectTransforms, anchors, pivots and layout groups, add components and keyframe animations, and it generates plain
@@ -13,6 +13,17 @@ node cli.js build example          # -> example/dist (static, host anywhere)
 node cli.js new my-site            # start a new project
 ```
 
+After `npm link` (or a global install) the same commands are available as `gpsb`, e.g. `gpsb serve example`.
+
+## Documentation
+
+The [docs](docs/README.md) folder has user guides ([getting started](docs/getting-started.md), [the editor](docs/editor.md),
+[layout](docs/layout.md), [content and data](docs/content-and-data.md), [events](docs/events.md),
+[animation](docs/animation.md), [prefabs and tokens](docs/prefabs-and-tokens.md), [publishing](docs/publishing.md))
+and developer guides for writing your own [behaviours](docs/behaviours.md), [custom components](docs/components.md)
+and [extension components](docs/extensions.md), with the [prop types](docs/prop-types.md) and the
+[runtime API](docs/runtime-api.md) they share.
+
 ## Project Hub
 
 The first screen lists your projects with their path, page and asset counts, and when you last opened each one.
@@ -20,8 +31,20 @@ The first screen lists your projects with their path, page and asset counts, and
 - **Add:** register a project folder that already exists.
 - **Remove:** take a project off the list; its files stay on disk.
 
-The list and your preferences are saved in `~/.config/perfect-site-builder/`, so they carry over between projects.
+The list and your preferences are saved in `~/.config/gpsb/`, so they carry over between projects.
 In the editor, use File ▸ Open Project Hub / Open Recent to switch projects.
+
+## Working faster
+
+- **⤢ next to Width / Height** sizes an object to fit its children; on the Canvas's Height it makes the page as long as its content.
+- **Arrow keys** nudge the selection (Shift: 10 px).
+- **WebObject ▸ Align** aligns or distributes the selection; with one object selected it aligns within the parent.
+- **Smart guides** snap moved objects to their neighbours' edges and centres (Scene toolbar ▸ Guides; hold Alt to skip).
+- **Copy / paste** go through the system clipboard, into other pages, tabs or projects. Prefabs come along.
+- **Edit ▸ Find & Replace** (Ctrl+Shift+F) searches text and names on every page.
+- **Edit ▸ Undo History** jumps to any step.
+- **Saving:** Preferences ▸ Saving turns on autosave. Unsaved changes are always kept in the browser and offered back if
+  the editor closes before you save.
 
 ## Configurable UI
 
@@ -66,11 +89,15 @@ Shortcuts work as in Unity:
   - `scale-with-screen` uses a reference resolution and Unity's width/height match.
   - Set `Canvas.height` to make a long scrolling page.
 - **Built-in components:**
-  - UI: Image, Text, Button, Link
+  - UI: Image, Raw Image, Text, Button, Toggle, Toggle Group, Slider, Scrollbar, Input Field, Dropdown
+    (the form controls are the browser's native ones; what the user types or picks is kept in the node's data and
+    passed to their events)
   - Media: Video, Audio
-  - Raw: HTML, Style (raw CSS)
-  - Layout: Horizontal / Vertical / Grid Layout Group, Layout Element, Content Size Fitter, Scroll Rect, Mask
-  - Effects: Canvas Group, Shadow
+  - Web: Link, IFrame, Form, Element (HTML tag, id, title, role, ARIA), Page Meta (language, favicon, link previews), HTML, Style (raw CSS)
+  - Layout: Horizontal / Vertical / Grid Layout Group, Layout Element, Content Size Fitter, Aspect Ratio Fitter,
+    Scroll Rect (scrollbars, snapping, smooth scrolling, hidden native bars), Mask (rect or sprite shape), Rect Mask 2D
+  - The **Scroll View** preset is built like Unity's: Viewport > Content plus a Scrollbar that tracks and drives it.
+  - Effects: Canvas Group, Shadow, Outline
   - Animation and data: Animator, Repeat
 - **Breakpoints** cover responsive layout. Defaults are Tablet ≤1024 px and Phone ≤600 px; edit them in the Scene toolbar.
   - Pick a breakpoint and every change you make in the Scene or Inspector is stored as an override, much like a Unity prefab override.
@@ -80,9 +107,11 @@ Shortcuts work as in Unity:
 - **Assets** live in `assets/` and are referenced by path.
   - JSON can be bound into any text field, for example `{{data/site.json:hero.title}}`.
   - A **Repeat** creates one copy of its children per item in a JSON array, with `{{item.name}}` and `{{index}}` available.
-  - Scripts can load data with `await PSB.assets.json('data/site.json')`.
+  - Scripts can load data with `await GPSB.assets.json('data/site.json')`.
 
 ## Custom components (HTML + CSS + JS)
+
+Full guide: [docs/components.md](docs/components.md).
 
 `components/Card.html` turns into a native custom element. Its CSS is scoped with Shadow DOM. Its props appear in the Inspector.
 
@@ -95,7 +124,7 @@ Shortcuts work as in Unity:
   { "title": { "type": "string", "default": "Hello" }, "image": { "type": "asset:image", "default": "" } }
 </script>
 <script>
-  import { Component } from '../psb/component.js';
+  import { Component } from '../gpsb/component.js';
   export default class extends Component {
     rendered() { this.$('h2').onclick = () => this.emit('picked', this.props.title); }
   }
@@ -103,6 +132,8 @@ Shortcuts work as in Unity:
 ```
 
 ## Behaviours (MonoBehaviour-style scripts)
+
+Full guide: [docs/behaviours.md](docs/behaviours.md).
 
 ```js
 // behaviours/Spin.js
@@ -131,12 +162,64 @@ Each key's easing can be linear, constant, ease-in/out, or a custom cubic-bezier
 
 Record mode works as in Unity. Press the red button, then move things in the Scene or change Inspector fields, and keys are written at the playhead.
 
+## Content pages
+
+- **File ▸ New Flowing Page** starts a page whose sections stack and grow with their content. It has a centred content
+  column and text that wraps, for articles, docs and marketing copy. Add more with WebObject ▸ Section / Content
+  Column / Text Block / Markdown.
+- **Markdown** renders a `.md` file or inline text: headings, lists, tables, code, links to pages and images from assets.
+- **Collection pages:** point a page's Canvas ▸ Collection at a JSON array (e.g. blog posts). The build writes one page
+  per item at `page/<slug>`, and `{{item.title}}` works in every field. The Scene toolbar picks which item to preview.
+
+## Prefabs
+
+Right-click an object ▸ **Create Prefab…** to make it reusable. Then drag the prefab from the Project window's
+Prefabs folder into any page (or use WebObject ▸ Add Prefab).
+- **Overrides:** a change inside an instance becomes an override of that instance, shown bold in the Inspector.
+  Right-click a field ▸ Revert to Prefab.
+- **Open:** edits the prefab on its own (Hierarchy ◀ goes back). Every instance updates and keeps its overrides.
+- **Apply / Revert / Unpack:** in the Inspector's prefab bar. Unpack turns an instance into plain objects.
+- **Structure:** adding or removing children and components inside an instance requires Open or Unpack, as in Unity.
+
+## Design tokens
+
+Project Settings ▸ Design Tokens holds named **colours**, **fonts** and **text styles**. Pick a colour or font token
+with ◆ in any colour or font field, and a text style with Text ▸ Text Style. Tokens compile to CSS variables, so
+changing one restyles every page. Renaming one updates everything that uses it.
+
+## Publishing
+
+File ▸ Project Settings sets how the site is built:
+- **Site URL**, so `sitemap.xml` and `robots.txt` are written and sites under a sub-path (`https://example.com/docs/`) work.
+- **Clean URLs**: `about/` instead of `about.html`.
+- **Minify**: compact HTML and CSS.
+- **Custom code**: for every page's `<head>` or the end of `<body>`.
+
+A page named `404` becomes the host's not-found page. Files in `public/` are copied to the site root as they are
+(`CNAME`, `_redirects`, `.well-known/`). Asset URLs carry a content hash, so hosts can cache them forever.
+Images can be real `<img>` tags (Image ▸ Element) with alt text and lazy loading. Position animations run on the GPU.
+
+## Extending
+
+Full guide to extension components: [docs/extensions.md](docs/extensions.md).
+
+- **Extension components** (`extensions/<Name>.js`) are added like built-in components: they show up in Add Component,
+  get Inspector fields from their props, can be animated, and work in the build, the editor and the published site.
+  They're for anything dynamic: data loaded at runtime, embeds, third-party widgets. Project ▸ Create ▸ Extension
+  Component starts one from a commented template.
+- **Custom code:** `project.json` `inject.head` / `inject.bodyEnd` go on every page (analytics, consent, fonts), and
+  Page Meta's `head` goes on one page.
+- **Build hooks:** an optional `build.js` can rewrite each page (`transformPage`) or post-process the whole site
+  (`afterBuild`, e.g. RSS or a search index).
+- The generated markup keeps stable hooks (`data-gpsb` ids, `window.GPSB`, unbundled ES modules) for code you add
+  later. See "Extending the output" in [CONTRACT.md](CONTRACT.md).
+
 ## Project layout
 
 ```
-project.json
+project.json            build.js (optional build hooks)
 pages/*.json            animations/*.anim.json
-assets/**               components/*.html       behaviours/*.js
+assets/**               components/*.html       behaviours/*.js       extensions/*.js
 ```
 
 See [CONTRACT.md](CONTRACT.md) for the full file formats, the property-path syntax and the internal architecture.

@@ -109,7 +109,8 @@ export function assetKind(v) {
 }
 const fits = (kind, want) => kind && (want === 'any' ? kind !== 'anim' : kind === want);
 export function thumb(kind, value) {
-  if (kind === 'image' && value) return h('img', { class: 'th', src: S.assetUrl(value), loading: 'lazy', draggable: 'false' });
+  // a {{binding}} (inside a Repeat) has no file to show
+  if (kind === 'image' && value && !value.includes('{{')) return h('img', { class: 'th', src: S.assetUrl(value), loading: 'lazy', draggable: 'false' });
   return h('span', { class: 'th', html: icon(kind ?? 'file') });
 }
 export function pickAsset(kind, current, onPick, anchor) {
@@ -135,7 +136,7 @@ export function accept(el, type, fn, ok = () => true) {
     if (ok(v)) fn(v); else S.log(`${v} can't be used here`, 'warn');
   });
 }
-const acceptAsset = (el, kind, fn) => accept(el, 'application/x-psb-asset', fn, v => (v == null ? !dragAsset || fits(dragAsset.kind, kind) : fits(assetKind(v), kind)));
+const acceptAsset = (el, kind, fn) => accept(el, 'application/x-gpsb-asset', fn, v => (v == null ? !dragAsset || fits(dragAsset.kind, kind) : fits(assetKind(v), kind)));
 
 // ---------- primitives ----------
 const evalNum = s => {
@@ -162,7 +163,7 @@ export function scrub(label, b, sc = {}) {
   label.classList.add('scrub');
   const step = sc.step ?? (sc.min != null && sc.max != null ? (sc.max - sc.min) / 200 : 1);
   label.onpointerdown = e => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || label.closest('.driven')) return; // fixed by another component: nothing to scrub
     e.preventDefault();
     const start = +b.get() || 0;
     let acc = 0;
@@ -202,20 +203,41 @@ const parseColor = v => {
   return m ? ['#' + m[1].toLowerCase(), m[2] ? parseInt(m[2], 16) : 255] : ['#000000', 255];
 };
 const outColor = (rgb, a) => rgb + (a < 255 ? Math.round(a).toString(16).padStart(2, '0') : '');
+// design tokens (project.json tokens.colors / fonts / textStyles); a prop holding "$name" uses the token
+const tokensOf = kind => S.S.P?.project.tokens?.[kind] ?? {};
+const isToken = v => /^\$[\w-]+$/.test(v ?? '');
+// small dropdown listing a token group; picking one sets "$name" (or the name itself for text styles)
+function tokenSelect(kind, b, { prefix = '$', none = null } = {}) {
+  const sel = h('select', { class: 'f-pages f-tok', title: 'Use a design token (Project Settings ▸ Design Tokens)' });
+  const fill = () => sel.replaceChildren(h('option', { value: '' }, '◆'), ...(none ? [h('option', { value: '\0' }, none)] : []),
+    ...Object.keys(tokensOf(kind)).map(n => h('option', { value: prefix + n }, n)));
+  sel.onfocus = fill;
+  sel.onchange = () => { if (sel.value === '\0') b.set(''); else if (sel.value) b.set(sel.value); sel.value = ''; sel.blur(); };
+  fill();
+  return sel;
+}
 function colorW(b) {
   const pick = h('input', { type: 'color', tabindex: -1 });
   const sw = h('span', { class: 'sw-c' }), al = h('span', { class: 'sw-a' });
   const swatch = h('label', { class: 'swatch', title: 'Click to pick a color' }, sw, h('span', { class: 'sw-ab' }, al), pick);
   const alpha = h('input', { type: 'range', min: 0, max: 255, step: 1, class: 'alpha', title: 'Alpha' });
   const hex = h('input', { class: 'hex', spellcheck: 'false', title: '#rrggbb or #rrggbbaa' });
-  pick.oninput = () => b.set(outColor(pick.value, parseColor(b.get())[1]));
-  alpha.oninput = () => b.set(outColor(parseColor(b.get())[0], +alpha.value));
-  hex.onchange = () => { const s = hex.value.trim(); if (/^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(s)) b.set(outColor(...parseColor(s))); else w.update(); };
+  const shown = () => { const v = b.get(); return isToken(v) ? tokensOf('colors')[v.slice(1)] : v; }; // a token shows its colour
+  pick.oninput = () => b.set(outColor(pick.value, parseColor(shown())[1]));
+  alpha.oninput = () => b.set(outColor(parseColor(shown())[0], +alpha.value));
+  hex.onchange = () => {
+    const s = hex.value.trim();
+    if (isToken(s)) b.set(s);
+    else if (/^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(s)) b.set(outColor(...parseColor(s)));
+    else w.update();
+  };
   hex.onkeydown = e => e.key === 'Enter' && hex.blur();
+  const tok = tokenSelect('colors', b);
   const w = {
-    el: h('div', { class: 'f-color' }, swatch, alpha, hex),
+    el: h('div', { class: 'f-color' }, swatch, alpha, hex, tok),
     update() {
-      const v = b.get(), [rgb, a] = parseColor(v);
+      const v = b.get(), [rgb, a] = parseColor(shown());
+      hex.classList.toggle('is-token', isToken(v));
       sw.style.background = rgb; al.style.width = `${(a / 255) * 100}%`;
       if (!focused(w.el)) { pick.value = rgb; alpha.value = a; hex.value = v ?? ''; }
       tint(swatch, b); tint(hex, b);
@@ -282,7 +304,7 @@ function nodeW(b, none = 'None (Node)') {
   pick.onclick = e => { e.stopPropagation(); pickNode(b.get(), v => b.set(v), box); };
   box.ondblclick = () => b.get() && S.node(b.get()) && S.select(b.get());
   box.onkeydown = e => { if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); b.set(''); } };
-  accept(box, 'application/x-psb-node', v => b.set(v), v => v == null || !!S.node(v));
+  accept(box, 'application/x-gpsb-node', v => b.set(v), v => v == null || !!S.node(v));
   return {
     el: box,
     update() {
@@ -316,9 +338,9 @@ const callLabel = c => CALL_LABEL[c] ?? c.replace(/^behaviour:/, '');
 
 let dl;
 function pagesList() {
-  dl ??= document.body.appendChild(h('datalist', { id: 'psb-pages' }));
+  dl ??= document.body.appendChild(h('datalist', { id: 'gpsb-pages' }));
   dl.replaceChildren(...Object.keys(S.S.P?.pages ?? {}).map(p => h('option', { value: p })));
-  return 'psb-pages';
+  return 'gpsb-pages';
 }
 
 function argW(call, tid, b) {
@@ -407,7 +429,7 @@ function listW(sc, b, label) {
     const grip = h('span', { class: 'ls-grip', draggable: 'true', title: 'Drag to reorder' }, '≡');
     const x = h('button', { class: 'mini x', title: 'Remove', onclick: () => { const a = arr(); a.splice(i, 1); b.set(a); } }, '×');
     const r = h('div', { class: 'ls-row' }, grip, f.el, x);
-    grip.ondragstart = e => { listDrag = { el, i }; e.dataTransfer.setData('application/x-psb-list', String(i)); e.dataTransfer.setDragImage(r, 8, 8); };
+    grip.ondragstart = e => { listDrag = { el, i }; e.dataTransfer.setData('application/x-gpsb-list', String(i)); e.dataTransfer.setDragImage(r, 8, 8); };
     grip.ondragend = () => (listDrag = null);
     r.ondragover = e => { if (listDrag?.el !== el) return; e.preventDefault(); e.stopPropagation(); r.classList.toggle('drop-above', e.offsetY < r.offsetHeight / 2); r.classList.toggle('drop-below', e.offsetY >= r.offsetHeight / 2); };
     r.ondragleave = () => r.classList.remove('drop-above', 'drop-below');
@@ -451,7 +473,14 @@ function widget(sc, b, label) {
     const s = textW(b), kind = sc.asset;
     const pick = h('button', { class: 'obj-p', html: icon('target'), title: `Pick a ${kind} asset`, onclick: () => pickAsset(kind, b.get() ?? '', v => b.set(v), s.el) });
     acceptAsset(s.el, kind, v => b.set(v));
-    return { el: h('div', { class: 'f-href' }, s.el, pick), update: s.update };
+    const extra = kind === 'font' ? [tokenSelect('fonts', b)] : [];
+    return { el: h('div', { class: 'f-href' }, s.el, ...extra, pick), update: s.update };
+  }
+  if (t === 'string' && sc.tokens) { // a token name (Text.textStyle)
+    const sel = h('select', {});
+    const fill = () => sel.replaceChildren(h('option', { value: '' }, 'None'), ...Object.keys(tokensOf(sc.tokens)).map(n => h('option', { value: n }, n)));
+    sel.onfocus = fill; sel.onchange = () => b.set(sel.value);
+    return { el: sel, update() { if (!focused(sel)) { fill(); sel.value = b.get() ?? ''; } tint(sel, b); } };
   }
   if (t === 'string') return textW(b);
   if (t === 'text') return { ...textW(b, true), wide: true };

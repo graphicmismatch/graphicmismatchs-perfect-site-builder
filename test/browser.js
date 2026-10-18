@@ -13,11 +13,12 @@ const url = args[0];
 if (!url) { console.log('usage: node test/browser.js <url> [--shot f.png] [--eval expr] [--wait ms] [--size WxH]'); process.exit(2); }
 
 const bin = ['/usr/bin/google-chrome', '/snap/bin/chromium', '/usr/bin/chromium'].find(f => fs.existsSync(f));
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'psb-chrome-'));
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'gpsb-chrome-'));
 const port = 9300 + Math.floor(Math.random() * 500);
 const chrome = spawn(bin, ['--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--mute-audio', '--autoplay-policy=no-user-gesture-required',
   `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, `--window-size=${W},${H}`, 'about:blank'], { stdio: 'ignore' });
-const cleanup = () => { chrome.kill('SIGKILL'); fs.rmSync(profile, { recursive: true, force: true }); };
+// Chrome's helper processes can still be writing the profile right after the kill: retry, and never crash on it
+const cleanup = () => { chrome.kill('SIGKILL'); try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } catch {} };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 let target;
