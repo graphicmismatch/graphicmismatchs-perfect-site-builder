@@ -12,6 +12,7 @@ const SECTIONS = {
   general: ['General', general],
   publishing: ['Publishing', publishing],
   tokens: ['Design Tokens', tokens],
+  languages: ['Languages', languagesSection],
   code: ['Custom Code', code],
 };
 
@@ -169,3 +170,39 @@ function code(body) {
   bind(body);
 }
 
+
+// ---------- languages ----------
+const COMMON = [['en', 'English'], ['fr', 'Français'], ['de', 'Deutsch'], ['es', 'Español'], ['it', 'Italiano'], ['pt', 'Português'], ['nl', 'Nederlands'], ['sv', 'Svenska'], ['pl', 'Polski'], ['ja', '日本語'], ['zh', '中文'], ['ar', 'العربية']];
+function languagesSection(body) {
+  const list = S.languages();
+  body.innerHTML = `<h3>Languages</h3>
+    <p class="prefs-note">The first language is the default: its pages are at the site root. Every other language gets the same pages under
+      <code>/&lt;code&gt;/</code> (fr/about.html), with <code>&lt;html lang&gt;</code> and <code>hreflang</code> links set. To translate, pick a language in the
+      Scene toolbar and change texts, pictures or links: they become that language's overrides, and the rest stays as in the default.
+      Translated data goes in <code>&lt;name&gt;.&lt;code&gt;.json</code> next to a JSON file; words used in many places go in
+      <code>assets/locales/&lt;code&gt;.json</code> and are used as <code>{{t:key}}</code>. Add a <b>Language Switcher</b> (Add Component ▸ Navigation) to link the versions.</p>
+    <table class="tk-table lg-table"><tbody>${list.map((l, i) => `<tr data-i="${i}"><td><input class="prefs-in lg-code" value="${esc(l.code)}" spellcheck="false" title="Language code (en, fr, pt-BR)"></td>
+      <td><input class="prefs-in lg-name" value="${esc(l.name)}" spellcheck="false" title="Name shown to visitors"></td>
+      <td>${i ? '<button class="tk-x lg-def" title="Make it the default">↑ Default</button>' : '<span class="prefs-note">default</span>'}</td><td><button class="tk-x lg-del" title="Remove">✕</button></td></tr>`).join('')}</tbody></table>
+    <div class="lg-add"><select class="prefs-in lg-pick"><option value="">Add a language…</option>${COMMON.filter(([c]) => !list.some(l => l.code === c)).map(([c, n]) => `<option value="${c}">${esc(n)} (${c})</option>`).join('')}<option value="?">Other…</option></select></div>
+    ${list.length === 1 ? '<p class="prefs-note">Add a second language to start translating.</p>' : ''}`;
+  const redraw = () => languagesSection(body), save = l => { S.setLanguages(l); redraw(); };
+  body.querySelector('.lg-pick').onchange = e => {
+    let code = e.target.value, name = COMMON.find(([c]) => c === code)?.[1];
+    if (code === '?') { code = prompt('Language code (like ko, pt-BR):')?.trim(); name = code && prompt('Its name, as visitors see it:', code)?.trim(); }
+    if (!code || !/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(code) || list.some(l => l.code === code)) { if (code) S.log(`"${code}" is not a language code, or is already there`, 'warn'); return redraw(); }
+    // the first language added also names the default (the site's current language)
+    const cur = list.length ? list : [{ code: S.S.P.project.languages?.[0]?.code ?? 'en', name: 'English' }];
+    save([...cur.filter(l => l.code !== code), { code, name: name || code }]);
+  };
+  for (const tr of body.querySelectorAll('tr[data-i]')) {
+    const i = +tr.dataset.i, l = list.map(x => ({ ...x, from: x.code }));
+    tr.querySelector('.lg-code').onchange = e => { const v = e.target.value.trim(); if (/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(v) && !list.some((x, j) => j !== i && x.code === v)) { l[i].code = v; save(l); } else redraw(); };
+    tr.querySelector('.lg-name').onchange = e => { l[i].name = e.target.value.trim() || l[i].code; save(l); };
+    tr.querySelector('.lg-del').onclick = () => { if (confirm(`Remove ${list[i].name}? Its translations stay in the pages, unused, until you add it again.`)) save(l.filter((_, j) => j !== i)); };
+    tr.querySelector('.lg-def')?.addEventListener('click', () => {
+      if (!confirm(`Make ${list[i].name} the default? Its pages move to the site root and its translations become the base texts (the current ones become ${list[0].name} translations). This can't be undone with Undo.`)) return;
+      S.makeDefaultLanguage(list[i].code); redraw();
+    });
+  }
+}

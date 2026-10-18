@@ -1,0 +1,73 @@
+// Multiple languages: lib/i18n.js, rendering with a language, and a built two-language site.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { languagesOf, languageOptions, translationOf, langKey } from '../lib/i18n.js';
+import { renderDocument, makeCtx } from '../lib/render.js';
+import { newNode } from '../lib/node.js';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const project = { name: 'Bi', siteUrl: 'https://bi.example/', languages: [{ code: 'en', name: 'English' }, { code: 'fr', name: 'Français' }, { code: 'bad code!' }] };
+assert.deepEqual(languagesOf(project).map(l => l.code), ['en', 'fr']);
+assert.deepEqual(languagesOf({}), []);
+assert.equal(translationOf('data/posts.fr.json', ['en', 'fr']), 'data/posts.json');
+assert.equal(translationOf('data/posts.old.json', ['en', 'fr']), null);
+const json = { 'data/posts.json': [{ t: 'Hello' }], 'data/posts.fr.json': [{ t: 'Bonjour' }], 'locales/en.json': { nav: { home: 'Home', about: 'About' } }, 'locales/fr.json': { nav: { home: 'Accueil' } } };
+const fr = languageOptions(project, json, 'fr'), en = languageOptions(project, json);
+assert.deepEqual([fr.lang, fr.langKey, en.lang, en.langKey], ['fr', 'lang:fr', 'en', null]);
+assert.equal(fr.json['data/posts.json'][0].t, 'Bonjour');
+assert.equal(en.json['data/posts.json'][0].t, 'Hello');
+assert.ok(!('data/posts.fr.json' in en.json), 'translations are not data files of their own');
+assert.deepEqual(fr.strings.nav, { home: 'Accueil', about: 'About' }, 'missing strings fall back to the default language');
+assert.deepEqual(languageOptions({}, json), {});
+
+// rendering with a language: its overrides, {{t:}} strings, <html lang>
+const page = newNode('C', [{ type: 'Canvas', props: { title: 'Welcome' } }]);
+page.overrides = { [langKey('fr')]: { 'Canvas.title': 'Bienvenue' } };
+const t = newNode('T', [{ type: 'Text', props: { text: 'Good morning' } }]);
+t.overrides = { [langKey('fr')]: { 'Text.text': 'Bonjour' }, Phone: { 'Text.size': 12 } };
+page.children.push(t, newNode('N', [{ type: 'Text', props: { text: '{{t:nav.home}} / {{t:nav.about}}' } }]));
+const rFr = renderDocument(page, makeCtx({ ...fr, alternates: [{ code: 'en', name: 'English', href: '../index.html', abs: 'https://bi.example/', default: true }, { code: 'fr', name: 'Français', href: 'index.html', abs: 'https://bi.example/fr/', current: true }] })), docFr = rFr.html;
+assert.match(docFr, /<html lang="fr">/);
+assert.match(docFr, /<title>Bienvenue<\/title>/);
+assert.match(docFr, />Bonjour</);
+assert.match(docFr, />Accueil \/ About</);
+assert.match(docFr, /hreflang="en" href="https:\/\/bi.example\/">[^]*hreflang="x-default" href="https:\/\/bi.example\/">[^]*hreflang="fr" href="https:\/\/bi.example\/fr\/">/);
+assert.match(rFr.css, /@media \(max-width: 600px\)[^]*font-size: 12px/, 'breakpoint overrides still apply');
+assert.match(docFr, /"langKey":"lang:fr"/, 'the runtime applies the language too');
+const docEn = renderDocument(page, makeCtx(en)).html;
+assert.match(docEn, /<html lang="en">[^]*<title>Welcome<\/title>[^]*>Good morning<[^]*>Home \/ About</);
+
+// a built site
+const DIR = path.join(ROOT, '.tmp/i18n-site');
+fs.rmSync(DIR, { recursive: true, force: true });
+for (const d of ['pages', 'assets/data', 'assets/locales']) fs.mkdirSync(path.join(DIR, d), { recursive: true });
+fs.writeFileSync(path.join(DIR, 'project.json'), JSON.stringify({ ...project, languages: project.languages.slice(0, 2) }));
+for (const [f, v] of Object.entries(json)) fs.writeFileSync(path.join(DIR, 'assets', f), JSON.stringify(v));
+const ls = newNode('LS', [{ type: 'LanguageSwitcher', props: { label: 'code' } }]);
+const link = newNode('L', [{ type: 'Text', props: { text: 'About' } }, { type: 'Link', props: { href: 'about' } }]);
+link.overrides = { 'lang:fr': { 'Text.text': 'À propos' } };
+const list = newNode('List', [{ type: 'Repeat', props: { source: 'data/posts.json' } }]);
+list.children.push(newNode('Item', [{ type: 'Text', props: { text: '{{item.t}}' } }]));
+const home = newNode('Canvas', [{ type: 'Canvas', props: { title: 'Home' } }]);
+home.children.push(ls, link, list);
+fs.writeFileSync(path.join(DIR, 'pages/index.json'), JSON.stringify(home));
+fs.writeFileSync(path.join(DIR, 'pages/about.json'), JSON.stringify(newNode('Canvas', [{ type: 'Canvas', props: { title: 'About' } }])));
+fs.writeFileSync(path.join(DIR, 'pages/404.json'), JSON.stringify(newNode('Canvas', [{ type: 'Canvas', props: { title: 'Not found' } }])));
+const b = spawnSync(process.execPath, ['cli.js', 'build', DIR], { cwd: ROOT, encoding: 'utf8' });
+assert.equal(b.status, 0, b.stderr);
+const read = f => fs.readFileSync(path.join(DIR, 'dist', f), 'utf8');
+assert.ok(fs.existsSync(path.join(DIR, 'dist/fr/about.html')) && !fs.existsSync(path.join(DIR, 'dist/fr/404.html')));
+const fri = read('fr/index.html'), eni = read('index.html');
+assert.match(fri, /<html lang="fr">/);
+assert.match(fri, /<a class="l" data-gpsb="[^"]+" href="..\/fr\/about.html">[^]*À propos/, 'links stay in the language');
+assert.match(fri, />Bonjour</, 'translated data');
+assert.match(fri, /href="..\/gpsb\/base.css"/);
+assert.match(fri, /<a class="gpsb-ls" href="..\/" hreflang="en" lang="en">EN<\/a><a class="gpsb-ls" href="..\/fr\/" hreflang="fr" lang="fr" aria-current="true">FR<\/a>/);
+assert.match(eni, /<a class="gpsb-ls" href=".\/" hreflang="en" lang="en" aria-current="true">EN<\/a><a class="gpsb-ls" href="fr\/"/);
+assert.match(eni, />Hello</);
+assert.match(eni, /hreflang="fr" href="https:\/\/bi.example\/fr\/"/);
+assert.match(read('sitemap.xml'), /https:\/\/bi.example\/fr\/about.html/);
+console.log('i18n ok');

@@ -23,6 +23,7 @@ import { parseComponent, compileComponent, isTS, compileTS, withMap, quiet } fro
 import { newNode, walk, getComponent } from './lib/node.js';
 import { expandPrefabs } from './lib/prefab.js';
 import { templateFiles, TEMPLATES } from './lib/sections.js';
+import { languagesOf, languageOptions } from './lib/i18n.js';
 import * as pm from './pm.js';
 
 const TOOL = path.dirname(fileURLToPath(import.meta.url));
@@ -328,7 +329,7 @@ export async function build(root, out = path.join(root, 'dist')) {
   }
   const site = siteUrl(P.project), clean = !!P.project.cleanUrls, files = [];
   const opts = { assetVersions: await hashVersions(root, P), extensionVersions, cleanUrls: clean, minify: !!P.project.minify };
-  const base = ctxFor(P, opts), outputs = outputsOf(P, base, clean, site), collections = collectionsOf(P);
+  const base = ctxFor(P, opts), outputs = outputsOf(P, extra => ctxFor(P, { ...opts, ...extra }), clean, site), collections = collectionsOf(P);
   // RSS feeds: collection pages with Canvas.feed (absolute links: needs the site URL)
   const feeds = [];
   for (const name of Object.keys(P.pages)) {
@@ -340,7 +341,7 @@ export async function build(root, out = path.join(root, 'dist')) {
     feeds.push({ title: f.title, href: f.href });
   }
   for (const o of outputs) {
-    let r = renderDocument(o.tree, ctxFor(P, { ...opts, collections, feeds, prefix: o.prefix }), { name: o.name.split('/').pop(), cssHref: o.cssHref, scope: o.scope });
+    let r = renderDocument(o.tree, ctxFor(P, { ...opts, collections, feeds, prefix: o.prefix, ...o.extra }), { name: o.name.split('/').pop(), cssHref: o.cssHref, scope: o.scope });
     if (hooks.transformPage) r = { ...r, ...(await hooks.transformPage({ name: o.name, html: r.html, css: r.css, project: P.project, item: o.scope?.item }) ?? {}) };
     await fsp.mkdir(path.join(out, path.dirname(o.file)), { recursive: true });
     await fsp.writeFile(path.join(out, o.file), r.html);
@@ -360,10 +361,29 @@ export async function build(root, out = path.join(root, 'dist')) {
   return { out, pages: Object.keys(P.pages), warnings };
 }
 
-// Every page the site is made of: normal pages, one per item (or group) of each collection page, and the further
-// pages of paged ones: [{ name, tree, scope, file, url, prefix, cssHref, cssFile }]. The build writes them all; the dev
-// server renders the one asked for.
-function outputsOf(P, base, clean, site) {
+// Every page the site is made of: normal pages, one per item (or group) of each collection page, the further pages of
+// paged ones, and all of it again under /<code>/ for each further language (lib/i18n.js):
+// [{ name, tree, scope, file, url, prefix, cssHref, cssFile, extra }] (extra: the language's render options, with
+// `alternates`, the same page in each language). The build writes them all; the dev server renders the one asked for.
+// mk(extra) -> a render ctx.
+function outputsOf(P, mk, clean, site) {
+  const langs = languagesOf(P.project);
+  if (!langs.length) return pagesOf(P, mk({}), clean, site).map(o => ({ ...o, extra: {} }));
+  const all = langs.map((L, i) => {
+    const dir = i ? `${L.code}/` : '', extra = { ...languageOptions(P.project, P.json, L.code), langDir: dir };
+    return { L, dir, outs: pagesOf(P, mk(extra), clean, site).filter(o => !(i && o.name === '404')).map(o => ({
+      ...o, extra, file: dir + o.file, url: dir + o.url, prefix: !dir || o.prefix.startsWith('/') ? o.prefix : '../' + o.prefix })) };
+  });
+  for (const { outs } of all) for (const o of outs) {
+    const name = o.name;
+    o.extra = { ...o.extra, alternates: all.map(({ L, dir, outs: os }, i) => {
+      const t = os.find(x => x.name === name), url = t ? t.url : dir; // a page missing in that language: its home
+      return { code: L.code, name: L.name, href: o.prefix + url || './', abs: site ? site + url : null, current: os.includes(o), default: !i };
+    }) };
+  }
+  return all.flatMap(x => x.outs);
+}
+function pagesOf(P, base, clean, site) {
   const outputs = [];
   for (const [name, tree] of Object.entries(P.pages)) {
     const items = collectionItems(tree, base);
@@ -671,15 +691,15 @@ function serve(initial) {
       // pages rendered on the fly (Links / IFrames in the editor preview, Play mode): pages, collection items, tag pages,
       // further pages of paged lists, RSS feeds; as the build would write them (drafts included)
       const rel = p.match(/^\/project\/((?:[\w-]+\/)*[\w-]+\.(?:html|xml))$/)?.[1], top = rel?.split(/[/.]/)[0];
-      if (rel && (fs.existsSync(safe(`pages/${top}.json`)) || fs.existsSync(safe(`pages/${top}`)) || top === 'page')) {
+      if (rel && (fs.existsSync(safe(`pages/${top}.json`)) || fs.existsSync(safe(`pages/${top}`)) || top === 'page' || /^[a-z]{2,3}(-[\w]+)*$/.test(top))) {
         const P = await loadProject(root), extensionVersions = statExtVersions(P);
         await loadExtensions(root, P, extensionVersions);
         for (const t of Object.values(P.pages)) expandPrefabs(t, P.prefabs);
         const cx = extra => ctxFor(P, { assetVersions: statVersions(P), extensionVersions, collections: collectionsOf(P), ...extra });
         const feed = rel.match(/^(.+)\/feed\.xml$/)?.[1], site = `http://${req.headers.host}/project/`;
         if (feed && P.pages[feed]) { const f = feedOf(P, feed, cx(), site, false); if (f) return send(res, 200, f.xml, 'application/rss+xml; charset=utf-8'); }
-        const o = outputsOf(P, cx(), false, '').find(x => x.file === rel);
-        if (o) return send(res, 200, renderDocument(o.tree, cx({ prefix: o.name === '404' ? '' : o.prefix }), { name: o.name.split('/').pop(), cssHref: null, scope: o.scope }).html, MIME.html);
+        const o = outputsOf(P, cx, false, '').find(x => x.file === rel);
+        if (o) return send(res, 200, renderDocument(o.tree, cx({ prefix: o.name === '404' ? '' : o.prefix, ...o.extra }), { name: o.name.split('/').pop(), cssHref: null, scope: o.scope }).html, MIME.html);
       }
       if (p.startsWith('/project/')) { // project files; public/ is served at the root as on the built site (public/vendor/x.js -> vendor/x.js)
         const f = safe(p.slice(9)), pub = safe('public/' + p.slice(9));

@@ -229,6 +229,7 @@ async function main() {
   await contentSection(page);
   await sectionsSection(page);
   await canvasSection(page);
+  await languagesSection(page);
 }
 
 // ---- forms: validation, sending, events (a local endpoint records submissions) ----
@@ -648,10 +649,76 @@ async function canvasSection(page) {
   check('editor: canvas editing zero console errors', page.errors.length === 0, page.errors.join(' | '));
 }
 
+// ---- languages: a built two-language site; translating in the editor (language selector, overrides, Settings, Content) ----
+async function languagesSection(page) {
+  const LG = path.join(ROOT, '.tmp/e2e-languages'), SITE = 4224, ED = 4225, cfg = path.join(ROOT, '.tmp', 'e2e-config-languages');
+  fs.rmSync(LG, { recursive: true, force: true });
+  spawnSync(process.execPath, ['cli.js', 'new', LG, '--template', 'blog'], { cwd: ROOT });
+  const pj = JSON.parse(fs.readFileSync(path.join(LG, 'project.json'), 'utf8'));
+  fs.writeFileSync(path.join(LG, 'project.json'), JSON.stringify({ ...pj, languages: [{ code: 'en', name: 'English' }, { code: 'fr', name: 'Français' }] }));
+  // a switcher in the header, a French headline on the index, French posts
+  const idx = JSON.parse(fs.readFileSync(path.join(LG, 'pages/index.json'), 'utf8'));
+  const find = (n, name) => { if (n.name === name) return n; for (const c of n.children ?? []) { const x = find(c, name); if (x) return x; } };
+  find(idx, 'Bar').children.push({ id: 'langs', name: 'Langs', active: true, rect: { anchorMin: [0.5, 0.5], anchorMax: [0.5, 0.5], pivot: [0.5, 0.5], pos: [0, 0], size: [90, 30], rotation: 0, scale: [1, 1] }, components: [{ type: 'LanguageSwitcher', props: { label: 'code' } }], children: [] });
+  const title = find(find(idx, 'Posts'), 'Title');
+  title.overrides = { 'lang:fr': { 'Text.text': 'Derniers articles' } };
+  fs.writeFileSync(path.join(LG, 'pages/index.json'), JSON.stringify(idx));
+  const posts = JSON.parse(fs.readFileSync(path.join(LG, 'assets/data/posts.json'), 'utf8'));
+  posts.posts[0].title = 'Notes d’une semaine lente';
+  fs.writeFileSync(path.join(LG, 'assets/data/posts.fr.json'), JSON.stringify(posts));
+  const b = spawnSync(process.execPath, ['cli.js', 'build', LG], { cwd: ROOT, encoding: 'utf8' });
+  check('languages: a two-language site builds', b.status === 0, b.stderr);
+  cleanups.push(await serveDir(path.join(LG, 'dist'), SITE));
+  page.errors.length = 0;
+  await page.open(`http://127.0.0.1:${SITE}/index.html`);
+  await page.until(`window.GPSB?.els`, 5000);
+  await page.eval(`[...document.querySelectorAll('.gpsb-ls')].find(a => a.textContent === 'FR').click()`);
+  await page.until(`location.pathname === '/fr/' && window.GPSB?.els && document.body.innerText.includes('Derniers articles')`, 5000);
+  const fr = await page.eval(`JSON.stringify([document.documentElement.lang, document.body.innerText.includes('Notes d’une semaine lente'), document.querySelector('.gpsb-ls[aria-current]').textContent,
+    new URL(document.querySelector('a[href*="post/"]').href).pathname, getComputedStyle(document.body).backgroundColor !== ''])`);
+  check('languages: the switcher goes to the French pages: translated text and data, links stay in French', fr === JSON.stringify(['fr', true, 'FR', '/fr/post/notes-from-a-slow-week.html', true]), fr);
+  check('languages: built pages zero console errors', page.errors.length === 0, page.errors.join(' | '));
+
+  const ed = spawn(process.execPath, ['cli.js', 'serve', LG, '--port', String(ED)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GPSB_CONFIG_DIR: cfg } });
+  cleanups.push(() => ed.kill());
+  await new Promise((ok, err) => { ed.stdout.on('data', d => /editor:/.test(d) && ok()); ed.on('exit', c => err(new Error(`editor exited ${c}`))); });
+  const dev = await fetch(`http://127.0.0.1:${ED}/project/fr/about.html`).then(async r => [r.status, await r.text()]);
+  check('dev server: renders the French pages', dev[0] === 200 && /<html lang="fr">/.test(dev[1]), String(dev[0]));
+  await page.open(`http://127.0.0.1:${ED}/editor/`);
+  await page.until(`document.querySelector('[data-panel=hierarchy]')?.innerText.includes('Footer')`, 8000);
+  page.errors.length = 0;
+  const r = await page.eval(`(async () => {
+    const S = await import('/editor/state.js'), w = ms => new Promise(r => setTimeout(r, ms)), wait = async f => { for (let i = 0; i < 60 && !f(); i++) await w(100); };
+    const sel = document.querySelector('.sc-lang'), out = { shown: !sel.hidden, options: [...sel.options].map(o => o.textContent).join('|') };
+    sel.value = 'fr'; sel.dispatchEvent(new Event('change'));
+    await wait(() => S.S.previewWin?.document.body.innerText.includes('Derniers articles'));
+    out.preview = S.S.previewWin.document.body.innerText.includes('Derniers articles') && S.S.previewWin.document.documentElement.lang;
+    out.banner = document.querySelector('.sc-banner').textContent.slice(0, 16);
+    let lead; for (const [x] of S.walk(S.root())) if (x.name === 'Lead' && !lead) lead = x;
+    S.setProp(lead.id, 'Text.text', 'Des notes sur le travail.');
+    out.recorded = [lead.overrides?.['lang:fr']?.['Text.text'], lead.components[0].props.text.slice(0, 5)];
+    sel.value = ''; sel.dispatchEvent(new Event('change'));
+    await wait(() => !S.S.previewWin?.document.body.innerText.includes('Derniers articles'));
+    out.back = S.S.previewWin.document.body.innerText.includes('Latest posts');
+    const { openProjectSettings } = await import('/editor/settings.js');
+    const win = openProjectSettings('languages');
+    out.settings = [...document.querySelectorAll('.lg-name')].map(i => i.value).join('|');
+    win.close();
+    // Content: the French data shows as its own collection
+    S.emit('show-tab', 'content'); await w(100);
+    out.content = [...document.querySelector('.cnt-col').options].map(o => o.textContent).filter(t => t.includes('posts')).sort().join('|');
+    return JSON.stringify(out);
+  })()`);
+  check('editor: language selector edits the French version (preview, banner, overrides recorded), Settings and Content list it',
+    r === JSON.stringify({ shown: true, options: 'English (default)|Français', preview: 'fr', banner: 'Editing Français', recorded: ['Des notes sur le travail.', 'Notes'], back: true, settings: 'English|Français', content: 'data/posts.fr.json › posts (5)|data/posts.json › posts (5)' }), r);
+  check('editor: languages zero console errors', page.errors.length === 0, page.errors.join(' | '));
+}
+
 // static file server for a built site -> cleanup function
 async function serveDir(dir, port) {
   const s = http.createServer((req, res) => {
-    const f = path.join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+    let f = path.join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+    if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, 'index.html'); // folder URLs, as static hosts serve them
     if (!f.startsWith(dir + path.sep) || !fs.existsSync(f) || !fs.statSync(f).isFile()) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { 'content-type': MIME[path.extname(f).slice(1)] ?? 'application/octet-stream' });
     fs.createReadStream(f).pipe(res);
@@ -685,7 +752,8 @@ async function chrome(W = 1440, H = 900) {
     if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error')
       page.errors.push('console.error: ' + m.params.args.map(a => a.value ?? a.description ?? '').join(' '));
     else if (m.method === 'Runtime.exceptionThrown') page.errors.push('exception: ' + (m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text));
-    else if (m.method === 'Log.entryAdded' && m.params.entry.level === 'error' && !/favicon\.ico/.test(m.params.entry.url ?? ''))
+    // (Chrome's notice when a test leaves an editor with unsaved changes is not a page error)
+    else if (m.method === 'Log.entryAdded' && m.params.entry.level === 'error' && !/favicon\.ico/.test(m.params.entry.url ?? '') && !/'beforeunload' confirmation/.test(m.params.entry.text))
       page.errors.push(`log: ${m.params.entry.text} ${m.params.entry.url ?? ''}`);
   });
   const send = (method, params = {}) => new Promise(r => { const i = ++n; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
@@ -711,7 +779,7 @@ async function chrome(W = 1440, H = 900) {
 }
 
 // E2E_ONLY=forms|widgets runs just that section (quicker while working on it)
-const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p), content: p => contentSection(p), sections: p => sectionsSection(p), canvas: p => canvasSection(p) }[process.env.E2E_ONLY];
+const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p), content: p => contentSection(p), sections: p => sectionsSection(p), canvas: p => canvasSection(p), languages: p => languagesSection(p) }[process.env.E2E_ONLY];
 try { if (ONLY) await ONLY(await chrome()); else await main(); } catch (e) { failed++; console.log('FAIL', e.stack ?? e); } finally { for (const f of cleanups.reverse()) try { f(); } catch {} }
 console.log(failed ? `\n${failed} assertion(s) failed` : '\nall e2e assertions passed');
 process.exit(failed ? 1 : 0);

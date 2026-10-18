@@ -5,6 +5,7 @@ import { renderDocument, makeCtx, collectionItems } from '/lib/render.js';
 import * as iconSet from '/lib/icons.js';
 import { setIcons } from '/lib/widgets.js';
 import { sectionById, missingTokens, applyTheme } from '/lib/sections.js';
+import { languagesOf, languageOptions, langKey, isLangKey } from '/lib/i18n.js';
 import { expandPrefabs, collapsePrefabs, overrideKey, bakeInstance, unpackInstance, OWN } from '/lib/prefab.js';
 
 export const S = {
@@ -185,7 +186,8 @@ export function fitToChildren(ids, axes = [0, 1]) {
 // ---------- responsive breakpoints ----------
 export const breakpoints = () => sortBreakpoints(S.P?.project.breakpoints);
 // breakpoints applied while editing S.breakpoint: it and every wider one (widest first)
-export const editNames = () => { const b = breakpoints(), i = b.findIndex(x => x.name === S.breakpoint); return i < 0 ? [] : b.slice(0, i + 1).map(x => x.name); };
+// (a language, 'lang:<code>', is edited like a breakpoint: its own overrides, on the base layout)
+export const editNames = () => { if (isLangKey(S.breakpoint)) return [S.breakpoint]; const b = breakpoints(), i = b.findIndex(x => x.name === S.breakpoint); return i < 0 ? [] : b.slice(0, i + 1).map(x => x.name); };
 // node as seen at the edited breakpoint (read values from this, write with setProp)
 export const view = id => { const n = node(id); return n && withOverrides(n, editNames()); };
 export const isOverridden = (id, path, bp = S.breakpoint) => !!bp && overridden(node(id) ?? {}, bp, path);
@@ -193,8 +195,40 @@ export function revertOverride(id, path, bp = S.breakpoint) {
   if (bp) edit(`Revert ${path ?? 'all'} ${id}`, () => clearOverride(node(id), bp, path), { kind: 'props', ids: [id] });
 }
 export function setBreakpoint(name) {
-  S.breakpoint = breakpoints().some(b => b.name === name) ? name : null;
+  S.breakpoint = breakpoints().some(b => b.name === name) || languages().slice(1).some(l => langKey(l.code) === name) ? name : null;
   emit('breakpoint');
+  if (isLangKey(name) || isLangKey(S.prevEdit)) emit('structure'); // the preview shows that language
+  S.prevEdit = S.breakpoint;
+}
+
+// ---------- languages (lib/i18n.js) ----------
+export const languages = () => languagesOf(S.P?.project);
+// Make `code` the default language: on every page and prefab, its translations become the base values and the former
+// base values become the former default's translations. Not undoable (it spans every file): the caller confirms.
+export function makeDefaultLanguage(code) {
+  const ls = languages(), old = ls[0]?.code, to = langKey(code), back = langKey(old);
+  if (!old || old === code) return;
+  for (const [t, f] of trees()) for (const [n] of walk(t)) {
+    const o = n.overrides?.[to];
+    if (!o) continue;
+    const prev = {};
+    for (const [p, v] of Object.entries(o)) { prev[p] = clone(getProp(n, p)); setPath(n, p, clone(v)); }
+    delete n.overrides[to];
+    n.overrides[back] = prev;
+    S.dirty.add(f);
+  }
+  if (S.breakpoint === to) S.breakpoint = null;
+  setLanguages([ls.find(l => l.code === code), ...ls.filter(l => l.code !== code)]);
+}
+// the language being edited ('' = the default one)
+export const editLanguage = () => (isLangKey(S.breakpoint) ? S.breakpoint.slice(5) : '');
+// list: [{ code, name, from? }] (from: the code before a rename: its translations follow)
+export function setLanguages(list) {
+  for (const l of list) if (l.from && l.from !== l.code) for (const [t, f] of trees()) for (const [n] of walk(t))
+    if (n.overrides?.[langKey(l.from)]) { n.overrides[langKey(l.code)] = n.overrides[langKey(l.from)]; delete n.overrides[langKey(l.from)]; S.dirty.add(f); }
+  setProjectSetting('languages', list.length ? list.map(({ code, name }) => ({ code, name })) : undefined);
+  if (isLangKey(S.breakpoint) && !languages().slice(1).some(l => langKey(l.code) === S.breakpoint)) S.breakpoint = null;
+  emit('breakpoint'); emit('structure');
 }
 // replace the list ([{name, maxWidth}]); renamed entries carry `from` so overrides follow them
 export function setBreakpoints(list) {
@@ -601,7 +635,7 @@ export const pageItems = () => (S.P && root() ? collectionItems(root(), ctx()) :
 const previewScope = () => { const it = pageItems(); const x = it?.[Math.min(S.collectionItem, it.length - 1)]; return x ? { item: x.item, index: x.index } : null; };
 export function setCollectionItem(i) { S.collectionItem = i; emit('structure'); }
 export const previewHTML = (editor = !S.playing) =>
-  renderDocument(root(), ctx({ editor, base: location.origin + '/project/' }), { name: S.page, cssHref: null, scope: previewScope() }).html;
+  renderDocument(root(), ctx({ editor, base: location.origin + '/project/', ...languageOptions(S.P.project, S.P.json, editLanguage() || undefined) }), { name: S.page, cssHref: null, scope: previewScope() }).html;
 export const generatedCode = () => renderDocument(root(), ctx(), { name: S.page, scope: previewScope() }); // { html, css } as built (the build versions assets by content hash)
 
 export function setPlaying(on) { S.playing = on; emit('play'); }

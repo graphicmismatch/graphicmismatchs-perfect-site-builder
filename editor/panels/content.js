@@ -3,6 +3,7 @@
 // Fields come from <file>.schema.json or are inferred (lib/content.js); drafts and publish dates control what's built.
 import * as S from '../state.js';
 import { h, menu, pickAsset, nice, accept } from '../fields.js';
+import { translationFile, translationOf } from '/lib/i18n.js';
 import { findCollections, collectionLabel, fieldsOf, titleOf, statusOf, slugify, sortItems, schemaFile, inferSchema, FIELD_TYPES } from '/lib/content.js';
 
 const keyOf = c => `${c.file}|${c.path}`;
@@ -238,12 +239,25 @@ export function mount(el) {
     try { await S.api.put(`assets/${f}`, JSON.stringify(inferSchema(c), null, 2) + '\n'); await S.reloadMeta(); S.log(`Wrote assets/${f}: edit it to change field types, labels and order`); }
     catch (e) { S.log(`Could not write assets/${f}: ${e.message}`, 'error'); }
   }
+  // a copy of the file as <name>.<code>.json: the pages in that language read it instead (lib/i18n.js)
+  async function translate(c, l) {
+    const f = translationFile(c.file, l.code);
+    try { await S.api.put(`assets/${f}`, JSON.stringify(S.S.P.json[c.file], null, 2) + '\n'); await S.reloadMeta(); }
+    catch (e) { return S.log(`Could not create assets/${f}: ${e.message}`, 'error'); }
+    S.log(`Created assets/${f}: translate its items here; the ${l.name} pages use it`);
+    showFile(f, c.path);
+  }
+  const showFile = (f, p) => { curKey = `${f}|${p}`; store('Col', curKey); cur = 0; formSig = ''; draw(); };
   more.onclick = () => {
     const c = col(), r = more.getBoundingClientRect(), page = c && pageOf(c);
     menu([
       { label: 'New Collection…', action: newCollection },
       c && !c.schema && { label: 'Create Schema File', action: () => createSchema(c) },
       page && { label: `Open Template Page (${page})`, action: () => S.setPage(page) },
+      ...(c && !translationOf(c.file, S.languages().map(l => l.code)) ? S.languages().slice(1).map(l => {
+        const f = translationFile(c.file, l.code), has = S.S.P.json[f] !== undefined;
+        return { label: has ? `Edit the ${l.name} version` : `Translate into ${l.name}…`, action: () => (has ? showFile(f, c.path) : translate(c, l)) };
+      }) : []),
     ], r.left, r.bottom);
   };
 

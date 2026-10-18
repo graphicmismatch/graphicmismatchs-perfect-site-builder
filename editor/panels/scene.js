@@ -630,6 +630,7 @@ export function mount(root) {
         <input type="number" class="sc-inc" min="0.01" step="any" title="Snap increment (px); rotation snaps to 15°">
       </span>
       <span class="sc-bps" title="Breakpoint being edited (lit = active at the current preview width)"></span>
+      <select class="sc-lang" title="Language being edited: changes made in another language than the first are translations of it" hidden></select>
       <span class="sc-web">Scale <input type="range" class="sc-scale" min="1" max="5" step="0.1"> <output></output></span>
     </div>
     <div class="sc-view" tabindex="0">
@@ -678,6 +679,7 @@ export function mount(root) {
     el.classList.toggle('bp', !!b);
     banner.hidden = !b;
     if (b) banner.textContent = `Editing ${b.name} overrides — changes apply at ≤${b.maxWidth}px only`;
+    langUI();
   };
   // keep the preview width inside the edited level's range (narrower levels would otherwise show through)
   const fitRes = () => {
@@ -726,6 +728,19 @@ export function mount(root) {
     Object.assign(pop.style, { left: Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + 'px', top: r.bottom + 4 + 'px' });
     addEventListener('pointerdown', outside, true);
   };
+  // languages (project.json languages): editing one records its overrides, like a breakpoint
+  const langSel = $('.sc-lang');
+  const langUI = () => {
+    const ls = S.languages(), cur = S.editLanguage();
+    langSel.hidden = ls.length < 2;
+    langSel.innerHTML = ls.map((l, i) => `<option value="${i ? esc(l.code) : ''}">${esc(l.name)}${i ? '' : ' (default)'}</option>`).join('');
+    langSel.value = cur;
+    langSel.classList.toggle('on', !!cur);
+    const l = ls.find(x => x.code === cur);
+    if (l) { banner.hidden = false; banner.textContent = `Editing ${l.name} — changes apply to the ${l.name} pages only (/${l.code}/)`; el.classList.add('bp'); }
+  };
+  langSel.onchange = () => S.setBreakpoint(langSel.value ? `lang:${langSel.value}` : null);
+  S.on('project', langUI);
   bpBar.onclick = e => {
     const b = e.target.closest('button');
     if (b) 'bpEdit' in b.dataset ? editBps(b) : S.setBreakpoint(b.dataset.bp || null);

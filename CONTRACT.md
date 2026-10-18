@@ -116,6 +116,27 @@ generated CSS; text content, raw HTML/Style code and JS modules are never rewrit
   `S.P.json[file]` as one undo step (touched JSON files join undo snapshots), marks `assets/<file>` dirty (saved by
   `save()`), emits `content` (`'undo'` from undo/redo). `reloadMeta` keeps unsaved JSON edits.
 
+## Languages (`lib/i18n.js`)
+
+- `project.json languages: [{ code, name }]`, first = default (site root); each other language's outputs are the same
+  under `<code>/` (cli.js `outputsOf`: `extra` = `languageOptions(project, json, code)` + `langDir` + `alternates`;
+  no 404 per language; feeds default only). `languageOptions` → `{ lang, langKey: 'lang:<code>' | null, json (with
+  `<name>.<code>.json` replacing `<name>.json`; translation files dropped), strings (`assets/locales/<default>.json`
+  deep-merged with `<code>.json`), languages }`.
+- Node overrides under `lang:<code>` (same storage as breakpoint overrides; prefab instance overrides `@lang:<code>`).
+  `renderPage` applies `ctx.langKey` first (`effectiveTree`), then breakpoints as usual; `renderDocument` reads the
+  root's title/PageMeta with it, writes `<html lang=ctx.lang>` and `hreflang` links from `ctx.alternates` (`abs`, needs
+  siteUrl). Page links: `makeCtx` prefixes them with `prefix + langDir` (assets with `prefix`). Page data carries
+  `langKey`, `langDir`, `lang`; the runtime's `effective` applies `langKey` before active breakpoints.
+- Bindings `{{t:key.path}}` read `ctx.strings`. `LanguageSwitcher` (widgets.js) renders `ctx.alternates` (`current`
+  marked; the editor: `ctx.languages` with `#` links). Content: `schemaOf` of `<name>.<code>.json` falls back to the
+  original's schema.
+- Editor: the language being edited is `S.breakpoint = 'lang:<code>'` (`setBreakpoint` accepts it; `editNames()` →
+  `[key]`, so `view`/`setProp`/overrides UI work unchanged); `previewHTML` renders with that language's options.
+  `S.languages()`, `editLanguage()`, `setLanguages(list with from)` (renames move overrides),
+  `makeDefaultLanguage(code)` (swaps base values with that language's overrides in every page and prefab; not
+  undoable). Scene toolbar `.sc-lang`; Project Settings ▸ Languages; Content ⋯ ▸ Translate into ….
+
 ## Sections, themes, templates (`lib/sections.js`; editor + project creation, not copied into builds)
 
 - `THEMES` { id: { name, desc, tokens: { colors, fonts, textStyles } } }: colours primary, onPrimary, background, surface,

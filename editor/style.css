@@ -267,3 +267,9 @@ input, textarea { user-select: text; }
 .te-b.b { font-weight: 800; } .te-b.i { font-style: italic; font-family: Georgia, serif; } .te-b.u { text-decoration: underline; }
 .te-b.done { background: var(--accent-hi); color: #fff; }
 .te-sep { width: 1px; align-self: stretch; margin: 2px 3px; background: var(--border); }
+
+/* Project Settings > Languages */
+.lg-table td { padding: 2px 4px; }
+.lg-code { width: 90px; } .lg-name { width: 200px; }
+.lg-add { margin-top: 8px; }
+.lg-def { white-space: nowrap; }
