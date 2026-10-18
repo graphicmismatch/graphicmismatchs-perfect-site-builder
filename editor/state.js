@@ -55,7 +55,10 @@ const undoStack = [], redoStack = []; // entries: { label, snap }
 let lastEdit = { label: '', t: 0 };
 // readable step name: node ids in an edit label become node names ('Set Text.text a1b2c3' -> 'Set Text.text · Title')
 const nice = label => label.split(' ').map(t => { const names = t.split(',').map(id => node(id)?.name); return names.every(Boolean) ? '· ' + names.join(', ') : t; }).join(' ');
-const snap = () => JSON.stringify({ page: S.page, prefab: S.prefabEdit?.name, tree: root(), clips: S.P.clips });
+// JSON assets edited in the Content window join the snapshots once touched (the rest of the project data never does)
+const touchedJSON = new Set();
+const snap = () => JSON.stringify({ page: S.page, prefab: S.prefabEdit?.name, tree: root(), clips: S.P.clips,
+  json: Object.fromEntries([...touchedJSON].map(f => [f, S.P.json[f] ?? null])) });
 function restore(json) {
   const s = JSON.parse(json), pageChanged = s.page !== S.page || s.prefab !== S.prefabEdit?.name;
   S.page = s.page; S.P.clips = s.clips;
@@ -63,9 +66,10 @@ function restore(json) {
   else { S.prefabEdit = null; S.P.pages[s.page] = s.tree; }
   S.dirty.add(fileOfRoot());
   for (const k of Object.keys(s.clips)) S.dirty.add(`animations/${k}.anim.json`);
+  for (const [f, v] of Object.entries(s.json ?? {})) if (JSON.stringify(S.P.json[f] ?? null) !== JSON.stringify(v)) { S.P.json[f] = v; S.dirty.add(`assets/${f}`); }
   S.selection = S.selection.filter(id => node(id));
   if (pageChanged) emit('page');
-  emit('structure'); emit('anim'); emit('selection');
+  emit('structure'); emit('anim'); emit('selection'); emit('content', 'undo');
 }
 export function undo() { if (!undoStack.length) return; const e = undoStack.pop(); redoStack.push({ label: e.label, snap: snap() }); restore(e.snap); }
 export function redo() { if (!redoStack.length) return; const e = redoStack.pop(); undoStack.push({ label: e.label, snap: snap() }); restore(e.snap); }
@@ -87,6 +91,14 @@ export function edit(label, fn, { kind = 'structure', ids = [], merge = false, f
   fn();
   for (const f of files ?? [fileOfRoot()]) S.dirty.add(f);
   emit(kind, ids);
+}
+
+// Change a JSON asset (the Content window): fn(data) mutates it in place, or returns a replacement. One undo step
+// (merge: typing in one field), saved with the project, and the preview re-renders with it.
+export function editContent(file, label, fn, { merge = false } = {}) {
+  touchedJSON.add(file); // before the snapshot, so undo has the data as it was
+  edit(label, () => { const r = fn(S.P.json[file]); if (r !== undefined) S.P.json[file] = r; }, { files: [`assets/${file}`], merge });
+  emit('content');
 }
 
 // Central property setter (Inspector, Scene gizmos, ...). Record mode may intercept it; while a breakpoint is being
@@ -593,7 +605,8 @@ export async function save() {
   const content = f => {
     const tree = f.startsWith('pages/') ? S.P.pages[f.slice(6, -5)] : f.startsWith('prefabs/') ? S.P.prefabs[f.slice(8, -12)] : undefined;
     const body = f === 'project.json' ? S.P.project : tree ? collapsePrefabs(tree) // instances are saved as references
-      : f.startsWith('animations/') ? S.P.clips[f.slice(11, -10)] : undefined;
+      : f.startsWith('animations/') ? S.P.clips[f.slice(11, -10)]
+        : f.startsWith('assets/') && f.endsWith('.json') ? S.P.json[f.slice(7)] ?? undefined : undefined; // Content window edits
     return body === undefined ? undefined : JSON.stringify(body, null, 2);
   };
   let ok = 0;
@@ -664,11 +677,12 @@ export async function reloadMeta() {
   if (!r.ok) return log('Project reload failed: ' + await r.text(), 'error');
   const P = await r.json();
   if (P.root !== S.P.root) return log('A different project was opened in the Hub; reload this tab to edit it.', 'warn');
+  for (const f of Object.keys(S.P.json ?? {})) if (S.dirty.has(`assets/${f}`)) P.json[f] = S.P.json[f]; // unsaved Content edits win
   for (const k of ['components', 'behaviours', 'assets', 'json', 'text', 'extensions', 'importMap']) S.P[k] = P[k];
   for (const e of P.errors ?? []) if (/^(components|assets)\//.test(e.file)) log(`${e.file}: ${e.error}`, 'error');
   await loadExtensions();
   await loadBehaviours();
-  emit('assets'); emit('structure');
+  emit('assets'); emit('structure'); emit('content');
 }
 
 // npm packages changed (Package Manager, `gpsb add`): previews pick them up at once; the editor page's own import map

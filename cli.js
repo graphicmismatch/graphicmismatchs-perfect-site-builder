@@ -15,7 +15,8 @@ import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import crypto from 'node:crypto';
 import * as nodeModule from 'node:module';
-import { renderDocument, makeCtx, pageUrl, itemUrl, collectionItems } from './lib/render.js';
+import { renderDocument, makeCtx, pageUrl, itemUrl, collectionItems, pageCount } from './lib/render.js';
+import { publishedJSON, schemaOf, feedFields, rssFeed, sortItems } from './lib/content.js';
 import { registerComponent, unregisterComponent, extensionNames, builtins } from './lib/components.js';
 import { parseComponent, compileComponent, isTS, compileTS, withMap, quiet } from './lib/compile.js';
 import { newNode, walk, getComponent } from './lib/node.js';
@@ -295,6 +296,7 @@ export async function build(root, out = path.join(root, 'dist')) {
   root = path.resolve(root); out = path.resolve(out);
   const restored = await pm.install(root); // packages the lock lists but packages/ lacks (a fresh clone): downloaded
   const P = await loadProject(root), keep = keepOf(P.project);
+  P.json = publishedJSON(P.json); // drafts and items scheduled for later stay off the site
   await checkOut(root, out, keep);
   const extensionVersions = {};
   for (const [n, e] of Object.entries(P.extensions)) extensionVersions[n] = await hashFile(path.join(root, e.path));
@@ -322,16 +324,19 @@ export async function build(root, out = path.join(root, 'dist')) {
   }
   const site = siteUrl(P.project), clean = !!P.project.cleanUrls, files = [];
   const opts = { assetVersions: await hashVersions(root, P), extensionVersions, cleanUrls: clean, minify: !!P.project.minify };
-  // every output page: normal pages, and one per item of each collection (template) page
-  const base = ctxFor(P, opts), outputs = [];
-  for (const [name, tree] of Object.entries(P.pages)) {
-    const items = collectionItems(tree, base);
-    if (!items) outputs.push({ name, tree, scope: null, ...pageOutput(name, clean, site), url: pageUrl(name, clean).replace(/^index\.html$/, '') });
-    else for (const it of items) outputs.push({ name: `${name}/${it.slug}`, tree, scope: { item: it.item, index: it.index }, ...itemOutput(name, it.slug, clean), url: itemUrl(name, it.slug, clean) });
+  const base = ctxFor(P, opts), outputs = outputsOf(P, base, clean, site), collections = collectionsOf(P);
+  // RSS feeds: collection pages with Canvas.feed (absolute links: needs the site URL)
+  const feeds = [];
+  for (const name of Object.keys(P.pages)) {
+    const f = feedOf(P, name, base, site, clean);
+    if (!f) continue;
+    if (!site) { warnings.push(`pages/${name}.json: the RSS feed needs the project's Site URL (Project Settings)`); continue; }
+    await fsp.mkdir(path.join(out, name), { recursive: true });
+    await fsp.writeFile(path.join(out, f.href), f.xml);
+    feeds.push({ title: f.title, href: f.href });
   }
-  const collections = collectionsOf(P);
   for (const o of outputs) {
-    let r = renderDocument(o.tree, ctxFor(P, { ...opts, collections, prefix: o.prefix }), { name: o.name.split('/').pop(), cssHref: o.cssHref, scope: o.scope });
+    let r = renderDocument(o.tree, ctxFor(P, { ...opts, collections, feeds, prefix: o.prefix }), { name: o.name.split('/').pop(), cssHref: o.cssHref, scope: o.scope });
     if (hooks.transformPage) r = { ...r, ...(await hooks.transformPage({ name: o.name, html: r.html, css: r.css, project: P.project, item: o.scope?.item }) ?? {}) };
     await fsp.mkdir(path.join(out, path.dirname(o.file)), { recursive: true });
     await fsp.writeFile(path.join(out, o.file), r.html);
@@ -349,6 +354,48 @@ export async function build(root, out = path.join(root, 'dist')) {
   if (fs.existsSync(path.join(root, 'public'))) await fsp.cp(path.join(root, 'public'), out, { recursive: true });
   await hooks.afterBuild?.({ out, root, project: P.project, pages: Object.keys(P.pages), files });
   return { out, pages: Object.keys(P.pages), warnings };
+}
+
+// Every page the site is made of: normal pages, one per item (or group) of each collection page, and the further
+// pages of paged ones: [{ name, tree, scope, file, url, prefix, cssHref, cssFile }]. The build writes them all; the dev
+// server renders the one asked for.
+function outputsOf(P, base, clean, site) {
+  const outputs = [];
+  for (const [name, tree] of Object.entries(P.pages)) {
+    const items = collectionItems(tree, base);
+    if (!items) outputs.push({ name, tree, scope: null, ...pageOutput(name, clean, site), url: pageUrl(name, clean).replace(/^index\.html$/, '') });
+    else for (const it of items) outputs.push({ name: `${name}/${it.slug}`, tree, scope: { item: it.item, index: it.index }, ...itemOutput(name, it.slug, clean), url: itemUrl(name, it.slug, clean) });
+  }
+  // a page with a paged Repeat (pageSize) continues on <page>/2.html, /3.html… (page/2.html for the home page);
+  // scope.pagination = { page, pages, urls, prev, next } (URLs relative to the page, '' = none) for Pagination / bindings
+  for (const o of [...outputs]) {
+    const n = pageCount(o.tree, base, o.scope);
+    if (n < 2) continue;
+    const dir = o.url.replace(/(\.html|\/)$/, '') || 'page';
+    const urls = Array.from({ length: n }, (_, i) => (!i ? o.url : clean ? `${dir}/${i + 1}/` : `${dir}/${i + 1}.html`));
+    const pagination = (k, prefix) => {
+      const u = i => (i < 0 || i >= n ? '' : prefix + urls[i] || './');
+      return { page: k + 1, pages: n, urls: urls.map((_, i) => u(i)), prev: u(k - 1), next: u(k + 1) };
+    };
+    const scope = o.scope;
+    o.scope = { ...scope, pagination: pagination(0, o.prefix) };
+    for (let k = 1; k < n; k++) {
+      const prefix = o.prefix.startsWith('/') ? o.prefix : '../'.repeat(urls[k].split('/').length - 1), css = clean ? 'page.css' : `${k + 1}.css`;
+      outputs.push({ name: `${o.name}/${k + 1}`, tree: o.tree, url: urls[k], prefix, cssHref: css, cssFile: css, file: clean ? `${urls[k]}index.html` : urls[k],
+        scope: { ...scope, pagination: pagination(k, prefix) } });
+    }
+  }
+  return outputs;
+}
+
+// The RSS feed of a collection page with Canvas.feed: { title, href (site-relative), xml } or null. Newest 50 items.
+function feedOf(P, name, base, site, clean) {
+  const tree = P.pages[name], c = getComponent(tree, 'Canvas')?.props;
+  if (!c?.collection || !c.feed || c.groupBy) return null;
+  const schema = schemaOf(P.json, c.collection), href = `${name}/feed.xml`, title = c.feedTitle || P.project.name || name;
+  const items = sortItems((collectionItems(tree, base) ?? []).map(it => ({ ...feedFields(it.item, schema), link: site + itemUrl(name, it.slug, clean) })), '-date').slice(0, 50);
+  const language = getComponent(tree, 'PageMeta')?.props?.language;
+  return { title, href, xml: rssFeed({ title, link: site, description: P.project.description, language, self: site + href }, items) };
 }
 
 // names of the pages that are collection templates
@@ -606,21 +653,18 @@ function serve(initial) {
         try { js = withMap(compileTS(src, ts[1] + '.ts')); } catch (e) { js = `throw new SyntaxError(${JSON.stringify(`${ts[1]}.ts: ${e.message}`)});\n`; }
         return send(res, 200, js, MIME.js);
       }
-      const it = p.match(/^\/project\/([\w-]+(?:\/[\w-]+)*)\/([\w-]+)\.html$/); // collection item (preview links)
-      if (it && fs.existsSync(safe(`pages/${it[1]}.json`))) {
-        const P = await loadProject(root), tree = P.pages[it[1]], extensionVersions = statExtVersions(P);
-        await loadExtensions(root, P, extensionVersions);
-        if (tree) expandPrefabs(tree, P.prefabs);
-        const cx = ctxFor(P, { assetVersions: statVersions(P), extensionVersions, prefix: '../'.repeat(it[1].split('/').length), collections: collectionsOf(P) });
-        const item = tree && collectionItems(tree, cx)?.find(x => x.slug === it[2]);
-        if (item) return send(res, 200, renderDocument(tree, cx, { name: it[2], cssHref: null, scope: { item: item.item, index: item.index } }).html, MIME.html);
-      }
-      const page = p.match(/^\/project\/([\w-]+(?:\/[\w-]+)*)\.html$/)?.[1];
-      if (page && fs.existsSync(safe(`pages/${page}.json`))) { // a page rendered on the fly (Links / IFrames in the editor preview)
+      // pages rendered on the fly (Links / IFrames in the editor preview, Play mode): pages, collection items, tag pages,
+      // further pages of paged lists, RSS feeds; as the build would write them (drafts included)
+      const rel = p.match(/^\/project\/((?:[\w-]+\/)*[\w-]+\.(?:html|xml))$/)?.[1], top = rel?.split(/[/.]/)[0];
+      if (rel && (fs.existsSync(safe(`pages/${top}.json`)) || fs.existsSync(safe(`pages/${top}`)) || top === 'page')) {
         const P = await loadProject(root), extensionVersions = statExtVersions(P);
         await loadExtensions(root, P, extensionVersions);
-        if (P.pages[page]) expandPrefabs(P.pages[page], P.prefabs);
-        if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P), extensionVersions, collections: collectionsOf(P), prefix: '../'.repeat(page.split('/').length - 1) }), { name: page.split('/').pop(), cssHref: null }).html, MIME.html);
+        for (const t of Object.values(P.pages)) expandPrefabs(t, P.prefabs);
+        const cx = extra => ctxFor(P, { assetVersions: statVersions(P), extensionVersions, collections: collectionsOf(P), ...extra });
+        const feed = rel.match(/^(.+)\/feed\.xml$/)?.[1], site = `http://${req.headers.host}/project/`;
+        if (feed && P.pages[feed]) { const f = feedOf(P, feed, cx(), site, false); if (f) return send(res, 200, f.xml, 'application/rss+xml; charset=utf-8'); }
+        const o = outputsOf(P, cx(), false, '').find(x => x.file === rel);
+        if (o) return send(res, 200, renderDocument(o.tree, cx({ prefix: o.name === '404' ? '' : o.prefix }), { name: o.name.split('/').pop(), cssHref: null, scope: o.scope }).html, MIME.html);
       }
       if (p.startsWith('/project/')) { // project files; public/ is served at the root as on the built site (public/vendor/x.js -> vendor/x.js)
         const f = safe(p.slice(9)), pub = safe('public/' + p.slice(9));

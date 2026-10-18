@@ -226,6 +226,7 @@ async function main() {
   check('dev server: public/ is served at the site root, as on the built site', pub === 'export const v = 1;\n', String(pub));
   await formsSection(page);
   await widgetsSection(page);
+  await contentSection(page);
 }
 
 // ---- forms: validation, sending, events (a local endpoint records submissions) ----
@@ -442,6 +443,70 @@ async function widgetsSection(page) {
   check('editor: widgets zero console errors', edErrs.length === 0, edErrs.join(' | '));
 }
 
+// ---- collections: paged lists, tag pages and the runtime (built); dev server routes; the Content window ----
+async function contentSection(page) {
+  const CT = path.join(ROOT, '.tmp/e2e-content'), CT_PORT = 4218, ED_PORT = 4219, cfg = path.join(ROOT, '.tmp', 'e2e-config');
+  fs.rmSync(CT, { recursive: true, force: true });
+  fs.cpSync(path.join(ROOT, 'test/fixtures/blog'), CT, { recursive: true });
+  const b = spawnSync(process.execPath, ['cli.js', 'build', CT], { cwd: ROOT, encoding: 'utf8' });
+  check('content: blog builds', b.status === 0, (b.stderr || b.stdout).trim());
+  cleanups.push(await serveDir(path.join(CT, 'dist'), CT_PORT));
+  page.errors.length = 0;
+  await page.open(`http://127.0.0.1:${CT_PORT}/blog/2.html`);
+  await page.until(`window.GPSB?.els`, 5000);
+  const rows = await page.eval(`JSON.stringify(GPSB.els('row').map(el => [GPSB.nodeFor(el).components[0].props.text, el.getAttribute('href')]))`);
+  check('content: page 2 of a paged list; repeated rows keep their item at runtime (nodeFor)', rows === JSON.stringify([['Café mornings · February 10, 2026', '../post/cafe-mornings.html'], ['First light · January 5, 2026', '../post/first-light.html']]), rows);
+  await page.eval(`document.querySelector('.gpsb-pg-prev').click()`);
+  await page.until(`location.pathname === '/blog.html' && window.GPSB?.els`, 5000);
+  check('content: Pagination links go to the previous page', (await page.eval(`GPSB.els('row').length`)) === 2);
+  await page.open(`http://127.0.0.1:${CT_PORT}/tags/travel/2.html`);
+  await page.until(`window.GPSB?.els`, 5000);
+  const tr = await page.eval(`JSON.stringify(GPSB.els('tr').map(el => GPSB.nodeFor(el).components[0].props.text))`);
+  check('content: tag page, page 2 (nested item list) at runtime', tr === '["First light"]', tr);
+  check('content: built pages zero console errors', page.errors.length === 0, page.errors.join(' | '));
+
+  const ed = spawn(process.execPath, ['cli.js', 'serve', CT, '--port', String(ED_PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GPSB_CONFIG_DIR: cfg } });
+  cleanups.push(() => ed.kill());
+  await new Promise((ok, err) => { ed.stdout.on('data', d => /editor:/.test(d) && ok()); ed.on('exit', c => err(new Error(`editor server exited ${c}`))); });
+  const get = p => fetch(`http://127.0.0.1:${ED_PORT}/project/${p}`).then(async r => [r.status, await r.text()]);
+  const [s1, t1] = await get('blog/2.html'), [s2, t2] = await get('tags/travel/2.html'), [s3, t3] = await get('post/secret.html'), [s4, t4] = await get('post/feed.xml');
+  // the preview shows drafts and scheduled posts too (in lists as well), so page 2 holds Mountains and the draft
+  check('dev server: paged pages, tag pages, drafts (previewed) and the RSS feed', s1 === 200 && /Mountains[^]*Not ready/.test(t1) && s2 === 200 && /Mountains[^]*Not ready/.test(t2) && s3 === 200 && t3.includes('Not ready') && s4 === 200 && t4.includes('<rss') && t4.includes(`http://127.0.0.1:${ED_PORT}/project/post/rivers.html`), [s1, s2, s3, s4].join());
+
+  page.errors.length = 0;
+  await page.open(`http://127.0.0.1:${ED_PORT}/editor/`);
+  await page.until(`document.querySelector('.cnt-row')`, 8000);
+  const r = await page.eval(`(async () => {
+    const S = await import('/editor/state.js'), w = ms => new Promise(r => setTimeout(r, ms)), posts = () => S.S.P.json['data/posts.json'].posts;
+    S.emit('show-tab', 'content');
+    const out = { rows: document.querySelectorAll('.cnt-row').length, status: [...document.querySelectorAll('.cnt-row .cnt-st')].map(x => x.className.split(' ')[1][0]).join('') };
+    document.querySelector('.cnt-bar .cnt-btn').click(); // + New
+    await w(50);
+    const title = document.querySelector('.cnt-field input');
+    title.value = 'Hello Lakes'; title.dispatchEvent(new Event('input'));
+    const tags = [...document.querySelectorAll('.cnt-field')].find(f => f.textContent.startsWith('Tags')).querySelector('input');
+    tags.value = 'Travel, Water'; tags.dispatchEvent(new Event('input'));
+    document.querySelector('.cnt-status input[type=checkbox]').click(); // draft
+    await w(50);
+    const it = posts().at(-1);
+    out.item = [it.title, it.slug, it.tags.join('/'), it.draft, typeof it.date];
+    out.label = document.querySelector('.cnt-status .cnt-say').textContent;
+    S.undo(); await w(50);
+    out.undo = posts().at(-1).draft === undefined && posts().length === 7;
+    document.querySelectorAll('.cnt-head .cnt-btn')[3].click(); // Duplicate
+    await w(50);
+    out.dup = [posts().length, posts().at(-1).slug];
+    await S.save(); await w(200);
+    out.dirty = S.S.dirty.has('assets/data/posts.json');
+    return JSON.stringify(out);
+  })()`);
+  const saved = JSON.parse(fs.readFileSync(path.join(CT, 'assets/data/posts.json'), 'utf8')).posts;
+  check('editor: Content window adds an item (slug follows the title, tags, date), draft toggle, undo, duplicate, save',
+    r === JSON.stringify({ rows: 6, status: 'sppdpp', item: ['Hello Lakes', 'hello-lakes', 'Travel/Water', true, 'string'], label: 'Draft: not on the published site.', undo: true, dup: [8, 'hello-lakes-copy'], dirty: false })
+    && saved.length === 8 && saved[6].title === 'Hello Lakes' && saved[7].slug === 'hello-lakes-copy', r + ' / saved ' + saved.length);
+  check('editor: content zero console errors', page.errors.length === 0, page.errors.join(' | '));
+}
+
 // static file server for a built site -> cleanup function
 async function serveDir(dir, port) {
   const s = http.createServer((req, res) => {
@@ -505,7 +570,7 @@ async function chrome(W = 1440, H = 900) {
 }
 
 // E2E_ONLY=forms|widgets runs just that section (quicker while working on it)
-const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p) }[process.env.E2E_ONLY];
+const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p), content: p => contentSection(p) }[process.env.E2E_ONLY];
 try { if (ONLY) await ONLY(await chrome()); else await main(); } catch (e) { failed++; console.log('FAIL', e.stack ?? e); } finally { for (const f of cleanups.reverse()) try { f(); } catch {} }
 console.log(failed ? `\n${failed} assertion(s) failed` : '\nall e2e assertions passed');
 process.exit(failed ? 1 : 0);

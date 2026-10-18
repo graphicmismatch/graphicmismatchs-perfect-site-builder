@@ -1,0 +1,10 @@
+{
+  "posts": [
+    { "slug": "first-light", "title": "First light", "date": "2026-01-05", "excerpt": "Where it started.", "tags": ["Photography", "Travel"], "body": "The **first** post." },
+    { "slug": "cafe-mornings", "title": "Café mornings", "date": "2026-02-10", "excerpt": "Coffee & notes.", "tags": ["Café Life"], "body": "Coffee." },
+    { "slug": "secret", "title": "Not ready", "date": "2026-02-20", "tags": ["Travel"], "draft": true, "body": "Draft." },
+    { "slug": "mountains", "title": "Mountains", "date": "2026-03-01", "excerpt": "Up high.", "tags": ["Travel"], "body": "Snow." },
+    { "slug": "future", "title": "From the future", "date": "2099-01-01", "tags": ["Travel"], "publishAt": "2099-01-01T00:00:00Z", "body": "Later." },
+    { "slug": "rivers", "title": "Rivers", "date": "2026-04-12", "excerpt": "Down low.", "tags": ["Travel", "Photography"], "body": "Water." }
+  ]
+}

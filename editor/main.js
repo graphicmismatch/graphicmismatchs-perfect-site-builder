@@ -11,7 +11,7 @@ await prefs.load();
 const panelEls = Object.fromEntries([...document.querySelectorAll('#dock > .panel')].map(p => [p.dataset.panel, p]));
 layout.init(document.getElementById('dock'), panelEls);
 
-for (const name of ['toolbar', 'hierarchy', 'scene', 'inspector', 'project', 'console', 'animation', 'code']) {
+for (const name of ['toolbar', 'hierarchy', 'scene', 'inspector', 'project', 'console', 'animation', 'code', 'content']) {
   const el = name === 'toolbar' ? document.getElementById('toolbar') : panelEls[name];
   try { (await import(`./panels/${name}.js`)).mount(el); }
   catch (e) { console.error(e); el.textContent = `${name}: ${e.message}`; }

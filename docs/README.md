@@ -11,7 +11,8 @@ Start here if you want to build a site.
 2. [The editor](editor.md): the panels, tools, menus and shortcuts.
 3. [Layout](layout.md): RectTransforms, anchors and pivots, layout groups, scroll views, Canvas Scaler, responsive
    breakpoints.
-4. [Content and data](content-and-data.md): text, images, media, forms, Markdown, JSON bindings, Repeat, collection pages.
+4. [Content and data](content-and-data.md): text, images, media, Markdown, JSON bindings and filters, Repeat (sorting,
+   grouping, pages), collection and tag pages, RSS, the Content window (a CMS for your collections), drafts and scheduling.
    [Forms](forms.md): contact forms that send to a form service or your endpoint, validation, spam protection, events.
    [Widgets](widgets.md): icons, navigation menu, social links, carousel, tabs, accordion, modal, gallery, video, map,
    countdown.

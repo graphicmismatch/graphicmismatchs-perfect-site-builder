@@ -4,11 +4,11 @@ import * as S from './state.js';
 import * as prefs from './prefs.js';
 import { menu } from './panels/toolbar.js';
 
-export const TITLES = { hierarchy: 'Hierarchy', scene: 'Scene', inspector: 'Inspector', project: 'Project', console: 'Console', animation: 'Animation', code: 'Generated Code' };
+export const TITLES = { hierarchy: 'Hierarchy', scene: 'Scene', inspector: 'Inspector', project: 'Project', console: 'Console', animation: 'Animation', code: 'Generated Code', content: 'Content' };
 const A = (...tabs) => ({ tabs, active: tabs[0] });
 const R = (sizes, ...children) => ({ dir: 'row', sizes, children });
 const C = (sizes, ...children) => ({ dir: 'col', sizes, children });
-const BOTTOM = ['project', 'console', 'animation', 'code'];
+const BOTTOM = ['project', 'console', 'animation', 'content', 'code'];
 export const PRESETS = {
   Default: () => R([79, 21], C([70, 30], R([20, 80], A('hierarchy'), A('scene')), A(...BOTTOM)), A('inspector')),
   '2 by 3': () => R([46, 16, 16, 22], C([62, 38], A('scene'), A('animation', 'console', 'code')), A('hierarchy'), A('project'), A('inspector')),

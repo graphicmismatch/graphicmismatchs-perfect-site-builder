@@ -1,0 +1,3 @@
+{ "path": "posts", "title": "title", "summary": "excerpt", "date": "date", "sort": "-date",
+  "fields": { "title": { "type": "string", "required": true }, "slug": { "type": "string" }, "date": { "type": "date" },
+    "excerpt": { "type": "text" }, "tags": { "type": "tags" }, "body": { "type": "markdown" } } }

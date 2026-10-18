@@ -92,6 +92,29 @@ generated CSS; text content, raw HTML/Style code and JS modules are never rewrit
   names) makes `href('post/<slug>')` resolve; the runtime gets it in the page data. A `Repeat` without `source` reads
   `path` from the current scope (`item.tags`). The dev server renders `/project/<page>/<slug>.html`; the editor previews
   `S.S.collectionItem` (Scene toolbar dropdown; `pageItems()`, `setCollectionItem(i)`).
+- Collections (`lib/content.js`, isomorphic): `findCollections(json)` → `[{ file, path, items, schema }]` (a schema's
+  `path`; else a file that is an array of objects, or each top-level key holding one). Schema = sibling
+  `<file>.schema.json` `{ path, fields: { name: { type, label, help, options, required } }, title, summary, date, sort,
+  draft, publishAt }`; `fieldsOf` = schema fields then inferred ones (`inferType`). `statusOf(item)` draft
+  (`draft === true`) | scheduled (`publishAt` in the future) | published. The build replaces `P.json` with
+  `publishedJSON(P.json)` (those items removed from every array, any depth) before rendering; the dev server and editor
+  keep them. `groupItems(items, field)` → `[{ name, slug, count, items }]` (slug = `slugify`, alphabetical);
+  `sortItems(items, 'a,-b')` (empty last); `rssFeed`, `feedFields`.
+- `Canvas.sortBy` / `groupBy` (one page per group, scope item = the group; output `<page>/<group slug>.html`) / `feed`
+  (`<page>/feed.xml`, newest 50, needs `siteUrl`; `ctx.feeds` → `<link rel="alternate">` on every page) / `feedTitle`.
+  `Repeat.sortBy` / `groupBy` / `pageSize`: `repeatItems(p, ctx, scope)` (render.js; also the runtime's nested Repeats)
+  = source → sort → group → limit → page slice (`scope.pagination.page`). `pageCount(root, ctx, scope)`: the first
+  Repeat with a pageSize (not inside another Repeat). cli.js `outputsOf(P, ctx, clean, site)` lists every output (pages,
+  items/groups, then `<url-dir>/<n>.html` or `<url-dir>/<n>/` pages, `page/<n>` for the home page) with
+  `scope.pagination = { page, pages, urls, prev, next }` (URLs relative to that output, '' = none); the build writes them
+  and the dev server renders the one requested (and `<page>/feed.xml`). `Pagination` component renders from
+  `scope.pagination` (`inner(p, ctx, node, scope)`; a sample in the editor).
+- Binding filters: `{{path | f | g: arg}}` (`FILTERS` in render.js: slug, lower, upper, length, join, first, last,
+  default, date); an unknown filter or unresolved value leaves the binding as written. `date` uses `ctx.lang`
+  (renderDocument: PageMeta.language; passed to the runtime as `data.lang`) in UTC.
+- Editor Content window (`panels/content.js`, Window ▸ Content): `S.editContent(file, label, fn, { merge })` mutates
+  `S.P.json[file]` as one undo step (touched JSON files join undo snapshots), marks `assets/<file>` dirty (saved by
+  `save()`), emits `content` (`'undo'` from undo/redo). `reloadMeta` keeps unsaved JSON edits.
 
 ## Prefabs (`lib/prefab.js`)
 
@@ -175,7 +198,7 @@ Tablet and Phone apply, Phone last. `lib/node.js`: `sortBreakpoints`, `activeBre
 Canvas, CanvasScaler, PageMeta, Image, RawImage, Text, Button, Toggle, ToggleGroup, Slider, Scrollbar, InputField, Dropdown,
 Link, Video, Audio, IFrame, Form, Element, HTML, Style, HorizontalLayoutGroup, VerticalLayoutGroup, GridLayoutGroup,
 LayoutElement, ContentSizeFitter, AspectRatioFitter, ScrollRect, Mask, RectMask2D, CanvasGroup, Shadow, Outline, Animator, Repeat,
-Captcha; widgets (`lib/widgets.js`, a factory merged into `builtins`): Icon, Divider, Marquee, Countdown, NavigationMenu,
+Captcha, Pagination; widgets (`lib/widgets.js`, a factory merged into `builtins`): Icon, Divider, Marquee, Countdown, NavigationMenu,
 SocialLinks, Carousel, Tabs, Accordion, Modal, Gallery, VideoEmbed, Map.
 - Scroll views follow Unity: `Scroll View > Viewport (ScrollRect, native scrolling; its first child is the content) >
   Content`, with Scrollbars outside the viewport (`ScrollRect.horizontalScrollbar/verticalScrollbar` = node ids). A
@@ -512,9 +535,9 @@ Requests with a Host other than `127.0.0.1:PORT`/`localhost:PORT` get 403; non-G
 ## Editor (`editor/`)
 
 Dockable layout (`editor/layout.js`; default = Unity's): toolbar (top), Hierarchy (left), Scene/Web (center), Inspector (right, full height),
-bottom tabs Project | Console | Animation | Generated Code. Each `editor/panels/<name>.js` exports `mount(el)` and owns
+bottom tabs Project | Console | Animation | Content | Generated Code. Each `editor/panels/<name>.js` exports `mount(el)` and owns
 `panels/<name>.css` (already linked). Theme tokens are CSS variables in `editor/style.css` (`--panel`, `--accent`, …).
-`main.js` mounts panels in order: toolbar, hierarchy, scene, inspector, project, console, animation, code; handles the
+`main.js` mounts panels in order: toolbar, hierarchy, scene, inspector, project, console, animation, code, content; handles the
 bottom tabs (`emit('show-tab', name)` switches) and splitters.
 
 `editor/state.js` (import as `* as S from '../state.js'`; the store object is `S.S`):
