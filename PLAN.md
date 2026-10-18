@@ -74,6 +74,63 @@ The docs will say so.
 
 ---
 
+## 5. Closing the gap with Wix
+
+What Wix offers that gpsb lacks, and how gpsb can offer it without servers. The output stays a static site, and gpsb
+stays dependency-free. Features that need a backend come through third-party services (form backends, payment
+providers), wired up by extensions.
+
+**Out of scope:** real-time collaboration, hosting, and deployment or publishing integrations. Server-side features
+gpsb would have to run itself (its own database writes, secure member accounts) are out too.
+
+### 5.1 Content
+
+| | Item | Design |
+|---|---|---|
+| ☐ | **Content editor for collections** | A Content window (Window ▸ Content) edits the JSON arrays that collection pages and Repeats read: a table of items plus a form for the selected one. Fields come from an optional `assets/<file>.schema.json` (text, rich text, Markdown, image, date, bool, enum, reference to another collection, list), or are inferred from the data. Add, duplicate, reorder and delete items, with undo. `_draft: true` items and items with a future `_publishAt` are left out of the build. |
+| ☐ | **Markdown files as collection items** | `content/<collection>/*.md` with front matter (`title: …`, `date: …`, `tags: [a, b]`) is a collection like a JSON array: the body is available as `{{item.body}}` for the Markdown component. Writers can work in files, and Git shows readable diffs. |
+| ☐ | **Blog features** | On collection pages: `groupBy` (e.g. `tags`) writes one page per value (`tag/<slug>`); `pageSize` writes paginated lists (`page/2`); `{{prev.*}}` / `{{next.*}}` and `{{item.readingTime}}` bindings. An RSS/Atom feed for any collection when `siteUrl` is set. |
+| ☐ | **Site search** | The build writes a compact search index (titles, headings and text of indexable pages, plus collection items); a Search extension (input plus results list) searches it in the browser. |
+| ☐ | **Multiple languages** | `project.json` `languages: ['en', 'fr']`. Per-language values reuse the breakpoint override mechanism (`overrides['lang:fr']`), so any prop can be translated, and the editor gets a language selector next to the breakpoint bar. The build writes `/fr/…` pages with `<html lang>`, `hreflang` links and sitemap entries; a Language Switcher component links the versions of a page. Strings shared across pages can live in `locales/<lang>.json` as `{{t:key}}` bindings. |
+
+### 5.2 Media
+
+| | Item | Design |
+|---|---|---|
+| ☐ | **Crop and focal point** | `Image.crop` (a rect in the source image) and `Image.focus` (the point that stays visible when `fit` cuts the image), edited on the image in a crop dialog. CSS only (the image scaled and offset inside the clipped element; `object-position` / `background-position` for the focus), so no image processing is needed and it works in every browser. |
+| ☐ | **Image optimisation (optional)** | `project.json` `images: { widths: [480, 960, 1600], formats: ['webp', 'avif'] }`: the build makes resized copies and `<img srcset>` / `<picture>` when an encoder is installed (ImageMagick, `cwebp`, `avifenc`, found on PATH). Without one, images are copied as now and the build says so. gpsb itself still has no dependencies. |
+| ☐ | **Icons and stock images** | A built-in SVG icon set (a few hundred icons, recolourable with `Image.color`) in the asset picker. Search for free stock photos from inside the Project panel (Openverse; no API key needed), downloaded into `assets/` with their attribution saved alongside. |
+| ☐ | **Video embeds** | YouTube and Vimeo components that load the player only on click (a poster image until then: fast, and private until the visitor chooses to play), plus `Video.poster`. |
+
+### 5.3 Editor ease of use
+
+| | Item | Design |
+|---|---|---|
+| ☐ | **Edit text on the canvas** | Double-click a Text in the Scene to type in place (the same rich text toolbar as the Inspector, floating over it). Enter or a click outside commits one undo step; Esc cancels. Inside a prefab instance it records an override, as Inspector edits do. |
+| ☐ | **Section library** | Ready-made prefabs (nav bar, hero, features, pricing, testimonials, FAQ, gallery, contact, footer) built on design tokens, so they take on the project's colours and fonts. An Insert Section picker with thumbnails places them in a flowing page. |
+| ☐ | **More templates and themes** | Starter projects in the Project Hub: portfolio, blog, landing page, documentation, restaurant, event. Theme presets in Project Settings ▸ Design Tokens (colour palettes and font pairings) that replace the token values in one step. |
+| ☐ | **Phone layout assistant** | Phone Layout ▸ Generate stacks a fixed-position section's children vertically at the Phone breakpoint (as overrides, so the desktop layout is untouched). A check marks objects that overflow or overlap at each breakpoint. |
+| ☐ | **Scroll effects** | Animator `playOn: 'scroll'`: clip time follows the object's progress through the viewport (CSS scroll-driven animations where supported, the frame loop otherwise). Parallax, reveal and sticky presets. |
+| ☐ | **Simple mode and onboarding** | A preference that hides anchors, pivots and other Unity-specific fields behind presets (pin to edges, centre, stretch), and a short first-run tour of the panels. |
+| ☐ | **Site history** | Saved versions of the project, local and not collaborative: a snapshot every N saves and on demand, kept in `.gpsb/history/`. Browse them with a preview, compare pages, and restore a page or the whole project. |
+
+### 5.4 Quality checks
+
+| | Item | Design |
+|---|---|---|
+| ☐ | **Accessibility and SEO audit** | An Audit window (also run by the build as warnings): images without alt text, skipped heading levels, text and background contrast (tokens resolved), link text like "click here", unlabelled form fields, missing page titles and descriptions, duplicate titles, broken internal links, heavy pages and images. Each finding selects the object it's about. |
+| ☐ | **Cookie consent** | A Consent extension (banner plus settings) and a `data-consent="analytics"` attribute on scripts in Custom Code: they only run once the visitor accepts that category. A privacy-policy page template. |
+
+### 5.5 Integrations (third-party services; nothing gpsb hosts)
+
+| | Item | Design |
+|---|---|---|
+| ☐ | **Forms that work** | `Form.provider`: Formspree, Netlify Forms, Basin, Getform, a custom endpoint or `mailto`. Validation on the field components (required, email, pattern, min/max) with messages; a honeypot field plus optional Cloudflare Turnstile or hCaptcha; success and error states as events (show a message, play a clip). Submits with `fetch`, so the visitor stays on the page. |
+| ☐ | **Payments** | Buy Button extensions for Stripe Payment Links, Lemon Squeezy and Gumroad, and a Product prefab. A cart through Snipcart or the Shopify Buy Button for small shops. |
+| ☐ | **Embeds pack** | Maps (OpenStreetMap/Leaflet, Google Maps), Calendly/Cal.com booking, social posts, chat widgets, newsletter sign-up (Buttondown, Mailchimp). Each loads its third-party script only on pages that use it, and after consent when it tracks visitors. |
+| ☐ | **Analytics** | Project Settings ▸ Analytics: Plausible, Umami or Google Analytics by ID, tied to cookie consent. |
+| ☐ | **Extension packages (an "asset store")** | An npm package with a `gpsb` field in its `package.json` (`{ "extensions": [...], "prefabs": [...], "behaviours": [...] }`) adds those to the project when installed with the Package Manager. They appear in Add Component and the section library like the project's own files, and are versioned and updated like any package. A `gpsb-extension` keyword makes them findable in the Package Manager's search. |
+
 ## Order of work
 
 0. Extensible output foundation (every later item builds on it).
@@ -81,5 +138,9 @@ The docs will say so.
 2. Design tokens, then prefabs.
 3. Flowing presets, then Markdown, then collections (these build on clean URLs and the sitemap).
 4. Editor productivity items, smallest first.
+5. Closing the gap with Wix. First forms and the content editor, which most sites need. Then canvas text editing and
+   the section library, which make gpsb easier for non-developers. Then languages, the blog features and the audit;
+   then media and the remaining integrations. Extension packages can come any time after the forms, since the
+   integrations can ship as such packages.
 
 Each finished item gets ☑ here and an entry in `CONTRACT.md` (formats/APIs) and `README.md` (user-facing).
