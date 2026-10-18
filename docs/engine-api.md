@@ -128,6 +128,8 @@ A node on the page, like Unity's GameObject. Inside a Repeat, a WebObject is pin
 | `.addComponent(type, props)` | Adds a built-in or extension component with its defaults. |
 | `.parent`, `.children`, `.find(path)` | Navigation. |
 | `.element`, `.elements` | Its HTML element(s). |
+| `.on(type, fn)` | Listens to a DOM event on the element(s): `on('click', …)`, `on('gpsb:success', e => e.detail.response)` ([form events](forms.md#events)). Returns a function that stops listening. |
+| `.call(name, arg?)` | Runs a call as an event list entry would: `call('Form.submit')`, `call('setActive', 'toggle')`. |
 | `.apply()` | Re-apply now (otherwise it happens at the end of the frame). |
 | `.changed()` | Mark it for re-applying after you changed `node` data yourself. |
 | `.moveTo`, `.moveBy`, `.rotateTo`, `.scaleTo`, `.sizeTo`, `.fadeTo`, `.colorTo`, `.shake`, `.punchScale`, `.killTweens` | [Tween shortcuts](#shortcuts). |
@@ -163,6 +165,9 @@ An `event` prop is a `WebEvent`:
 this.onArrived.invoke('east');              // runs the entries set up in the Inspector; empty arguments get 'east'
 this.onArrived.addListener(arg => {});      // and listeners added in code
 ```
+
+A component's event (from `getComponent`) is the DOM event the component fires: its listeners receive the event's
+detail and the event, e.g. `this.getComponent('Form').onSuccess.addListener(({ response }) => …)`.
 
 ## Coroutines
 

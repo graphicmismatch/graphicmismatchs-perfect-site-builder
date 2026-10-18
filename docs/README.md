@@ -12,6 +12,7 @@ Start here if you want to build a site.
 3. [Layout](layout.md): RectTransforms, anchors and pivots, layout groups, scroll views, Canvas Scaler, responsive
    breakpoints.
 4. [Content and data](content-and-data.md): text, images, media, forms, Markdown, JSON bindings, Repeat, collection pages.
+   [Forms](forms.md): contact forms that send to a form service or your endpoint, validation, spam protection, events.
 5. [Interactivity and events](events.md): Button On Click and the other event lists, and what each call does.
 6. [Animation](animation.md): clips, the Animation window, record mode, curves, sprite swaps, animation events.
 7. [Prefabs and design tokens](prefabs-and-tokens.md): reusable objects and project-wide colours, fonts and text styles.

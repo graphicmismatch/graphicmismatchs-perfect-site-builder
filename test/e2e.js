@@ -224,6 +224,81 @@ async function main() {
   check('packages: editor zero console errors', page.errors.length === 0, page.errors.join(' | '));
   const pub = await fetch(`http://127.0.0.1:${PK_EDITOR_PORT}/project/vendor/v.js`).then(r => r.status === 200 && r.text());
   check('dev server: public/ is served at the site root, as on the built site', pub === 'export const v = 1;\n', String(pub));
+  await formsSection(page);
+}
+
+// ---- forms: validation, sending, events (a local endpoint records submissions) ----
+async function formsSection(page) {
+  const FM = path.join(ROOT, '.tmp/e2e-forms'), FM_PORT = 4214, API_PORT = 4215, got = [];
+  const api = http.createServer((req, res) => {
+    const cors = { 'access-control-allow-origin': '*', 'content-type': 'application/json' };
+    if (req.method === 'OPTIONS') { res.writeHead(204, { ...cors, 'access-control-allow-headers': '*' }); return res.end(); }
+    let body = '';
+    req.on('data', d => (body += d)).on('end', () => {
+      got.push(body);
+      const bad = body.includes('fail@');
+      res.writeHead(bad ? 422 : 200, cors);
+      res.end(JSON.stringify(bad ? { errors: [{ message: 'Bad email' }] } : { ok: true }));
+    });
+  });
+  await new Promise(r => api.listen(API_PORT, '127.0.0.1', r));
+  cleanups.push(() => api.close());
+  fs.rmSync(FM, { recursive: true, force: true });
+  for (const d of ['pages', 'behaviours']) fs.mkdirSync(path.join(FM, d), { recursive: true });
+  const rect = (x, y, w = 200, h = 32) => ({ anchorMin: [0, 0], anchorMax: [0, 0], pivot: [0, 0], pos: [x, y], size: [w, h], rotation: 0, scale: [1, 1] });
+  const n = (id, name, components, r, children = [], extra = {}) => ({ id, name, active: true, rect: r, components, children, ...extra });
+  const root = n('root', 'Canvas', [{ type: 'Canvas', props: {} }, { type: 'CanvasScaler', props: {} }], rect(0, 0), [
+    n('contact', 'Contact', [{ type: 'Form', props: { action: `http://127.0.0.1:${API_PORT}/submit`, message: 'msg', onSuccess: [{ target: 'thanks', call: 'setActive', arg: 'true' }] } }, { type: 'behaviour:FormWatch', props: {} }], rect(20, 20, 400, 200), [
+      n('email', 'Email', [{ type: 'InputField', props: { name: 'email', contentType: 'email', required: true, errorMessage: 'Enter your email' } }], rect(0, 0)),
+      n('agree', 'Agree', [{ type: 'Toggle', props: { name: 'agree', required: true, isOn: false } }], rect(0, 40, 20, 20)),
+      n('send', 'Send', [{ type: 'Button', props: { type: 'submit' } }], rect(0, 80, 100, 30)),
+    ]),
+    n('msg', 'Msg', [{ type: 'Text', props: { text: '' } }], rect(20, 240, 400, 30)),
+    n('thanks', 'Thanks', [{ type: 'Text', props: { text: 'Thanks panel' } }], rect(20, 280, 400, 30), [], { active: false }),
+    n('mine', 'Mine', [{ type: 'Form', props: {} }], rect(20, 320, 400, 60), [n('q', 'Q', [{ type: 'InputField', props: { name: 'q', text: 'hi' } }], rect(0, 0))]),
+  ]);
+  fs.writeFileSync(path.join(FM, 'pages/index.json'), JSON.stringify(root));
+  fs.writeFileSync(path.join(FM, 'project.json'), JSON.stringify({ name: 'forms', inject: { bodyEnd: `<script type="module">
+    window.events = [];
+    for (const t of ['submit', 'success', 'error', 'invalid']) document.addEventListener('gpsb:' + t, e => events.push([e.target.dataset.gpsb, t, t === 'invalid' ? e.detail.fields.map(f => f.name + ':' + f.message).join() : t === 'error' ? e.detail.error + ' ' + e.detail.status : t === 'submit' ? JSON.stringify(e.detail.data) : e.detail.status]));
+    document.querySelector('[data-gpsb=mine]').addEventListener('gpsb:submit', e => e.detail.handle(async data => { window.handled = data; return { mine: true }; }));
+  </script>` } }));
+  fs.writeFileSync(path.join(FM, 'behaviours/FormWatch.js'), "import { Behaviour } from '../gpsb/engine.js';\nexport default class FormWatch extends Behaviour {\n  start() { this.getComponent('Form').onSuccess.addListener((d, e) => { window.viaEngine = [d.status, e.type]; }); }\n}\n");
+  const b = spawnSync(process.execPath, ['cli.js', 'build', FM], { cwd: ROOT, encoding: 'utf8' });
+  check('forms: project builds', b.status === 0, (b.stderr || b.stdout).trim());
+  cleanups.push(await serveDir(path.join(FM, 'dist'), FM_PORT));
+  await page.open(`http://127.0.0.1:${FM_PORT}/index.html`);
+  await page.until(`window.GPSB?.behaviour?.('contact', 'FormWatch')`, 5000);
+  const ev = () => page.eval(`JSON.stringify(window.events.splice(0))`);
+  const submit = id => page.eval(`GPSB.el('${id}').querySelector('button[type=submit]').click()`);
+  const text = id => page.eval(`GPSB.el('${id}').textContent`);
+  await submit('contact'); await sleep(200);
+  const inv = { ev: await ev(), msg: await text('msg'), state: await page.eval(`GPSB.el('contact').dataset.state`), cls: await page.eval(`GPSB.el('email').classList.contains('gpsb-invalid')`) };
+  check('forms: invalid fields -> gpsb:invalid with custom messages, message Text, gpsb-invalid class, nothing sent',
+    inv.ev === JSON.stringify([['contact', 'invalid', 'email:Enter your email,agree:' + (await page.eval(`GPSB.el('agree').querySelector('input').validationMessage`))]]) && inv.msg === 'Please check the highlighted fields.' && inv.state === 'invalid' && inv.cls && got.length === 0, JSON.stringify(inv));
+  await page.eval(`(() => { const e = GPSB.el('email').querySelector('input'); e.value = 'me@example.com'; e.dispatchEvent(new Event('input', { bubbles: true })); GPSB.el('agree').querySelector('input').click(); })()`);
+  check('forms: fixing a field clears its invalid mark', !(await page.eval(`GPSB.el('email').classList.contains('gpsb-invalid')`)));
+  await submit('contact');
+  await page.until(`GPSB.el('contact').dataset.state === 'success'`, 4000);
+  const ok = { ev: await ev(), msg: await text('msg'), sent: got.at(-1) ?? '', thanks: await page.eval(`getComputedStyle(GPSB.el('thanks')).display`), engine: await page.eval(`JSON.stringify(window.viaEngine)`),
+    reset: await page.eval(`[GPSB.el('email').querySelector('input').value, GPSB.nodeFor(GPSB.el('email')).components[0].props.text, GPSB.nodeFor(GPSB.el('agree')).components[0].props.isOn]`) };
+  check('forms: valid -> gpsb:submit (data) -> sent -> gpsb:success, message, fields reset (node data too)',
+    ok.ev === JSON.stringify([['contact', 'submit', '{"email":"me@example.com","agree":"on"}'], ['contact', 'success', 200]]) && ok.msg === 'Thank you! Your message was sent.' && /me@example\.com/.test(ok.sent) && !/_hp/.test(ok.sent) && JSON.stringify(ok.reset) === '["","",false]', JSON.stringify(ok));
+  check('forms: On Success event list ran (setActive) and an engine listener heard it', ok.thanks !== 'none' && ok.engine === '[200,"gpsb:success"]', JSON.stringify(ok));
+  await page.eval(`(() => { const e = GPSB.el('email').querySelector('input'); e.value = 'fail@example.com'; GPSB.el('agree').querySelector('input').click(); })()`);
+  await page.eval(`GPSB.invoke('contact', 'Form.submit')`);
+  await page.until(`GPSB.el('contact').dataset.state === 'error'`, 4000);
+  const err = { ev: await ev(), msg: await text('msg') };
+  check('forms: Form.submit from an event; a failed send -> gpsb:error with the service message and status', err.ev.includes('["contact","error","Bad email 422"]') && err.msg.startsWith('Sorry'), JSON.stringify(err));
+  const n0 = got.length;
+  await page.eval(`(() => { GPSB.el('contact').querySelector('.gpsb-hp').value = 'spam'; GPSB.el('email').querySelector('input').value = 'bot@example.com'; })()`);
+  await submit('contact'); await sleep(300);
+  check('forms: honeypot filled -> looks sent, nothing sent', got.length === n0 && (await page.eval(`GPSB.el('contact').dataset.state`)) === 'success');
+  await page.eval(`GPSB.invoke('mine', 'Form.submit')`); await sleep(200);
+  const mine = { handled: await page.eval(`JSON.stringify(window.handled)`), ev: await ev(), state: await page.eval(`GPSB.el('mine').dataset.state`) };
+  check('forms: gpsb:submit detail.handle(fn) sends with your code, then success', mine.handled === '{"q":"hi"}' && mine.ev.includes('["mine","success",0]') && mine.state === 'success' && got.length === n0, JSON.stringify(mine));
+  const errs = page.errors.filter(e => !/status of 422/.test(e)); // the deliberate failed send
+  check('forms: zero console errors', errs.length === 0, errs.join(' | '));
 }
 
 // static file server for a built site -> cleanup function

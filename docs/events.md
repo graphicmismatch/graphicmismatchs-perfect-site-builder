@@ -1,7 +1,8 @@
 # Interactivity and events
 
 Many components have **event lists**, like Unity's UnityEvents: Button ▸ On Click (), Toggle, Slider, Input Field and
-Dropdown ▸ On Value Changed, Input Field ▸ On End Edit, Form ▸ On Submit, Scroll Rect ▸ On Value Changed. Custom and
+Dropdown ▸ On Value Changed, Input Field ▸ On End Edit, Form ▸ On Submit / On Success / On Error / On Invalid
+([Forms](forms.md)), Scroll Rect ▸ On Value Changed. Custom and
 extension components can have their own. When the event happens, every entry in the list runs, in order.
 
 You can make a lot of interactive pages this way without writing code.
@@ -27,6 +28,7 @@ Events only run on the published page and in Play mode, not while you edit.
 | Animator.play | clip name (empty = the default clip) | Plays an animation on the target's Animator. |
 | Animator.stop, Animator.pause | | Stops or pauses it. |
 | Media.play, Media.pause, Media.toggle | | Controls the target's Video or Audio. |
+| *Component*.*call* | depends | A component's own calls, listed under its name: Form.submit, Form.reset, and those of other components (Modal.open, Carousel.next…). |
 | *Script*.*method* | any text | Calls a method of a behaviour script on the target (`behaviour:Spin.reverse`). |
 
 Behaviour methods are listed under the script's name. Methods named `start`, `update` or starting with `_` are left

@@ -50,11 +50,10 @@ Drag images into the Project panel to import them, then drag them onto the Scene
 with the keyboard, screen readers and autofill. What the visitor types or picks is passed to their events (On Value
 Changed, On End Edit).
 
-To send a form somewhere, add a **Form** component to a parent object:
-- **Action** is the URL the fields are sent to (a form service such as Formspree, or your own endpoint), with Method
-  `get` or `post`. Leave Action empty to handle the form only with On Submit.
-- Give each control a **Name**: it's the field name that is sent.
-- Set a Button's Type to `submit`.
+To send a form somewhere, add a **Form** component to a parent object, give each control a **Name**, and set a
+Button's Type to `submit`. The form checks the fields, sends them to a form service (Formspree, Netlify Forms, Basin,
+Getform) or your own endpoint without leaving the page, shows a message, and fires On Submit / On Success / On Error /
+On Invalid. See [Forms](forms.md).
 
 ## Raw HTML and CSS
 

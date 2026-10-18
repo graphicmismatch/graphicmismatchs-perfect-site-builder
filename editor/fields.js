@@ -380,6 +380,7 @@ export function callGroups(tid) {
   const g = [['Node', ['setActive', 'scrollTo', 'navigate']]];
   if (has('Animator')) g.push(['Animator', ['Animator.play', 'Animator.stop', 'Animator.pause']]);
   if (has('Video') || has('Audio')) g.push(['Media', ['Media.play', 'Media.pause', 'Media.toggle']]);
+  for (const c of comps) { const m = Object.keys(S.def(c.type)?.methods ?? {}); if (m.length) g.push([c.type, m.map(x => `${c.type}.${x}`)]); } // Form.submit, Modal.open…
   for (const name of new Set(comps.filter(c => c.type.startsWith('behaviour:')).map(c => c.type.slice(10))))
     g.push([`${name} (Script)`, (S.S.behaviourMeta[name]?.methods ?? []).filter(m => !['start', 'update', 'lateUpdate'].includes(m) && !m.startsWith('_')).map(m => `behaviour:${name}.${m}`)]);
   return g;

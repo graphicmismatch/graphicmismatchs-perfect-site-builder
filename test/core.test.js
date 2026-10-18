@@ -374,4 +374,19 @@ assert.equal(collectionItems(canvasNode(), cctx), null);
   const body = renderPage(pg, makeCtx({ pages: ['about', 'blog/post'] })).body;
   assert.ok(body.includes('<a href="about.html">A</a> <a href=\'blog/post.html#top\'>B</a> <a href="https://x.y/about">C</a> <b>about</b>'), body);
 }
+// forms: Netlify markup, honeypot names per service, Captcha script + widget, validation attributes
+{
+  const pg = newNode('C', [{ type: 'Canvas', props: {} }]);
+  const f = newNode('F', [{ type: 'Form', props: { provider: 'netlify', formId: 'quote' } }]);
+  f.children.push(newNode('E', [{ type: 'InputField', props: { name: 'email', contentType: 'email', required: true, pattern: '.+@.+', minLength: 5, autocomplete: 'email' } }]),
+    newNode('Cap', [{ type: 'Captcha', props: { siteKey: 'k"1' } }]));
+  pg.children.push(f, newNode('G', [{ type: 'Form', props: { provider: 'formspree', formId: 'abc', honeypot: true } }]));
+  const r = renderPage(pg, makeCtx({}));
+  assert.match(r.body, /<form class="f" data-gpsb="[^"]+" method="post" name="quote" data-netlify="true" netlify-honeypot="bot-field"><input type="hidden" name="form-name" value="quote"><input class="gpsb-hp" type="text" name="bot-field"/);
+  assert.match(r.body, /<input type="email" value="" name="email" minlength="5" pattern="\.\+@\.\+" autocomplete="email" required/);
+  assert.match(r.body, /<div class="cf-turnstile" data-sitekey="k&#34;1" data-theme="auto"><\/div>/);
+  assert.deepEqual(r.heads, ['<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>']);
+  assert.match(r.body, /name="_gotcha"/, 'Formspree honeypot');
+  assert.equal(typeof componentDef('Form').methods.submit, 'function');
+}
 console.log('core ok');

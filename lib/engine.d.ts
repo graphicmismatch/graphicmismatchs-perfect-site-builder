@@ -267,11 +267,36 @@ export type ComponentRef<K extends keyof ComponentTypes = never> = [K] extends [
   ? ComponentRefBase & Record<string, any>
   : ComponentRefBase<K & string> & ComponentTypes[K];
 
-/** An event list (an `event` prop). */
+// ---------- form events ----------
+export type FormData_ = Record<string, FormDataEntryValue | FormDataEntryValue[]>;
+export interface FormFieldError { name: string; message: string; element: Element; node: NodeData | null }
+export interface FormSubmitDetail {
+  /** The fields, by name (repeated names: arrays). Change it to change what's sent. */
+  data: FormData_;
+  form: HTMLFormElement;
+  provider: 'url' | 'formspree' | 'netlify' | 'basin' | 'getform' | 'mailto';
+  /** Send it yourself: the form shows Sending / success / error around your function (a throw = error). */
+  handle(send: (data: FormData_) => unknown): void;
+}
+export interface FormSuccessDetail { data: FormData_; response: unknown; status: number; form: HTMLFormElement }
+export interface FormErrorDetail { data: FormData_; error: string; status: number; response: unknown; form: HTMLFormElement }
+export interface FormInvalidDetail { fields: FormFieldError[]; form: HTMLFormElement }
+declare global {
+  interface HTMLElementEventMap {
+    /** Cancelable: preventDefault() stops the form; detail.handle(fn) sends with your code. */
+    'gpsb:submit': CustomEvent<FormSubmitDetail>;
+    'gpsb:success': CustomEvent<FormSuccessDetail>;
+    'gpsb:error': CustomEvent<FormErrorDetail>;
+    'gpsb:invalid': CustomEvent<FormInvalidDetail>;
+  }
+}
+
+/** An event list (an `event` prop). On a component (getComponent('Form').onSuccess), listeners receive the DOM
+ *  event's detail and the event itself. */
 export class WebEvent {
   readonly entries: Array<{ target: string; call: string; arg: string }>;
-  addListener(fn: (arg: unknown) => void): this;
-  removeListener(fn: (arg: unknown) => void): this;
+  addListener(fn: (detail: any, event?: Event) => void): this;
+  removeListener(fn: (detail: any, event?: Event) => void): this;
   /** Run every entry (an entry with an empty argument receives `arg`) and every listener. */
   invoke(arg?: unknown): void;
 }
@@ -307,6 +332,11 @@ export class WebObject {
   /** Add a built-in or extension component with its defaults. */
   addComponent<K extends keyof ComponentTypes>(type: K, props?: Partial<Record<string, unknown>>): ComponentRef<K>;
   addComponent(type: string, props?: Record<string, unknown>): ComponentRefBase & Record<string, any>;
+  /** Listen to a DOM event on the element(s), e.g. on('gpsb:success', e => e.detail.response). Returns: stop listening. */
+  on<K extends keyof HTMLElementEventMap>(type: K, fn: (e: HTMLElementEventMap[K]) => void, opts?: AddEventListenerOptions): () => void;
+  on(type: string, fn: (e: Event) => void, opts?: AddEventListenerOptions): () => void;
+  /** Run a call as an event list entry would: call('Form.submit'), call('Modal.open'), call('setActive', 'toggle'). */
+  call(name: string, arg?: string): unknown;
   /** Re-apply now (API changes are applied at the end of the frame anyway). */
   apply(): void;
   /** Mark for re-apply at the end of the frame (after changing node data yourself). */

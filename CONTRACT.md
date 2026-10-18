@@ -181,7 +181,18 @@ LayoutElement, ContentSizeFitter, AspectRatioFitter, ScrollRect, Mask, RectMask2
   scroll position and scrollbars in sync both ways. Scrollbar value 1 = top for `bottomToTop` (Unity's default).
 - `Toggle.group` = a node with `ToggleGroup`: the toggles render as radios sharing a name (`allowSwitchOff` handled at runtime).
 - `Mask` clips to the rect, or to the node's Image sprite shape when it has one; `RectMask2D` = `clip-path: inset(padding)`.
-- `Form` makes the node a `<form>`; Button `type` submit/reset, control `name`s. Empty `action` = not sent (onSubmit only).
+- `Form` makes the node a `<form>`; Button `type` submit/reset, control `name`s. `provider` url (action/method) |
+  formspree | basin | getform (formId) | netlify (form name; `data-netlify`, `form-name` input) | mailto; `send` fetch (stay
+  on the page) | page (classic, url only). `submitForm` (runtime): validate (constraint validation + each field's
+  `errorMessage`; invalid fields get `aria-invalid` and class `gpsb-invalid`) → `gpsb:invalid` {fields} | honeypot
+  (`.gpsb-hp`, named per service) filled → fake success | `gpsb:submit` (cancelable; detail {data, form, provider,
+  handle(fn)}) → send (or `handle`'s fn) → `gpsb:success` {data, response, status} | `gpsb:error` {data, error, status,
+  response}. Events bubble; event props `onSubmit/onSuccess/onError/onInvalid` listen to them. `data-state` on the form
+  (sending/success/error/invalid), `message` node (Text) shows the state's message. After a reset the controls' values
+  are written back into their node data. `Captcha` (Turnstile / hCaptcha widget + head script) inside a form must be
+  solved before sending.
+- Component calls: `def.methods = { name(el, arg, GPSB, ci) }` → `GPSB.invoke(id, '<Type>.<name>', arg)` and event
+  lists (editor `callGroups`); engine `WebObject.call(name, arg)`. Form: `submit`, `reset`.
 - `PageMeta` (root only): `<html lang>`, favicon, canonical URL, og:title/description/image/url, `noindex`, `head` code.
 - `Image.element: img` renders `<img class="gpsb-img" alt loading decoding=async>` filling the rect at `z-index: -1` inside an
   `isolation: isolate` element (children, Button tint, Mask and state sprites keep working); `background` (default) is a
