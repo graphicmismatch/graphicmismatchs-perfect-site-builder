@@ -225,3 +225,18 @@ textarea.mono { font: var(--mono); font-size: 11px; white-space: pre; tab-size: 
 .driven > .f-lab, .driven > .rt-lab, .driven .rt-labrow .rt-lab, .driven .v-lab { color: var(--disabled); }
 .driven input, .driven select, .driven textarea, .driven button { opacity: .45; cursor: not-allowed; }
 .in-driven { grid-column: 1 / -1; font-size: 10px; line-height: 1.2; color: var(--text-dim); white-space: normal; }
+
+/* rich text field: toolbar + formatted box (or the HTML in Source) */
+.rt-wrap { display: flex; flex-direction: column; gap: 2px; }
+.rt-bar { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
+.rt-b { min-width: 22px; height: 20px; padding: 0 4px; border: 1px solid var(--btn-border); border-radius: 3px; background: var(--btn); color: var(--text); font-size: 11px; cursor: pointer; }
+.rt-b:hover { background: var(--btn-hover); }
+.rt-b.b { font-weight: 700; } .rt-b.i { font-style: italic; } .rt-b.u { text-decoration: underline; } .rt-b.s { text-decoration: line-through; }
+.rt-b.on { background: var(--btn-on); color: var(--text-strong); }
+.rt-srcb { margin-left: auto; font-family: var(--mono); }
+.rt-color { width: 22px; height: 20px; padding: 0; border: 0; background: none; cursor: pointer; }
+.rt-ed { min-height: 40px; max-height: 240px; overflow: auto; padding: 3px 5px; white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--field); border: 1px solid var(--field-border); border-radius: 3px; color: var(--text); outline: none; }
+.rt-ed:focus { border-color: var(--accent); }
+.rt-ed a { color: var(--accent); }
+.rt-src { min-height: 54px; resize: vertical; }

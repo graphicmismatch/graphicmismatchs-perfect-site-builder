@@ -126,7 +126,7 @@ Editor: Project Settings ▸ Design Tokens; `files.js` `renameToken(kind, from, 
 | `number` | number (opts `min`,`max`,`step`; min+max → slider) | drag-label number field |
 | `int` | integer | same, rounded |
 | `string` | string (opt `asset: 'font'` → a CSS font-family list whose entries may be font assets, each gets `@font-face`) | text input |
-| `text` | multiline string (HTML allowed) | textarea |
+| `text` | multiline string (HTML allowed; opt `rich` → formatted editor + Source view, e.g. `Text.text`) | textarea / rich editor |
 | `code` | string (`lang`: html/css/js) | monospace textarea |
 | `bool` | boolean | checkbox |
 | `color` | `#rrggbb` or `#rrggbbaa` | color swatch + alpha |

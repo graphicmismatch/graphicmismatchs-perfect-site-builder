@@ -184,6 +184,56 @@ function textW(b, multi, mono) {
   return { el: inp, update() { if (!focused(inp)) inp.value = b.get() ?? ''; tint(inp, b); } };
 }
 
+// Rich text (a `text` prop with `rich: true`, e.g. Text.text): formatted editing over the HTML the prop holds, with a
+// Source view of the HTML itself. Enter adds a <br>; paste is plain text. The formatted view never
+// runs scripts or event handlers, so text that has any opens in Source and nothing is lost.
+const parseBody = html => new DOMParser().parseFromString(`<body>${html ?? ''}`, 'text/html').body; // inert: nothing runs
+function safeHTML(html) {
+  const d = parseBody(html);
+  for (const e of d.querySelectorAll('script, style, iframe, object, embed, link, meta, base, form')) e.remove();
+  for (const e of d.querySelectorAll('*')) for (const a of [...e.attributes]) if (/^on/i.test(a.name) || /^\s*(javascript|vbscript):/i.test(a.value)) e.removeAttribute(a.name);
+  return d.innerHTML;
+}
+const unsafe = html => safeHTML(html) !== parseBody(html).innerHTML;
+function richW(b) {
+  const ed = h('div', { class: 'rt-ed', contenteditable: 'true', spellcheck: 'true' });
+  const src = h('textarea', { class: 'mono rt-src', rows: 4, spellcheck: 'false', hidden: '' });
+  let source = false, shown = null;
+  const commit = () => { shown = ed.innerHTML; b.set(shown); };
+  const run = (c, v) => { ed.focus(); document.execCommand('styleWithCSS', false, c === 'foreColor'); document.execCommand(c, false, v); };
+  const btn = (label, title, fn, cls = '') => h('button', { class: 'rt-b ' + cls, title, onmousedown: e => e.preventDefault(), onclick: fn }, label); // keeps the selection
+  const color = h('input', { type: 'color', class: 'rt-color', title: 'Text colour' });
+  color.onmousedown = () => { const s = getSelection(); color.range = s.rangeCount && ed.contains(s.anchorNode) ? s.getRangeAt(0) : null; };
+  color.oninput = () => { if (color.range) { getSelection().removeAllRanges(); getSelection().addRange(color.range); } run('foreColor', color.value); };
+  const srcBtn = btn('</>', 'Show the HTML', () => setSource(!source), 'rt-srcb');
+  const bar = h('div', { class: 'rt-bar' },
+    btn('B', 'Bold (Ctrl+B)', () => run('bold'), 'b'), btn('I', 'Italic (Ctrl+I)', () => run('italic'), 'i'),
+    btn('U', 'Underline (Ctrl+U)', () => run('underline'), 'u'), btn('S', 'Strikethrough', () => run('strikeThrough'), 's'),
+    btn('🔗', 'Link: a page name, URL or #anchor', () => { const u = prompt('Link to (a page name, URL or #anchor):'); if (u) run('createLink', u.trim()); }),
+    btn('⛓̸', 'Remove link', () => run('unlink')), color,
+    btn('Tx', 'Clear formatting', () => { run('removeFormat'); run('unlink'); }), srcBtn);
+  function setSource(on) {
+    if (!on && unsafe(src.value)) { srcBtn.title = 'Has scripts or event handlers: edit it as HTML'; return; }
+    source = on; srcBtn.classList.toggle('on', on);
+    ed.hidden = on; src.hidden = !on;
+    shown = null; show();
+  }
+  function show() {
+    const v = b.get() ?? '';
+    if (source) { if (!focused(src)) src.value = v; return; }
+    if (unsafe(v)) return setSource(true);
+    if (!focused(ed) && v !== shown) { ed.innerHTML = safeHTML(v); shown = v; }
+  }
+  ed.oninput = commit;
+  src.oninput = () => b.set(src.value);
+  ed.onkeydown = e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.execCommand('insertLineBreak'); } // a <div> would start a block
+    else if (e.key === 'Escape') ed.blur();
+  };
+  ed.onpaste = e => { e.preventDefault(); document.execCommand('insertText', false, e.clipboardData.getData('text/plain')); };
+  return { el: h('div', { class: 'rt-wrap' }, bar, ed, src), update() { show(); tint(ed, b); tint(src, b); } };
+}
+
 function boolW(b) {
   const cb = h('input', { type: 'checkbox' });
   cb.onchange = () => b.set(cb.checked);
@@ -483,7 +533,7 @@ function widget(sc, b, label) {
     return { el: sel, update() { if (!focused(sel)) { fill(); sel.value = b.get() ?? ''; } tint(sel, b); } };
   }
   if (t === 'string') return textW(b);
-  if (t === 'text') return { ...textW(b, true), wide: true };
+  if (t === 'text') return { ...(sc.rich ? richW(b) : textW(b, true)), wide: true };
   if (t === 'code') return { ...textW(b, true, true), wide: true };
   if (t === 'bool') return boolW(b);
   if (t === 'color') return colorW(b);

@@ -6,6 +6,12 @@ The **Text** component holds the words: font, size, colour, weight, alignment (i
 letter spacing and wrapping. Set **Tag** to `h1`–`h6`, `p`, `span` or `label` so search engines and screen readers
 understand the page. Text can contain inline HTML such as `<b>`, `<em>`, `<a href>` or `<br>`.
 
+The Text field is a rich text editor: select words and use the toolbar (or Ctrl+B, Ctrl+I, Ctrl+U) for bold, italic,
+underline and strikethrough, add or remove a link, pick a colour, or clear the formatting. Labels, buttons and text
+blocks all use it. **</>** shows the HTML underneath, to edit it directly. A link can name a page (`about`) as well as a
+URL or `#anchor`; page names become the page's address when the site is built. Pasted text comes in unformatted.
+Text with scripts or event handlers opens as HTML, since the formatted view never runs them.
+
 - **Fonts:** type any CSS font family (`Georgia, serif`), or drop a font file from `assets/` onto the Font field. Font
   files get an `@font-face` rule automatically. A list mixes both, for fallbacks:
   `fonts/Game.ttf, fonts/Mono.ttf, monospace` uses Mono for characters Game lacks. The Canvas's Font is the default

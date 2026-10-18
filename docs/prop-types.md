@@ -27,7 +27,7 @@ The Inspector labels each field from its prop name (`maxWidth` shows as "Max Wid
 | `number` | number | number field with a draggable label | `min`, `max`, `step`; with both `min` and `max` it's a slider |
 | `int` | whole number | same, rounded | `min`, `max`, `step` |
 | `string` | string | one-line text | `asset: 'font'` also accepts a font file; `tokens: 'textStyles'` shows a text-style picker |
-| `text` | string, HTML allowed | multi-line text | |
+| `text` | string, HTML allowed | multi-line text; with `rich: true`, a formatting toolbar (bold, italic, underline, strikethrough, link, colour, clear) and a Source view | `rich` |
 | `code` | string | monospace editor | `lang`: `html`, `css` or `js` |
 | `bool` | `true` / `false` | checkbox | |
 | `color` | `#rrggbb` or `#rrggbbaa`, or a colour token `$name` | colour swatch with alpha | |
