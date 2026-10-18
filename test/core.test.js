@@ -367,4 +367,11 @@ assert.equal(collectionItems(canvasNode(), cctx), null);
   assert.equal(drivenBy(free, canvasNode(), ctx, 'rect.size.x'), null);
   assert.equal(drivenBy(free, canvasNode(), ctx, 'rect.pos.y'), null);
 }
+// rich text links: a page name resolves to its URL (nested pages and #anchors too), URLs stay as written
+{
+  pg = canvasNode();
+  pg.children.push(newNode('Rt', [{ type: 'Text', props: { text: '<a href="about">A</a> <a href=\'blog/post#top\'>B</a> <a href="https://x.y/about">C</a> <b>about</b>' } }]));
+  const body = renderPage(pg, makeCtx({ pages: ['about', 'blog/post'] })).body;
+  assert.ok(body.includes('<a href="about.html">A</a> <a href=\'blog/post.html#top\'>B</a> <a href="https://x.y/about">C</a> <b>about</b>'), body);
+}
 console.log('core ok');
