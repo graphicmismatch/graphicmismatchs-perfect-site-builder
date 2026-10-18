@@ -35,6 +35,8 @@ All three get Inspector fields from a props schema, and all of them can be targe
 - [Engine API](engine-api.md): the Unity-style scripting API (`Behaviour`, typed props, `getComponent`, `Vector2`,
   coroutines, [tweening](engine-api.md#tweening) with eases, loops and sequences, class-form extensions).
 - [TypeScript](typescript.md): write scripts in TypeScript, with types for your project's components.
+- [Packages and JavaScript libraries](packages.md): install npm packages with the Package Manager and import them by
+  name; other ways to use a library.
 - [Prop types](prop-types.md): the schema format all three share.
 - [Runtime API](runtime-api.md): `window.GPSB`, which every script on a published page can use.
 - [CONTRACT.md](../CONTRACT.md): the full internal spec (file formats, architecture). Read it before changing gpsb itself.

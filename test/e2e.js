@@ -6,6 +6,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as pm from '../pm.js';
+import { startRegistry, PACKAGES } from './registry.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, '.tmp/e2e-dist'), SITE_PORT = 4208, EDITOR_PORT = 4209;
@@ -170,6 +172,58 @@ async function main() {
   fs.writeFileSync(path.join(TS, 'behaviours/Bad.ts'), 'export default class { x: = 1 }\n');
   const bad = await fetch(`http://127.0.0.1:${TS_EDITOR_PORT}/project/behaviours/Bad.js`).then(r => r.text());
   check('dev server: a TS syntax error comes back as a script that throws it', /^throw new SyntaxError\(".*behaviours\/Bad\.ts/.test(bad), bad.slice(0, 120));
+
+  // ---- npm packages (pm.js) from a fake registry: imported by name in the built site, the editor and Play mode ----
+  const reg = await startRegistry(PACKAGES);
+  cleanups.push(() => reg.close());
+  const PK = path.join(ROOT, '.tmp/e2e-packages'), PK_PORT = 4212, PK_EDITOR_PORT = 4213;
+  fs.rmSync(PK, { recursive: true, force: true });
+  fs.cpSync(path.join(ROOT, 'test/fixtures/scripting'), PK, { recursive: true });
+  fs.mkdirSync(path.join(PK, 'packages')); fs.mkdirSync(path.join(PK, 'public/vendor'), { recursive: true });
+  fs.writeFileSync(path.join(PK, 'packages/manifest.json'), JSON.stringify({ registry: reg.url, dependencies: {} }));
+  fs.writeFileSync(path.join(PK, 'public/vendor/v.js'), 'export const v = 1;\n');
+  await pm.add(PK, ['esm-lib', 'umd-lib']);
+  fs.writeFileSync(path.join(PK, 'behaviours/UsesPkgs.ts'), "import { Behaviour } from '../gpsb/engine.js';\nimport { sum, twice, env } from 'esm-lib';\nimport { up } from 'esm-lib/utils/str.js';\nimport umd from 'umd-lib';\nexport default class UsesPkgs extends Behaviour {\n  start() { (window as any).pkgs = { sum: sum(2, 3), twice: twice(4), env, up: up('x'), triple: umd.triple(3) }; }\n}\n");
+  const pg = JSON.parse(fs.readFileSync(path.join(PK, 'pages/index.json'), 'utf8'));
+  pg.children.push({ id: 'pk', name: 'Pkgs', active: true, rect: pg.children[0].rect, components: [{ type: 'behaviour:UsesPkgs', props: {} }], children: [] });
+  fs.writeFileSync(path.join(PK, 'pages/index.json'), JSON.stringify(pg));
+  const pb = spawnSync(process.execPath, ['cli.js', 'build', PK], { cwd: ROOT, encoding: 'utf8' });
+  check('packages: project with npm packages builds', pb.status === 0, (pb.stderr || pb.stdout).trim());
+  cleanups.push(await serveDir(path.join(PK, 'dist'), PK_PORT));
+  const want = JSON.stringify({ sum: 5, twice: 8, env: 'browser', up: 'X', triple: 9 });
+  await page.open(`http://127.0.0.1:${PK_PORT}/index.html`);
+  const built = await page.until(`window.pkgs && JSON.stringify(window.pkgs)`, 5000);
+  check('packages: built site imports ESM, bundled CommonJS and UMD packages by name (import map)', built === want, built);
+  check('packages: built site zero console errors', page.errors.length === 0, page.errors.join(' | '));
+  const ped = spawn(process.execPath, ['cli.js', 'serve', PK, '--port', String(PK_EDITOR_PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GPSB_CONFIG_DIR: cfg } });
+  cleanups.push(() => ped.kill());
+  await new Promise((ok, err) => { ped.stdout.on('data', d => /editor:/.test(d) && ok()); ped.on('exit', c => err(new Error(`editor server exited ${c}`))); });
+  await page.open(`http://127.0.0.1:${PK_EDITOR_PORT}/editor/`);
+  await page.until(`document.querySelector('[data-panel=hierarchy]')?.innerText.includes('Pkgs')`, 5000);
+  await sleep(800);
+  const pmeta = await page.eval(`import('/editor/state.js').then(S => S.S.behaviourMeta.UsesPkgs)`);
+  check('packages: the editor reads a behaviour that imports packages (its own import map)', pmeta && !pmeta.error && pmeta.methods.includes('start'), JSON.stringify(pmeta));
+  await page.eval(`import('/editor/state.js').then(S => S.setPlaying(true))`);
+  const played2 = await page.until(`[...document.querySelectorAll('iframe[title=Preview]')].map(f => f.contentWindow?.pkgs && JSON.stringify(f.contentWindow.pkgs)).find(Boolean)`, 6000);
+  check('packages: Play mode runs them', played2 === want, played2);
+  await page.eval(`import('/editor/state.js').then(S => S.setPlaying(false))`);
+  const win = await page.eval(`(async () => {
+    (await import('/editor/packages.js')).openPackageManager();
+    const wait = async f => { for (let i = 0; i < 40 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    const rows = () => [...document.querySelectorAll('.pm-row .pm-name')].map(e => e.textContent);
+    const project = await wait(() => rows().includes('esm-lib') && rows());
+    document.querySelector('[data-tab=registry]').click();
+    const q = document.querySelector('.pm-q'); q.value = 'lib'; q.dispatchEvent(new Event('input'));
+    const found = await wait(() => rows().includes('old-lib') && rows());
+    document.querySelector('.prefs-x').click();
+    return { project, found };
+  })()`);
+  check('packages: Package Manager lists the project\'s packages and searches the registry', win.project?.includes('umd-lib') && win.project?.includes('dep-cjs') && win.found?.includes('old-lib'), JSON.stringify(win));
+  const added = await page.eval(`fetch('/api/packages/add', { method: 'POST', headers: { 'x-gpsb': '1', 'x-gpsb-project': ${JSON.stringify(encodeURIComponent(PK))}, 'content-type': 'application/json' }, body: JSON.stringify({ specs: ['@scope/thing'] }) }).then(r => r.json())`);
+  check('packages: /api/packages/add installs and answers with the list', added.installed?.includes('@scope/thing@0.1.0') && added.list?.packages.some(p => p.name === '@scope/thing'), JSON.stringify(added).slice(0, 200));
+  check('packages: editor zero console errors', page.errors.length === 0, page.errors.join(' | '));
+  const pub = await fetch(`http://127.0.0.1:${PK_EDITOR_PORT}/project/vendor/v.js`).then(r => r.status === 200 && r.text());
+  check('dev server: public/ is served at the site root, as on the built site', pub === 'export const v = 1;\n', String(pub));
 }
 
 // static file server for a built site -> cleanup function

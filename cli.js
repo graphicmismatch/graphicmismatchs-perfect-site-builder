@@ -5,6 +5,8 @@
 //   gpsb new   <dir>            create an empty project
 //   gpsb build [dir] [--out D]  write the static site (default <dir>/dist)
 //   gpsb types [dir]            write TypeScript typings + tsconfig.json for the project's scripts
+//   gpsb add <pkg>[@range]…     npm packages (pm.js): add, remove <pkg>…, update [pkg…], install, packages, search <text>
+//                               (these take the project folder as --dir D, default: the current folder)
 import http from 'node:http';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -18,11 +20,12 @@ import { registerComponent, unregisterComponent, extensionNames, builtins } from
 import { parseComponent, compileComponent, isTS, compileTS, withMap, quiet } from './lib/compile.js';
 import { newNode, walk, getComponent } from './lib/node.js';
 import { expandPrefabs } from './lib/prefab.js';
+import * as pm from './pm.js';
 
 const TOOL = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const flag = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args.splice(i, 2)[1] : d; };
-const PORT = +flag('--port', 4000), OUT = flag('--out');
+const PORT = +flag('--port', 4000), OUT = flag('--out'), DIR = flag('--dir');
 const [cmd = 'hub', dir = '.'] = args;
 const ROOT = path.resolve(dir);
 
@@ -100,7 +103,11 @@ export async function loadProject(root) {
     else if (['md', 'txt'].includes(ext(f)) && st.size <= 512 * 1024) text[f] = await fsp.readFile(p('assets/' + f), 'utf8'); // Markdown component sources
   }
   for (const c of Object.values(components)) if (c.error) errors.push({ file: `components/${c.name}.html`, error: c.error });
-  return { project, pages, prefabs, components, behaviours, clips, json, text, assets, extensions, errors };
+  // npm packages (pm.js): import map entries (paths inside packages/), and what the lock lists but isn't installed
+  const lock = await pm.readLock(root).catch(e => (errors.push({ file: pm.LOCK, error: e.message }), null));
+  const importMap = pm.packageImports(lock);
+  for (const e of await pm.problems(root)) errors.push({ file: 'packages/', error: e });
+  return { project, pages, prefabs, components, behaviours, clips, json, text, assets, extensions, importMap, errors };
 }
 
 // dev server: a version per asset from size + mtime (changes whenever the file does)
@@ -114,6 +121,7 @@ async function hashVersions(root, P) {
 // Register the project's extension components (replacing the previous project's) so rendering knows them.
 // versions: { Name: v } (import cache key; the same value goes into page URLs). Load errors land in P.errors.
 async function loadExtensions(root, P, versions) {
+  packageRoots.set(path.resolve(root), P.importMap ?? {}); // bare imports of npm packages (resolve hook below)
   for (const n of extensionNames()) unregisterComponent(n);
   for (const [name, e] of Object.entries(P.extensions)) {
     try { registerComponent(name, (await import(`${pathToFileURL(path.join(root, e.path)).href}?v=${versions[name]}`)).default); }
@@ -128,9 +136,19 @@ async function hashFile(file) {
 }
 
 // Project scripts imported in Node (extensions, at build time and by the dev server): .ts files are compiled on load,
-// './x.js' finds x.ts, and '../gpsb/<file>.js' (the runtime as published next to the site's scripts) is this tool's lib/.
+// './x.js' finds x.ts, '../gpsb/<file>.js' (the runtime as published next to the site's scripts) is this tool's lib/,
+// and a package name resolves through the project's import map, as in the browser.
+const packageRoots = new Map(); // project root -> import map entries (pm.packageImports)
+const projectOf = f => [...packageRoots.keys()].find(r => f.startsWith(r + path.sep));
+function packageFile(spec, parentURL) {
+  const root = parentURL?.startsWith('file:') && projectOf(fileURLToPath(parentURL));
+  if (!root) return null;
+  const map = packageRoots.get(root), key = spec in map ? spec : Object.keys(map).filter(k => k.endsWith('/') && spec.startsWith(k)).sort((a, b) => b.length - a.length)[0];
+  return key && path.join(root, pm.DIR, map[key] + spec.slice(key.length));
+}
 if (nodeModule.registerHooks) quiet(() => nodeModule.registerHooks({
   resolve(spec, ctx, next) {
+    if (!/^(\.{0,2}\/|[a-z][\w+.-]*:)/i.test(spec) && !nodeModule.isBuiltin(spec)) { const f = packageFile(spec, ctx.parentURL); if (f) return next(pathToFileURL(f).href, ctx); }
     if (/^\.\.?\//.test(spec) && ctx.parentURL?.startsWith('file:')) {
       const u = new URL(spec, ctx.parentURL), f = fileURLToPath(u);
       if (!fs.existsSync(f)) {
@@ -142,6 +160,8 @@ if (nodeModule.registerHooks) quiet(() => nodeModule.registerHooks({
     return next(spec, ctx);
   },
   load(url, ctx, next) {
+    // package files reached through imports are ES modules (gpsb.esm.js bundles, "module" builds without "type": "module")
+    if (url.startsWith('file:') && /\.js$/.test(new URL(url).pathname)) { const f = fileURLToPath(new URL(url).href.split('?')[0]), r = projectOf(f); if (r && f.startsWith(path.join(r, pm.DIR) + path.sep)) return next(url, { ...ctx, format: 'module' }); }
     if (!url.startsWith('file:') || !isTS(new URL(url).pathname)) return next(url, ctx);
     const f = fileURLToPath(new URL(url).href.split('?')[0]);
     return { format: 'module', shortCircuit: true, source: withMap(compileTS(fs.readFileSync(f, 'utf8'), f)) };
@@ -163,17 +183,46 @@ async function copyScripts(from, to) {
   }
 }
 
+// packages/ -> the site: the runtime packages the lock lists, without typings (types-only packages, *.d.ts)
+async function copyPackages(root, out) {
+  const lock = await pm.readLock(root);
+  for (const [name, p] of Object.entries(lock?.packages ?? {})) {
+    if (p.typesOnly) continue;
+    await fsp.cp(path.join(root, pm.DIR, name), path.join(out, pm.DIR, name), { recursive: true, filter: f => !/\.d\.[mc]?ts$/.test(f) });
+  }
+}
+
 // ---------- TypeScript typings ----------
 // .gpsb/types/gpsb/*.d.ts: the engine API (scripts import it as '../gpsb/engine.js'; tsconfig rootDirs maps that here)
-// and project.d.ts (typed getComponent for every component this project has). Plus a tsconfig.json if there is none.
-// The dev server rewrites them when the editor (re)loads a project that uses TypeScript; `gpsb types` on demand.
-const TSCONFIG = {
-  compilerOptions: {
-    target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', lib: ['ES2022', 'DOM', 'DOM.Iterable'],
-    strict: true, noEmit: true, skipLibCheck: true, allowImportingTsExtensions: true, rootDirs: ['.', '.gpsb/types'],
-  },
-  include: ['behaviours', 'extensions', '.gpsb/types'],
-};
+// and project.d.ts (typed getComponent for every component this project has). .gpsb/tsconfig.json: the compiler
+// settings gpsb maintains, with `paths` to the installed packages' types; the project's tsconfig.json (written if
+// there is none) extends it. The dev server rewrites them when the editor (re)loads a project that uses TypeScript;
+// `gpsb types` on demand.
+const TSCONFIG = { extends: './.gpsb/tsconfig.json' };
+// what this file used to contain (an earlier gpsb): replaced by TSCONFIG
+const OLD_TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', lib: ['ES2022', 'DOM', 'DOM.Iterable'], strict: true, noEmit: true, skipLibCheck: true, allowImportingTsExtensions: true, rootDirs: ['.', '.gpsb/types'] }, include: ['behaviours', 'extensions', '.gpsb/types'] });
+function baseTsconfig(lock) {
+  const paths = {}, untyped = [], pkgs = lock?.packages ?? {};
+  const typesOf = name => { const t = pkgs[name]?.types ? name : pkgs['@types/' + (name.startsWith('@') ? name.slice(1).replace('/', '__') : name)]?.types ? '@types/' + (name.startsWith('@') ? name.slice(1).replace('/', '__') : name) : null; return t && `../${pm.DIR}/${t}/${pkgs[t].types}`; };
+  for (const [name, p] of Object.entries(pkgs)) {
+    if (name.startsWith('@types/')) continue;
+    const t = typesOf(name);
+    if (t) paths[name] = [t]; else if (!p.typesOnly) untyped.push(name);
+    paths[`${name}/*`] = [`../${pm.DIR}/${name}/*`];
+  }
+  return {
+    config: {
+      compilerOptions: {
+        target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', lib: ['ES2022', 'DOM', 'DOM.Iterable'],
+        strict: true, noEmit: true, skipLibCheck: true, allowImportingTsExtensions: true, rootDirs: ['..', 'types'],
+        typeRoots: [`../${pm.DIR}/@types`], paths,
+      },
+      include: ['../behaviours', '../extensions', 'types'],
+    },
+    // packages without types (and no @types package) are typed `any` rather than an error
+    untyped: `// Generated by gpsb: packages that ship no types. Do not edit.\n${untyped.map(n => `declare module ${JSON.stringify(n)};\ndeclare module ${JSON.stringify(n + '/*')};\n`).join('')}export {};\n`,
+  };
+}
 const usesTS = (root, P) => fs.existsSync(path.join(root, 'tsconfig.json')) || [...Object.values(P.behaviours), ...Object.values(P.extensions)].some(s => s.lang === 'ts');
 const writeIfChanged = async (f, text) => { if ((await fsp.readFile(f, 'utf8').catch(() => null)) !== text) await fsp.writeFile(f, text); };
 export async function writeTypes(root, P) {
@@ -184,8 +233,13 @@ export async function writeTypes(root, P) {
   for (const f of libTypes) await writeIfChanged(path.join(dir, f), await fsp.readFile(path.join(TOOL, 'lib', f), 'utf8'));
   await writeIfChanged(path.join(dir, 'project.d.ts'), projectTypes(P));
   for (const f of await fsp.readdir(dir)) if (f.endsWith('.d.ts') && f !== 'project.d.ts' && !libTypes.includes(f)) await fsp.rm(path.join(dir, f)); // from an older gpsb
-  const tc = path.join(root, 'tsconfig.json');
-  if (!fs.existsSync(tc)) await fsp.writeFile(tc, JSON.stringify(TSCONFIG, null, 2) + '\n');
+  const base = baseTsconfig(await pm.readLock(root).catch(() => null));
+  await writeIfChanged(path.join(root, '.gpsb/tsconfig.json'), JSON.stringify(base.config, null, 2) + '\n');
+  await writeIfChanged(path.join(root, '.gpsb/types/packages.d.ts'), base.untyped);
+  const tc = path.join(root, 'tsconfig.json'), cur = await fsp.readFile(tc, 'utf8').catch(() => null);
+  let old = false;
+  try { old = cur != null && JSON.stringify(JSON.parse(cur)) === OLD_TSCONFIG; } catch { /* the user's own */ }
+  if (cur == null || old) await fsp.writeFile(tc, JSON.stringify(TSCONFIG, null, 2) + '\n');
 }
 const tsType = s => {
   const t = s.type ?? '';
@@ -208,7 +262,7 @@ function projectTypes(P) {
     + `declare module './engine.js' {\n  interface ComponentTypes {\n${body}\n  }\n}\nexport {};\n`;
 }
 
-const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, text: P.text, clips: P.clips, breakpoints: P.project.breakpoints, inject: P.project.inject, tokens: P.project.tokens, ...extra });
+const ctxFor = (P, extra) => makeCtx({ importMap: P.importMap, pages: Object.keys(P.pages), customs: P.components, json: P.json, text: P.text, clips: P.clips, breakpoints: P.project.breakpoints, inject: P.project.inject, tokens: P.project.tokens, ...extra });
 
 // The output folder is deleted before every build: refuse anything that is not a previous build or a fresh folder.
 // project.json `keep`: paths in the output folder that builds leave alone, gitignore-style: `name/` is a folder,
@@ -230,7 +284,7 @@ async function clearOut(dir, keep, rel = '') {
 async function checkOut(root, out, keep) {
   const inside = (a, b) => a === b || a.startsWith(b + path.sep);
   if (inside(root, out)) throw new Error(`refusing to build into ${out}: it contains the project`);
-  for (const d of ['pages', 'assets', 'components', 'behaviours', 'animations'])
+  for (const d of ['pages', 'assets', 'components', 'behaviours', 'animations', 'packages'])
     if (inside(out, path.join(root, d))) throw new Error(`refusing to build into ${out}: it is inside the project's ${d}/ folder`);
   const ents = (await fsp.readdir(out, { withFileTypes: true }).catch(() => [])).filter(e => !isKept(keep, e.name, e.isDirectory()) && !(e.isDirectory() && holdsKept(keep, e.name)));
   if (ents.length && !['gpsb', 'psb'].some(d => fs.existsSync(path.join(out, d, 'runtime.js')))) // psb/: built before the rename
@@ -239,6 +293,7 @@ async function checkOut(root, out, keep) {
 
 export async function build(root, out = path.join(root, 'dist')) {
   root = path.resolve(root); out = path.resolve(out);
+  const restored = await pm.install(root); // packages the lock lists but packages/ lacks (a fresh clone): downloaded
   const P = await loadProject(root), keep = keepOf(P.project);
   await checkOut(root, out, keep);
   const extensionVersions = {};
@@ -248,7 +303,7 @@ export async function build(root, out = path.join(root, 'dist')) {
   // a broken page/clip/extension/project.json would silently drop content from the site: fail. Bad components/assets: warn.
   const fatal = P.errors.filter(e => !/^(components|assets)\//.test(e.file));
   if (fatal.length) throw new Error('cannot build:\n' + fatal.map(e => `  ${e.file}: ${e.error}`).join('\n'));
-  const warnings = P.errors.map(e => `${e.file}: ${e.error}`);
+  const warnings = [...P.errors.map(e => `${e.file}: ${e.error}`), ...restored.warnings.map(w => `packages: ${w}`)];
   for (const [name, tree] of Object.entries(P.pages)) { // prefab instances -> real nodes
     expandPrefabs(tree, P.prefabs);
     for (const [n] of walk(tree)) if (n._missing) warnings.push(`pages/${name}.json: ${n.name} uses ${n._missing === 'cycle' ? 'a prefab that contains itself' : 'a missing prefab'} (${n.prefab})`);
@@ -258,6 +313,7 @@ export async function build(root, out = path.join(root, 'dist')) {
   for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f !== 'compile.js' && !f.endsWith('.d.ts')) await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'gpsb', f));
   if (fs.existsSync(path.join(root, 'assets'))) await fsp.cp(path.join(root, 'assets'), path.join(out, 'assets'), { recursive: true });
   for (const d of ['behaviours', 'extensions']) if (fs.existsSync(path.join(root, d))) await copyScripts(path.join(root, d), path.join(out, d));
+  await copyPackages(root, out);
   await fsp.mkdir(path.join(out, 'components'), { recursive: true });
   for (const name of Object.keys(P.components)) {
     if (P.components[name].error) continue; // reported in warnings
@@ -414,12 +470,14 @@ async function openProject(dir) {
   await register(dir, true);
   watcher?.close();
   watcher = watchProject(dir);
+  // like Unity opening a project: download packages the lock lists but packages/ lacks (the watcher tells the editor)
+  pm.install(dir, { log: m => console.log(`packages: ${m}`) }).then(r => r.warnings.forEach(w => console.warn(`packages: ${w}`)), e => console.error(`packages: ${e.message}`));
 }
 
 // Hot reload: tell editors about changed project files. Only the source folders are watched recursively (plus the root
 // itself for project.json/build.js): the output folder and .git can be big and change under a recursive watcher (a
 // rebuild, a commit), which made it fail. A watcher that errors is restarted.
-const SOURCES = ['pages', 'assets', 'components', 'behaviours', 'extensions', 'animations', 'prefabs', 'public'];
+const SOURCES = ['pages', 'assets', 'components', 'behaviours', 'extensions', 'animations', 'prefabs', 'public', 'packages'];
 function watchProject(dir) {
   const ws = new Map(); // folder ('' = root) -> FSWatcher
   let t, closed = false;
@@ -483,6 +541,22 @@ async function hubApi(req, res, p, q) {
   }
   send(res, 404, 'not found');
 }
+// Package Manager window (editor/packages.js); every change answers with the new list
+async function packagesApi(req, res, p, q) {
+  if (!root) throw notOpen();
+  if (req.method === 'GET') {
+    if (p === '/api/packages') return sendJSON(res, await pm.list(root));
+    if (p === '/api/packages/outdated') return sendJSON(res, await pm.outdated(root));
+    if (p === '/api/packages/search') return sendJSON(res, await pm.search(root, q.get('q') ?? ''));
+    if (p === '/api/packages/info') return sendJSON(res, await pm.info(root, q.get('name') ?? ''));
+    return send(res, 404, 'not found');
+  }
+  const b = await bodyJSON(req), op = { add: () => pm.add(root, b.specs ?? []), remove: () => pm.remove(root, b.names ?? []), update: () => pm.update(root, b.names ?? []) }[p.slice(14)];
+  if (!op) return send(res, 404, 'not found');
+  const r = await op().catch(e => { throw Object.assign(e, { code: 400 }); });
+  return sendJSON(res, { ...r, list: await pm.list(root) });
+}
+
 const clients = new Set();
 function serve(initial) {
   migrateConfig();
@@ -500,7 +574,10 @@ function serve(initial) {
       if (p === '/' || p === '/hub') return sendFile(res, path.join(TOOL, 'editor/hub.html'));
       if (p === '/editor' || p === '/editor/') {
         if (!root) { res.writeHead(302, { location: '/' }); return res.end(); }
-        return sendFile(res, path.join(TOOL, 'editor/index.html'));
+        // the editor imports the project's scripts itself (props, methods, extensions): give it the packages' import map
+        const imports = Object.fromEntries(Object.entries(pm.packageImports(await pm.readLock(root).catch(() => null))).map(([k, v]) => [k, '/project/packages/' + pm.packageUrl(v)]));
+        const html = (await fsp.readFile(path.join(TOOL, 'editor/index.html'), 'utf8')).replace('</head>', `  <script type="importmap">${JSON.stringify({ imports }).replace(/</g, '\\u003c')}</script>\n</head>`);
+        return send(res, 200, html, MIME.html);
       }
       if (p.startsWith('/editor/') || p.startsWith('/lib/')) {
         const f = path.resolve(TOOL, '.' + p);
@@ -508,6 +585,7 @@ function serve(initial) {
         return sendFile(res, f);
       }
       if (p.startsWith('/api/hub/')) return await hubApi(req, res, p, q);
+      if (p.startsWith('/api/packages')) return await packagesApi(req, res, p, q);
       if (p === '/api/prefs') {
         if (req.method === 'PUT') { await writeCfg('prefs.json', await bodyJSON(req)); return sendJSON(res, { ok: true }); }
         return sendJSON(res, await readCfg('prefs.json', {}));
@@ -544,7 +622,10 @@ function serve(initial) {
         if (P.pages[page]) expandPrefabs(P.pages[page], P.prefabs);
         if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P), extensionVersions, collections: collectionsOf(P), prefix: '../'.repeat(page.split('/').length - 1) }), { name: page.split('/').pop(), cssHref: null }).html, MIME.html);
       }
-      if (p.startsWith('/project/')) return sendFile(res, safe(p.slice(9)));
+      if (p.startsWith('/project/')) { // project files; public/ is served at the root as on the built site (public/vendor/x.js -> vendor/x.js)
+        const f = safe(p.slice(9)), pub = safe('public/' + p.slice(9));
+        return sendFile(res, !fs.existsSync(f) && fs.existsSync(pub) ? pub : f);
+      }
       if (p === '/api/project') {
         if (!root) throw notOpen();
         const P = await loadProject(root);
@@ -592,9 +673,34 @@ function serve(initial) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (cmd === 'new') create(ROOT).then(() => console.log(`created ${ROOT}\nnext: gpsb serve ${dir}`), e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'build') build(ROOT, OUT && path.resolve(OUT)).then(r => { for (const w of r.warnings) console.warn('warning: ' + w); console.log(`built ${r.pages.length} page(s) -> ${r.out}`); }, e => { console.error(e.message); process.exit(1); });
+  else if (['add', 'remove', 'update', 'install', 'packages', 'search'].includes(cmd)) packagesCli(cmd).catch(e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'types') loadProject(ROOT).then(async P => { await loadExtensions(ROOT, P, statExtVersions(P)); await writeTypes(ROOT, P); console.log(`wrote ${path.join(ROOT, '.gpsb/types')} and tsconfig.json`); }).catch(e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'serve' || cmd === 'hub') {
     if (cmd === 'serve' && !isProject(ROOT)) { console.error(`no project.json in ${ROOT} (run: gpsb new ${dir})`); process.exit(1); }
     serve(cmd === 'serve' ? ROOT : null);
-  } else { console.log('usage: gpsb [hub] | gpsb serve [dir] [--port N] | gpsb new <dir> | gpsb build [dir] [--out D] | gpsb types [dir]'); process.exit(1); }
+  } else { console.log('usage: gpsb [hub] | gpsb serve [dir] [--port N] | gpsb new <dir> | gpsb build [dir] [--out D] | gpsb types [dir]\n'
+    + '       gpsb add <pkg>[@range]… | remove <pkg>… | update [pkg…] | install | packages | search <text>   [--dir <project>]'); process.exit(1); }
+}
+
+async function packagesCli(cmd) {
+  const proj = path.resolve(DIR ?? (cmd === 'install' || cmd === 'packages' ? dir : '.')), names = args.slice(1);
+  if (cmd === 'search') {
+    for (const r of await pm.search(proj, names.join(' '))) console.log(`${r.name.padEnd(32)} ${r.version.padEnd(10)} ${r.description.slice(0, 70)}`);
+    return;
+  }
+  if (!isProject(proj)) throw new Error(`no project.json in ${proj} (use --dir <project>)`);
+  if (cmd === 'packages') {
+    const [l, o] = await Promise.all([pm.list(proj), pm.outdated(proj).catch(() => ({}))]);
+    if (!l.packages.length) return console.log('no packages (add one with: gpsb add <name>)');
+    for (const x of l.packages.sort((a, b) => b.direct - a.direct || a.name.localeCompare(b.name))) {
+      const up = o[x.name]?.latest && o[x.name].latest !== x.version ? ` (latest ${o[x.name].latest})` : '';
+      console.log(`${x.direct ? '' : '  '}${x.name.padEnd(x.direct ? 32 : 30)} ${x.version.padEnd(10)} ${x.typesOnly ? 'types' : x.format}${x.installed ? '' : ' NOT INSTALLED'}${x.direct ? up : ''}`);
+    }
+    return;
+  }
+  if ((cmd === 'add' || cmd === 'remove') && !names.length) throw new Error(`usage: gpsb ${cmd} <package>…`);
+  const log = m => console.log(m);
+  const r = await (cmd === 'add' ? pm.add(proj, names, { log }) : cmd === 'remove' ? pm.remove(proj, names, { log }) : cmd === 'update' ? pm.update(proj, names, { log }) : pm.install(proj, { log }));
+  for (const w of r.warnings) console.warn('warning: ' + w);
+  console.log([r.installed.length && `installed ${r.installed.join(', ')}`, r.removed.length && `removed ${r.removed.join(', ')}`].filter(Boolean).join('; ') || 'packages are up to date');
 }

@@ -29,7 +29,7 @@ the Hierarchy draws on top.
   - **WebObject:** create objects from presets (Panel, Image, Text, Button, Link, form controls, media, layouts, Scroll
     View, Section, Markdown, Repeat, …) and your custom components; Align / Distribute; prefabs.
   - **Component:** add a component to the selected object.
-  - **Window:** reopen closed panels, switch or save layouts.
+  - **Window:** the [Package Manager](packages.md) (npm packages), reopen closed panels, switch or save layouts.
 - **Tools:** View (Q), Move (W), Rotate (E), Scale (R), Rect (T).
 - **Play** runs the page with its scripts and animations. **Page switcher.** **Build Site.**
 

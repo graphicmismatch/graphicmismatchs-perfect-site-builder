@@ -64,7 +64,10 @@ widgets, consent banners). For one page only, use the Canvas's **Page Meta** com
 
 - **404 page:** a page named `404` becomes the page hosts show for missing addresses. Its links work from any path.
 - **`public/`:** everything in this folder is copied to the site root unchanged, after everything else. Use it for
-  `CNAME`, `_redirects`, `_headers`, `.well-known/`, `favicon.ico` or your own `robots.txt`.
+  `CNAME`, `_redirects`, `_headers`, `.well-known/`, `favicon.ico` or your own `robots.txt`. While you edit, the dev
+  server serves it at the root too, so `public/vendor/x.js` is at `vendor/x.js` in previews and Play mode as well.
+- **`packages/`:** [npm packages](packages.md). The build copies the ones the site uses to `dist/packages/` (without
+  typings), and first downloads any the lock lists that are missing, e.g. in a fresh clone.
 
 ## Hosting
 

@@ -5,6 +5,7 @@ import * as layout from '../layout.js';
 import * as prefs from '../prefs.js';
 import { openPreferences, shortcut as sc } from '../preferences.js';
 import { openProjectSettings } from '../settings.js';
+import { openPackageManager } from '../packages.js';
 import { openFind } from '../find.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
@@ -238,6 +239,8 @@ const MENUS = {
   },
   Component: componentItems,
   Window: () => [
+    { label: 'Package Manager…', action: () => openPackageManager() },
+    '-',
     { label: 'Layouts', sub: layout.layoutMenu() },
     '-',
     ...layout.windowItems(),

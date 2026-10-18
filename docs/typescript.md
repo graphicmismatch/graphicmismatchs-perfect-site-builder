@@ -38,8 +38,11 @@ When the editor opens a project that has TypeScript files (or a `tsconfig.json`)
   generated from this project's components. `getComponent('Text')` knows `text`, `color` and `size`, and your own
   extensions and custom components are in there too. It's updated whenever the editor reloads the project, so a new
   extension prop shows up in your IDE. The folder has its own `.gitignore`.
-- `tsconfig.json`, if there isn't one. Its `rootDirs` setting makes `import … from '../gpsb/engine.js'` resolve to
-  those types, the same path that works on the published site.
+- `.gpsb/tsconfig.json`: the compiler settings gpsb maintains. Its `rootDirs` setting makes
+  `import … from '../gpsb/engine.js'` resolve to those types (the same path that works on the published site), and its
+  `paths` point every installed [npm package](packages.md) at its types.
+- `tsconfig.json`, if there isn't one: `{ "extends": "./.gpsb/tsconfig.json" }`. Add your own options to it; they win
+  over the generated ones.
 
 Run `gpsb types <project>` to write them without opening the editor.
 

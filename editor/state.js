@@ -511,7 +511,7 @@ const ver = f => f.size.toString(36) + Math.floor(f.mtime ?? 0).toString(36);
 const assetVersions = () => Object.fromEntries((S.P.assets ?? []).map(a => [a.path, ver(a)]));
 const extensionVersions = () => Object.fromEntries(Object.entries(S.P.extensions ?? {}).map(([n, e]) => [n, ver(e)]));
 const collections = () => Object.keys(S.P.pages).filter(n => getComponent(S.P.pages[n], 'Canvas')?.props?.collection);
-export const ctx = extra => makeCtx({ pages: Object.keys(S.P.pages), collections: collections(), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, text: S.P.text, clips: S.P.clips, breakpoints: breakpoints(), assetVersions: assetVersions(), extensionVersions: extensionVersions(), inject: S.P.project.inject, tokens: S.P.project.tokens, ...extra });
+export const ctx = extra => makeCtx({ importMap: S.P.importMap, pages: Object.keys(S.P.pages), collections: collections(), customs: S.P.components, behaviours: S.behaviourMeta, json: S.P.json, text: S.P.text, clips: S.P.clips, breakpoints: breakpoints(), assetVersions: assetVersions(), extensionVersions: extensionVersions(), inject: S.P.project.inject, tokens: S.P.project.tokens, ...extra });
 // editor=true: behaviours/animators don't auto-run (Scene). Play mode passes editor=false.
 // Absolute <base>: Chrome's srcdoc preload scanner resolves a relative one against the editor URL.
 // collection (template) pages preview one item: [{ slug, item, index }] / the previewed one's scope
@@ -533,6 +533,7 @@ export const api = {
   del: p => fetch('/api/file?path=' + encodeURIComponent(p), { method: 'DELETE', headers: H }).then(ok),
   rename: (from, to) => fetch(`/api/rename?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'POST', headers: H }).then(ok),
   build: () => fetch('/api/build', { method: 'POST', headers: H }).then(ok),
+  post: (p, body) => fetch(p, { method: 'POST', body: JSON.stringify(body), headers: { ...H, 'content-type': 'application/json' } }).then(ok),
 };
 
 export async function save() {
@@ -611,15 +612,25 @@ export async function reloadMeta() {
   if (!r.ok) return log('Project reload failed: ' + await r.text(), 'error');
   const P = await r.json();
   if (P.root !== S.P.root) return log('A different project was opened in the Hub; reload this tab to edit it.', 'warn');
-  for (const k of ['components', 'behaviours', 'assets', 'json', 'text', 'extensions']) S.P[k] = P[k];
+  for (const k of ['components', 'behaviours', 'assets', 'json', 'text', 'extensions', 'importMap']) S.P[k] = P[k];
   for (const e of P.errors ?? []) if (/^(components|assets)\//.test(e.file)) log(`${e.file}: ${e.error}`, 'error');
   await loadExtensions();
   await loadBehaviours();
   emit('assets'); emit('structure');
 }
 
+// npm packages changed (Package Manager, `gpsb add`): previews pick them up at once; the editor page's own import map
+// (used to read the project's scripts) only on reload
+let packagesNote = false;
+export async function packagesChanged() {
+  await reloadMeta();
+  emit('packages');
+  if (!packagesNote) { packagesNote = true; log('Packages changed. Previews and Play mode use them now; reload the editor (after saving) so the Inspector can read scripts that import new packages.', 'warn'); }
+}
+
 // external file edits (VS Code etc.) -> hot reload components/behaviours/assets
 new EventSource('/api/events').onmessage = e => {
   const { file } = JSON.parse(e.data);
   if (/^(components|behaviours|assets|extensions)\//.test(file)) { clearTimeout(load.t); load.t = setTimeout(reloadMeta, 150); }
+  if (file === 'packages/packages-lock.json') { clearTimeout(load.p); load.p = setTimeout(packagesChanged, 300); }
 };

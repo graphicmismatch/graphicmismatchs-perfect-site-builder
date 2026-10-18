@@ -208,6 +208,8 @@ export interface RenderCtx {
   font(path: string): string;
   /** URL for a page name, link or #anchor. */
   href(link: string): string;
+  /** URL of a file inside an installed npm package ('leaflet/dist/leaflet.css'). */
+  package(path: string): string;
   editor?: boolean;
   [key: string]: any;
 }
@@ -541,6 +543,8 @@ export function defineExtension(cls: abstract new () => object): ExtensionDefini
 export const Assets: {
   /** The published URL (with its version), e.g. for an asset prop. */
   url(path: string): string;
+  /** The URL of a file inside an installed npm package: packageUrl('leaflet/dist/leaflet.css'). */
+  packageUrl(path: string): string;
   json<T = any>(path: string): Promise<T>;
   text(path: string): Promise<string>;
 };

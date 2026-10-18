@@ -12,6 +12,7 @@ node cli.js serve example          # same, with the demo project opened (editor 
 node cli.js build example          # -> example/dist (static, host anywhere)
 node cli.js new my-site            # start a new project
 node cli.js types my-site          # TypeScript typings + tsconfig.json for the project's scripts
+node cli.js add dayjs --dir my-site   # npm packages: add, remove, update, install, packages, search
 ```
 
 After `npm link` (or a global install) the same commands are available as `gpsb`, e.g. `gpsb serve example`.
@@ -24,8 +25,8 @@ The [docs](docs/README.md) folder has user guides ([getting started](docs/gettin
 and developer guides for writing your own [behaviours](docs/behaviours.md), [custom components](docs/components.md)
 and [extension components](docs/extensions.md), with the [prop types](docs/prop-types.md) and the
 [runtime API](docs/runtime-api.md) they share. Scripts can use a Unity-style [engine API](docs/engine-api.md)
-(`Behaviour`, typed props, `getComponent`, `Vector2`, coroutines, [tweens](docs/engine-api.md#tweening)), and
-[TypeScript](docs/typescript.md).
+(`Behaviour`, typed props, `getComponent`, `Vector2`, coroutines, [tweens](docs/engine-api.md#tweening)),
+[TypeScript](docs/typescript.md), and [npm packages](docs/packages.md) from a Unity-style Package Manager.
 
 ## Project Hub
 

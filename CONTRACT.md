@@ -8,6 +8,7 @@ everyone working on the code. Read it fully before changing anything.
 - Match the surrounding style: 2-space indent, single quotes, semicolons, terse comments, small functions.
 - **Y axis is top-down everywhere.** anchor/pivot y=0 is the top edge, +pos.y moves down. (Unity is Y-up; we deliberately differ.)
 - `lib/` is isomorphic (Node + browser) and is copied 1:1 to `dist/gpsb/` and served at `/project/gpsb/` and `/lib/`.
+  Node-only tool code lives next to `cli.js` (`pm.js`, the package manager).
   Relative imports between lib files only. No Node APIs in lib (except `compile.js`, which is not shipped).
   `lib/*.d.ts` (typings for project scripts) aren't shipped either; `gpsb types` copies them into projects.
 - Shared files (`lib/rect.js node.js components.js render.js runtime.js compile.js`, `cli.js`, `editor/state.js`):
@@ -32,11 +33,14 @@ assets/**                    images, video, audio, json, fonts, text (copied to 
 components/<Name>.html       custom components (template/style/props/script) -> dist/components/<Name>.js
 behaviours/<Name>.js|.ts     MonoBehaviour-style scripts -> dist/behaviours/<Name>.js (.ts compiled, + .js.map)
 extensions/<Name>.js|.ts     extension components (same format as built-ins) -> dist/extensions/ (subfolders: helpers)
-tsconfig.json, .gpsb/types/  TypeScript project config + generated typings (written by the dev server / `gpsb types`)
+tsconfig.json, .gpsb/        TypeScript: tsconfig.json extends .gpsb/tsconfig.json; generated typings in .gpsb/types/
+packages/manifest.json       npm packages (pm.js): dependencies (+ registry, scopedRegistries); packages-lock.json;
+packages/<name>/             installed packages -> dist/packages/<name>/ (runtime packages only, no *.d.ts)
 animations/<Name>.anim.json  animation clips (inlined into pages that use them)
 prefabs/<Name>.prefab.json   prefab node trees (expanded into pages at build time; not shipped)
 build.js                     optional build hooks (Node only, not shipped)
-public/**                    copied to the site root as-is, after everything else (CNAME, _redirects, .well-known/…)
+public/**                    copied to the site root as-is, after everything else (CNAME, _redirects, .well-known/…);
+                             the dev server serves it at /project/ too (a project file of the same path wins)
 ```
 
 Build output (`cli.js build`): `<page>.html` + `<page>.css` (or `<page>/index.html` + `<page>/<page>.css` with
@@ -319,6 +323,39 @@ embedded (`sourcesContent`). Needs Node ≥ 22.15 (`stripTypeScriptTypes`, `regi
   `.gpsb/.gitignore`, and `tsconfig.json` if missing (typings it no longer writes are removed) (`rootDirs: ['.', '.gpsb/types']` maps `../gpsb/engine.js`). Run by
   `/api/project` when the project has `.ts` scripts or a `tsconfig.json`, and by `gpsb types [dir]`.
 
+## npm packages (`pm.js`, Node only, not shipped)
+
+UPM-style: `packages/manifest.json` `{ dependencies: { name: range }, registry?, scopedRegistries?: [{ url, scopes }],
+types?: false }`; `packages/packages-lock.json` `{ lockfileVersion: 1, packages: { name: { version, resolved, integrity,
+direct, dependencies, main, format: 'esm'|'cjs'|'none', imports: { specifier: path in the package }, types, named?,
+typesOnly? } } }`; files in `packages/<name>/` (scoped: `packages/@scope/name/`). Docs: `docs/packages.md`.
+- One version per package (flat): highest satisfying every request (npm semver: `^ ~ x * - || < <= > >= =`, dist-tags;
+  prereleases only when named), locked versions preferred, direct dependencies win conflicts (warning).
+  `dependencies` + non-optional `peerDependencies`; optional dependencies and install scripts are ignored.
+- Download: abbreviated packuments, tarball checked against `dist.integrity` (sha512) / `shasum`, extracted after every
+  entry path is checked (nothing may escape `packages/<name>/`), via a `.gpsb-tmp` folder.
+- `analyze`: browser entry from `exports` (conditions browser, import, module, default) → `module` → `browser` (string) →
+  `main`; format from extension, condition, `type`, else syntax. Import map entries: `name`, exact `exports` subpaths,
+  `./x/*` patterns as `name/x/` prefixes, and `name/` (any file). ESM packages: extensionless relative imports (and deep
+  imports into packages without `exports`) are rewritten to the real file. CJS: `bundleCJS` writes
+  `packages/<name>/gpsb.esm.js` (the package's own files reachable by literal `require`, JSON, `browser` field swaps;
+  other packages become imports, Node built-ins and missing packages throw when required; `process.env.NODE_ENV` =
+  'production' in the browser; default export `module.exports`, named exports found statically).
+- `@types/<name>` (version ~major.minor of the library) and the packages it depends on are installed `typesOnly` for
+  packages without types (unless `types: false`).
+- API: `add(root, specs)`, `remove(root, names)`, `update(root, names?)`, `install(root)` (restore from the lock without
+  resolving when the manifest matches it), `problems(root)` (offline check), `list`, `outdated`, `search`, `info`,
+  `packageImports(lock)` (→ `{ specifier: '<name>/<path>' }`), `packageUrl(rel)`. Operations are serialised per project.
+- Render: `ctx.importMap` (`P.importMap` from `loadProject`) → `<script type="importmap">` after `<base>` and before any
+  module script; addresses are `ctx.package(path)` (`<prefix>packages/<path>`), made `./`-relative. Runtime / engine:
+  `GPSB.ctx.package`, `Assets.packageUrl`.
+- Node (`cli.js` hooks): a bare specifier from a file inside a registered project resolves through its import map
+  (`packageRoots`, set by `loadExtensions`); `.js` files inside `packages/` load as ES modules.
+- Build: `pm.install` first (restore), then `copyPackages`. Dev server: `pm.install` when a project is opened;
+  `/editor/` gets an import map (`/project/packages/…`) for the editor's own imports of project scripts; `packages/` is
+  watched and a lock change triggers `S.packagesChanged()` (reloadMeta + `packages` event).
+- CLI: `gpsb add | remove | update | install | packages | search` (`--dir`, default the current folder).
+
 ## Events (`event` prop type, e.g. `Button.onClick`; animation events use the same `call` syntax)
 
 Entry `{ target: nodeId, call, arg }` (`target` empty = the node owning the event). `call` values:
@@ -435,12 +472,14 @@ GET  /project/gpsb/*            lib/*                      GET /project/componen
 GET  /project/(behaviours|extensions)/<path>.js   <path>.ts compiled on the fly when there's no .js file
 GET  /project/<page>.html      that page rendered on the fly (Links / IFrames inside the editor preview)
 GET  /project/*                project files (Range requests supported)
-GET  /api/project  -> { root, project, pages, components, behaviours, clips, json, assets[{path,type,size}], errors[{file,error}] }
+GET  /api/project  -> { root, project, pages, components, behaviours, clips, json, assets[{path,type,size}], importMap, errors[{file,error}] }
                    (unparseable pages/clips are left out, a bad JSON asset is null, project.json falls back to defaults;
                    a project with TypeScript also gets its typings rewritten, see TypeScript)
 GET|PUT|DELETE /api/file?path= read / write (raw body, streamed) / delete a project file (never the project folder itself)
 POST /api/rename?from=&to=     POST /api/build -> { out, pages, warnings[] }
-GET  /api/events               SSE { file } on external changes (editor hot-reloads components/behaviours/assets)
+GET  /api/events               SSE { file } on external changes (editor hot-reloads components/behaviours/assets/packages)
+GET  /api/packages[/outdated|/search?q=|/info?name=]   POST /api/packages/add {specs} | remove {names} | update {names}
+                               -> { installed, removed, warnings, list } (Package Manager window, editor/packages.js)
 ```
 `build()` refuses an output folder that contains the project, sits inside a source folder, or is non-empty without
 being a previous build (`gpsb/runtime.js`, or `psb/runtime.js` from before the rename), ignoring and keeping the paths in `project.json` `keep` (gitignore-style: `name/` a folder, `name` a file, nested paths allowed; `[".git/"]` for a deploy repo); it fails on broken pages/clips/project.json and skips broken components (warning).

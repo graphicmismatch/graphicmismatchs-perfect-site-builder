@@ -203,8 +203,9 @@ The demo project (`example/behaviours/`) has three behaviours worth reading:
   `this.GPSB.assets.url(path)`. `node` props are node ids: look them up with `this.GPSB.node(id)`.
 - **Data:** `await this.GPSB.assets.json('data/site.json')` inside an `async start()`.
 - **Imports:** behaviours are ES modules. They're published to `behaviours/`, next to the gpsb runtime in `gpsb/`, so
-  `import { Behaviour, tween } from '../gpsb/engine.js'` or `import { lerpValue } from '../gpsb/anim.js'` works. Other files you import must be reachable from the published
-  site, e.g. in `public/` or `assets/`.
+  `import { Behaviour, tween } from '../gpsb/engine.js'` or `import { lerpValue } from '../gpsb/anim.js'` works. npm
+  packages installed with the [Package Manager](packages.md) are imported by name (`import dayjs from 'dayjs'`). Other
+  files you import must be reachable from the published site, e.g. in `assets/` or `public/`.
 - **Several behaviours** can be attached to the same object, including more than one of the same script.
 - **Debugging:** `console.log` and errors appear in the editor's Console during Play mode. Errors name the behaviour
   and hook (`[behaviour Bob] start: …`).

@@ -352,7 +352,7 @@ A component from `getComponent` has `.tween(prop, to, s)` too: `this.getComponen
 | `Color` | Channels `r g b a` from 0 to 1. `Color.parse('#ff3366')`, `Color.rgba(1, 0, 0, 0.5)`, `Color.rgb255(…)`, `Color.token('brand')`, `withAlpha`, `toHex`, `lerp`, and `white`, `black`, `clear`, `red`, … It converts to `'#rrggbb(aa)'` wherever a string is expected. A value that isn't a hex colour (a `$token`) is kept as-is; `valid` is `false` for it. |
 | `Mathf` | `clamp`, `clamp01`, `lerp`, `lerpUnclamped`, `inverseLerp`, `repeat`, `pingPong`, `deltaAngle`, `lerpAngle`, `moveTowards`, `moveTowardsAngle`, `smoothStep`, `smoothDamp(current, target, state, smoothTime)` (keep `state` between calls), `approximately`, `Deg2Rad`, `Rad2Deg`. |
 | `Random` | `value`, `range(min, max)`, `int(min, max)` (max exclusive), `pick(list)`, `insideUnitCircle`, `onUnitCircle`. |
-| `Assets` | `url(path)` (the published URL of an asset prop), `json(path)`, `text(path)`. |
+| `Assets` | `url(path)` (the published URL of an asset prop), `json(path)`, `text(path)`, `packageUrl(path)` (a file inside an [npm package](packages.md): `'leaflet/dist/leaflet.css'`). |
 
 ## Extensions as classes
 

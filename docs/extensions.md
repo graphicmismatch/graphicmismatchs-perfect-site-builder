@@ -88,6 +88,8 @@ The same file is imported **in Node** by the build and **in the browser** by the
   `inner`, `rules`, `head` or `tag`. Those run in Node during the build.
 - Put browser work in `init`, `patch` and `state`, which only run in the browser.
 - Don't import Node modules either: the file is published to the site as it is.
+- [npm packages](packages.md) can be imported by name (`import dayjs from 'dayjs'`), at build time too, as long as
+  the package doesn't touch the DOM when it loads. Link a package's CSS from `head` with `ctx.package(path)`.
 - gpsb's own modules can be imported as they're published, e.g. `import { html } from '../gpsb/engine.js'`. In Node,
   the build resolves `../gpsb/` to gpsb's copy. The [engine API](engine-api.md#extensions-as-classes) has a class form
   for extensions and an `html` template tag that escapes values.
