@@ -23,7 +23,7 @@ Start here if you want to add your own code. There are three ways to extend gpsb
 
 | | Behaviour | Custom component | Extension component |
 |---|---|---|---|
-| File | `behaviours/<Name>.js` | `components/<Name>.html` | `extensions/<Name>.js` |
+| File | `behaviours/<Name>.js` or `.ts` | `components/<Name>.html` | `extensions/<Name>.js` or `.ts` |
 | Is | A script attached to an object, like a Unity MonoBehaviour | A Web Component (custom element, Shadow DOM) | A component definition, the same format the built-ins use |
 | Runs | In the browser only (published page and Play mode) | In the browser | At build time **and** in the browser |
 | Output | Changes the object it's on, at runtime | Its own markup and scoped CSS inside a shadow root | Real HTML and CSS written into the page |
@@ -32,6 +32,10 @@ Start here if you want to add your own code. There are three ways to extend gpsb
 
 All three get Inspector fields from a props schema, and all of them can be targets or sources of events.
 
+- [Engine API](engine-api.md): the Unity-style scripting API (`Behaviour`, typed props, `getComponent`, `Vector2`,
+  coroutines, class-form extensions).
+- [Tweening](tweening.md): animate anything from code, with eases, loops and sequences.
+- [TypeScript](typescript.md): write scripts in TypeScript, with types for your project's components.
 - [Prop types](prop-types.md): the schema format all three share.
 - [Runtime API](runtime-api.md): `window.GPSB`, which every script on a published page can use.
 - [CONTRACT.md](../CONTRACT.md): the full internal spec (file formats, architecture). Read it before changing gpsb itself.

@@ -574,7 +574,7 @@ export async function upload(file, dir = '') {
 async function loadExtensions() {
   for (const n of extensionNames()) if (!S.P.extensions?.[n]) unregisterComponent(n);
   for (const [name, e] of Object.entries(S.P.extensions ?? {})) {
-    try { registerComponent(name, (await import(`/project/${e.path}?v=${ver(e)}`)).default); }
+    try { registerComponent(name, (await import(`/project/${e.module ?? e.path}?v=${ver(e)}`)).default); } // .ts: served compiled as .js
     catch (err) { log(`Extension ${name}: ${err.message}`, 'error'); }
   }
 }
@@ -583,9 +583,9 @@ async function loadBehaviours() {
   S.behaviourMeta = {};
   for (const [name, b] of Object.entries(S.P.behaviours)) {
     try {
-      const m = await import(`/project/${b.path}?t=${Date.now()}`);
+      const m = await import(`/project/${b.module ?? b.path}?t=${Date.now()}`);
       const proto = m.default?.prototype ?? {};
-      const methods = Object.getOwnPropertyNames(proto).filter(k => k !== 'constructor' && typeof proto[k] === 'function');
+      const methods = Object.getOwnPropertyNames(proto).filter(k => k !== 'constructor' && typeof Object.getOwnPropertyDescriptor(proto, k).value === 'function'); // not getters: they'd run without an instance
       S.behaviourMeta[name] = { props: m.props ?? m.default?.props ?? {}, methods };
     } catch (e) { S.behaviourMeta[name] = { props: {}, methods: [], error: String(e) }; log(`Behaviour ${name}: ${e.message}`, 'error'); }
   }

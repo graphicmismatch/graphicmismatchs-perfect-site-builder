@@ -381,7 +381,7 @@ export function callGroups(tid) {
   if (has('Animator')) g.push(['Animator', ['Animator.play', 'Animator.stop', 'Animator.pause']]);
   if (has('Video') || has('Audio')) g.push(['Media', ['Media.play', 'Media.pause', 'Media.toggle']]);
   for (const name of new Set(comps.filter(c => c.type.startsWith('behaviour:')).map(c => c.type.slice(10))))
-    g.push([`${name} (Script)`, (S.S.behaviourMeta[name]?.methods ?? []).filter(m => m !== 'start' && m !== 'update' && !m.startsWith('_')).map(m => `behaviour:${name}.${m}`)]);
+    g.push([`${name} (Script)`, (S.S.behaviourMeta[name]?.methods ?? []).filter(m => !['start', 'update', 'lateUpdate'].includes(m) && !m.startsWith('_')).map(m => `behaviour:${name}.${m}`)]);
   return g;
 }
 const callLabel = c => CALL_LABEL[c] ?? c.replace(/^behaviour:/, '');

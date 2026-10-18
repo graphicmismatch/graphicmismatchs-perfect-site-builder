@@ -16,7 +16,8 @@ engines, no-JS visitors and fast first paint), or when you need a new kind of bu
 ## Create one
 
 - **From the Project panel:** + ▾ ▸ Extension Component. gpsb writes `extensions/<Name>.js` from a commented template.
-- **By hand:** create `extensions/<Name>.js` in the project folder.
+  Extension Component (TypeScript) writes `extensions/<Name>.ts` in the [class form](engine-api.md#extensions-as-classes).
+- **By hand:** create `extensions/<Name>.js` (or [`.ts`](typescript.md)) in the project folder.
 
 Then add it to an object with Add Component ▸ Extensions ▸ *Name*. The editor reloads the extension whenever the file
 changes.
@@ -66,6 +67,7 @@ The default export is either a **definition object** or a **factory** that recei
 ```js
 export default { props: { … }, inner: p => … };          // a plain object
 export default ({ esc, cssUrl }) => ({ props: { … } });  // or a factory
+export default defineExtension(MyExtension);             // or a class (engine API)
 ```
 
 The factory form means the module needs no imports. The toolkit (`kit`) has:
@@ -86,6 +88,9 @@ The same file is imported **in Node** by the build and **in the browser** by the
   `inner`, `rules`, `head` or `tag`. Those run in Node during the build.
 - Put browser work in `init`, `patch` and `state`, which only run in the browser.
 - Don't import Node modules either: the file is published to the site as it is.
+- gpsb's own modules can be imported as they're published, e.g. `import { html } from '../gpsb/engine.js'`. In Node,
+  the build resolves `../gpsb/` to gpsb's copy. The [engine API](engine-api.md#extensions-as-classes) has a class form
+  for extensions and an `html` template tag that escapes values.
 
 If the module fails to load, the build fails with the error rather than silently publishing pages with missing
 content.

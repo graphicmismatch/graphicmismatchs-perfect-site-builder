@@ -4,6 +4,7 @@
 //   gpsb serve [dir] [--port N] same, with <dir> registered and opened in the editor
 //   gpsb new   <dir>            create an empty project
 //   gpsb build [dir] [--out D]  write the static site (default <dir>/dist)
+//   gpsb types [dir]            write TypeScript typings + tsconfig.json for the project's scripts
 import http from 'node:http';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -11,9 +12,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import crypto from 'node:crypto';
+import * as nodeModule from 'node:module';
 import { renderDocument, makeCtx, pageUrl, itemUrl, collectionItems } from './lib/render.js';
-import { registerComponent, unregisterComponent, extensionNames } from './lib/components.js';
-import { parseComponent, compileComponent } from './lib/compile.js';
+import { registerComponent, unregisterComponent, extensionNames, builtins } from './lib/components.js';
+import { parseComponent, compileComponent, isTS, compileTS, withMap, quiet } from './lib/compile.js';
 import { newNode, walk, getComponent } from './lib/node.js';
 import { expandPrefabs } from './lib/prefab.js';
 
@@ -69,7 +71,13 @@ export async function loadProject(root) {
     try { components[name] = parseComponent(name, await fsp.readFile(p('components/' + f), 'utf8')); }
     catch (e) { components[name] = { name, tag: 'gpsb-error', props: {}, error: String(e) }; }
   }
-  for (const f of await files(p('behaviours'))) if (f.endsWith('.js')) behaviours[f.slice(0, -3)] = { path: 'behaviours/' + f };
+  // scripts: <Name>.js or <Name>.ts (module: the URL it's published and served as)
+  const script = (dir, f, list, extra) => {
+    const name = f.slice(0, -3);
+    if (list[name]) return errors.push({ file: `${dir}/${f}`, error: `both ${name}.js and ${name}.ts exist: remove one` });
+    list[name] = { path: `${dir}/${f}`, module: `${dir}/${name}.js`, lang: f.slice(-2), ...extra };
+  };
+  for (const f of await files(p('behaviours'))) if (f.endsWith('.js') || isTS(f)) script('behaviours', f, behaviours);
   const prefabs = {};
   for (const f of await files(p('prefabs'))) if (f.endsWith('.prefab.json')) {
     const t = await tryJSON(root, 'prefabs/' + f, null, null, errors);
@@ -77,9 +85,9 @@ export async function loadProject(root) {
   }
   // extension components: top-level extensions/<Name>.js (subfolders may hold their helper modules)
   const extensions = {};
-  for (const f of await files(p('extensions'))) if (/^[A-Za-z_]\w*\.js$/.test(f)) {
+  for (const f of await files(p('extensions'))) if (/^[A-Za-z_]\w*\.[jt]s$/.test(f)) {
     const st = await fsp.stat(p('extensions/' + f));
-    extensions[f.slice(0, -3)] = { path: 'extensions/' + f, size: st.size, mtime: st.mtimeMs };
+    script('extensions', f, extensions, { size: st.size, mtime: st.mtimeMs });
   }
   for (const f of await files(p('animations'))) if (f.endsWith('.anim.json')) {
     const c = await tryJSON(root, 'animations/' + f, null, null, errors);
@@ -109,7 +117,7 @@ async function loadExtensions(root, P, versions) {
   for (const n of extensionNames()) unregisterComponent(n);
   for (const [name, e] of Object.entries(P.extensions)) {
     try { registerComponent(name, (await import(`${pathToFileURL(path.join(root, e.path)).href}?v=${versions[name]}`)).default); }
-    catch (err) { P.errors.push({ file: e.path, error: err.message }); }
+    catch (err) { P.errors.push({ file: e.path, error: err.message + (nodeModule.registerHooks ? '' : ` (TypeScript extensions and '../gpsb/' imports need Node 22.15 or later; this is ${process.version})`) }); }
   }
 }
 const statExtVersions = P => Object.fromEntries(Object.entries(P.extensions).map(([n, e]) => [n, e.size.toString(36) + Math.floor(e.mtime).toString(36)]));
@@ -117,6 +125,85 @@ async function hashFile(file) {
   const h = crypto.createHash('sha1');
   for await (const chunk of fs.createReadStream(file)) h.update(chunk);
   return h.digest('hex').slice(0, 10);
+}
+
+// Project scripts imported in Node (extensions, at build time and by the dev server): .ts files are compiled on load,
+// './x.js' finds x.ts, and '../gpsb/<file>.js' (the runtime as published next to the site's scripts) is this tool's lib/.
+if (nodeModule.registerHooks) quiet(() => nodeModule.registerHooks({
+  resolve(spec, ctx, next) {
+    if (/^\.\.?\//.test(spec) && ctx.parentURL?.startsWith('file:')) {
+      const u = new URL(spec, ctx.parentURL), f = fileURLToPath(u);
+      if (!fs.existsSync(f)) {
+        const ts = f.replace(/\.js$/, '.ts'), lib = path.join(TOOL, 'lib', path.basename(f));
+        if (ts !== f && fs.existsSync(ts)) return next(pathToFileURL(ts).href + u.search, ctx);
+        if (path.basename(path.dirname(f)) === 'gpsb' && fs.existsSync(lib)) return next(pathToFileURL(lib).href, ctx);
+      }
+    }
+    return next(spec, ctx);
+  },
+  load(url, ctx, next) {
+    if (!url.startsWith('file:') || !isTS(new URL(url).pathname)) return next(url, ctx);
+    const f = fileURLToPath(new URL(url).href.split('?')[0]);
+    return { format: 'module', shortCircuit: true, source: withMap(compileTS(fs.readFileSync(f, 'utf8'), f)) };
+  },
+}));
+
+// behaviours/ and extensions/ -> the site: .ts compiled to .js (+ .js.map), .d.ts left out, everything else as-is
+async function copyScripts(from, to) {
+  for (const f of await files(from)) {
+    if (f.endsWith('.d.ts')) continue;
+    const dst = path.join(to, f);
+    await fsp.mkdir(path.dirname(dst), { recursive: true });
+    if (!isTS(f)) { await fsp.copyFile(path.join(from, f), dst); continue; }
+    let r;
+    try { r = compileTS(await fsp.readFile(path.join(from, f), 'utf8'), f); } catch (e) { throw new Error(`${path.basename(from)}/${f}: ${e.message}`); }
+    const js = dst.slice(0, -3) + '.js';
+    await fsp.writeFile(js, withMap(r, path.basename(js) + '.map'));
+    await fsp.writeFile(js + '.map', JSON.stringify(r.map));
+  }
+}
+
+// ---------- TypeScript typings ----------
+// .gpsb/types/gpsb/*.d.ts: the engine API (scripts import it as '../gpsb/engine.js'; tsconfig rootDirs maps that here)
+// and project.d.ts (typed getComponent for every component this project has). Plus a tsconfig.json if there is none.
+// The dev server rewrites them when the editor (re)loads a project that uses TypeScript; `gpsb types` on demand.
+const TSCONFIG = {
+  compilerOptions: {
+    target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', lib: ['ES2022', 'DOM', 'DOM.Iterable'],
+    strict: true, noEmit: true, skipLibCheck: true, allowImportingTsExtensions: true, rootDirs: ['.', '.gpsb/types'],
+  },
+  include: ['behaviours', 'extensions', '.gpsb/types'],
+};
+const usesTS = (root, P) => fs.existsSync(path.join(root, 'tsconfig.json')) || [...Object.values(P.behaviours), ...Object.values(P.extensions)].some(s => s.lang === 'ts');
+const writeIfChanged = async (f, text) => { if ((await fsp.readFile(f, 'utf8').catch(() => null)) !== text) await fsp.writeFile(f, text); };
+export async function writeTypes(root, P) {
+  const dir = path.join(root, '.gpsb/types/gpsb');
+  await fsp.mkdir(dir, { recursive: true });
+  await writeIfChanged(path.join(root, '.gpsb/.gitignore'), '*\n');
+  for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f.endsWith('.d.ts')) await writeIfChanged(path.join(dir, f), await fsp.readFile(path.join(TOOL, 'lib', f), 'utf8'));
+  await writeIfChanged(path.join(dir, 'project.d.ts'), projectTypes(P));
+  const tc = path.join(root, 'tsconfig.json');
+  if (!fs.existsSync(tc)) await fsp.writeFile(tc, JSON.stringify(TSCONFIG, null, 2) + '\n');
+}
+const tsType = s => {
+  const t = s.type ?? '';
+  if (t === 'number' || t === 'int') return 'number';
+  if (t === 'bool') return 'boolean';
+  if (t === 'color') return 'Color';
+  if (t === 'vec2') return 'Vector2';
+  if (t === 'vec4') return 'Vector4';
+  if (t === 'enum') return (s.options ?? []).map(o => JSON.stringify(o)).join(' | ') || 'string';
+  if (t === 'node') return s.component ? `ComponentRef<${JSON.stringify(s.component)}> | null` : 'WebObject | null';
+  if (t === 'event') return 'WebEvent';
+  if (t === 'list') return `Array<${tsType({ type: s.of ?? 'string' }).replace(/^Color$|^Vector[24]$/, 'string')}>`;
+  return 'string';
+};
+function projectTypes(P) {
+  const comps = { ...Object.fromEntries(Object.entries(builtins).map(([n, d]) => [n, d.props])), ...Object.fromEntries(Object.entries(P.components).map(([n, c]) => ['component:' + n, c.props])) };
+  const body = Object.entries(comps).map(([n, props]) => `    ${JSON.stringify(n)}: {\n${Object.entries(props ?? {}).map(([k, s]) => `      ${/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k)}: ${tsType(s)};`).join('\n')}\n    };`).join('\n');
+  return `// Generated by gpsb from this project's components (built-in, extensions, components/*.html). Do not edit.\n`
+    + `import type { Color, Vector2, Vector4, WebObject, WebEvent, ComponentRef } from './engine.js';\n\n`
+    + `declare module './engine.js' {\n  interface ComponentTypes {\n${body}\n  }\n}\nexport {};\n`;
 }
 
 const ctxFor = (P, extra) => makeCtx({ pages: Object.keys(P.pages), customs: P.components, json: P.json, text: P.text, clips: P.clips, breakpoints: P.project.breakpoints, inject: P.project.inject, tokens: P.project.tokens, ...extra });
@@ -166,8 +253,9 @@ export async function build(root, out = path.join(root, 'dist')) {
   }
   await clearOut(out, keep); // the previous build
   await fsp.mkdir(path.join(out, 'gpsb'), { recursive: true });
-  for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f !== 'compile.js') await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'gpsb', f));
-  for (const d of ['assets', 'behaviours', 'extensions']) if (fs.existsSync(path.join(root, d))) await fsp.cp(path.join(root, d), path.join(out, d), { recursive: true });
+  for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f !== 'compile.js' && !f.endsWith('.d.ts')) await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'gpsb', f));
+  if (fs.existsSync(path.join(root, 'assets'))) await fsp.cp(path.join(root, 'assets'), path.join(out, 'assets'), { recursive: true });
+  for (const d of ['behaviours', 'extensions']) if (fs.existsSync(path.join(root, d))) await copyScripts(path.join(root, d), path.join(out, d));
   await fsp.mkdir(path.join(out, 'components'), { recursive: true });
   for (const name of Object.keys(P.components)) {
     if (P.components[name].error) continue; // reported in warnings
@@ -430,6 +518,14 @@ function serve(initial) {
         const out = compileComponent(comp[1], src);
         return send(res, 200, out[comp[1] + (comp[2] ?? '') + '.js'] ?? '', MIME.js);
       }
+      // a TypeScript script, served under its published .js name (a syntax error comes back as a script that throws it)
+      const ts = p.match(/^\/project\/((?:behaviours|extensions)\/.+)\.js$/);
+      if (ts && !fs.existsSync(safe(ts[1] + '.js')) && fs.existsSync(safe(ts[1] + '.ts'))) {
+        const src = await fsp.readFile(safe(ts[1] + '.ts'), 'utf8');
+        let js;
+        try { js = withMap(compileTS(src, ts[1] + '.ts')); } catch (e) { js = `throw new SyntaxError(${JSON.stringify(`${ts[1]}.ts: ${e.message}`)});\n`; }
+        return send(res, 200, js, MIME.js);
+      }
       const it = p.match(/^\/project\/([\w-]+(?:\/[\w-]+)*)\/([\w-]+)\.html$/); // collection item (preview links)
       if (it && fs.existsSync(safe(`pages/${it[1]}.json`))) {
         const P = await loadProject(root), tree = P.pages[it[1]], extensionVersions = statExtVersions(P);
@@ -447,7 +543,15 @@ function serve(initial) {
         if (P.pages[page]) return send(res, 200, renderDocument(P.pages[page], ctxFor(P, { assetVersions: statVersions(P), extensionVersions, collections: collectionsOf(P), prefix: '../'.repeat(page.split('/').length - 1) }), { name: page.split('/').pop(), cssHref: null }).html, MIME.html);
       }
       if (p.startsWith('/project/')) return sendFile(res, safe(p.slice(9)));
-      if (p === '/api/project') { if (!root) throw notOpen(); return sendJSON(res, { root, ...await loadProject(root) }); }
+      if (p === '/api/project') {
+        if (!root) throw notOpen();
+        const P = await loadProject(root);
+        if (usesTS(root, P)) { // keep the IDE typings in step with the project's components
+          await loadExtensions(root, P, statExtVersions(P));
+          await writeTypes(root, P).catch(e => P.errors.push({ file: '.gpsb/types', error: e.message }));
+        }
+        return sendJSON(res, { root, ...P });
+      }
       if (p === '/api/file') {
         const f = safe(q.get('path'), req.method !== 'GET');
         if (req.method === 'PUT') {
@@ -486,8 +590,9 @@ function serve(initial) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (cmd === 'new') create(ROOT).then(() => console.log(`created ${ROOT}\nnext: gpsb serve ${dir}`), e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'build') build(ROOT, OUT && path.resolve(OUT)).then(r => { for (const w of r.warnings) console.warn('warning: ' + w); console.log(`built ${r.pages.length} page(s) -> ${r.out}`); }, e => { console.error(e.message); process.exit(1); });
+  else if (cmd === 'types') loadProject(ROOT).then(async P => { await loadExtensions(ROOT, P, statExtVersions(P)); await writeTypes(ROOT, P); console.log(`wrote ${path.join(ROOT, '.gpsb/types')} and tsconfig.json`); }).catch(e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'serve' || cmd === 'hub') {
     if (cmd === 'serve' && !isProject(ROOT)) { console.error(`no project.json in ${ROOT} (run: gpsb new ${dir})`); process.exit(1); }
     serve(cmd === 'serve' ? ROOT : null);
-  } else { console.log('usage: gpsb [hub] | gpsb serve [dir] [--port N] | gpsb new <dir> | gpsb build [dir] [--out D]'); process.exit(1); }
+  } else { console.log('usage: gpsb [hub] | gpsb serve [dir] [--port N] | gpsb new <dir> | gpsb build [dir] [--out D] | gpsb types [dir]'); process.exit(1); }
 }

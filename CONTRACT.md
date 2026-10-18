@@ -9,6 +9,7 @@ everyone working on the code. Read it fully before changing anything.
 - **Y axis is top-down everywhere.** anchor/pivot y=0 is the top edge, +pos.y moves down. (Unity is Y-up; we deliberately differ.)
 - `lib/` is isomorphic (Node + browser) and is copied 1:1 to `dist/gpsb/` and served at `/project/gpsb/` and `/lib/`.
   Relative imports between lib files only. No Node APIs in lib (except `compile.js`, which is not shipped).
+  `lib/*.d.ts` (typings for project scripts) aren't shipped either; `gpsb types` copies them into projects.
 - Shared files (`lib/rect.js node.js components.js render.js runtime.js compile.js`, `cli.js`, `editor/state.js`):
   small **surgical Edit-tool changes only** (no full rewrites), and list every such change in your final report.
 - Verify in a real browser: `node test/browser.js <url> [--eval "expr"] [--shot f.png] [--wait ms]`
@@ -29,8 +30,9 @@ pages/<name>.json            one node tree per page (= a Unity scene) -> dist/<n
                              folders (pages/a/b.json -> a/b.html, prefix '../')
 assets/**                    images, video, audio, json, fonts, text (copied to dist/assets/)
 components/<Name>.html       custom components (template/style/props/script) -> dist/components/<Name>.js
-behaviours/<Name>.js         MonoBehaviour-style scripts -> dist/behaviours/<Name>.js
-extensions/<Name>.js         extension components (same format as built-ins) -> dist/extensions/ (subfolders: helpers)
+behaviours/<Name>.js|.ts     MonoBehaviour-style scripts -> dist/behaviours/<Name>.js (.ts compiled, + .js.map)
+extensions/<Name>.js|.ts     extension components (same format as built-ins) -> dist/extensions/ (subfolders: helpers)
+tsconfig.json, .gpsb/types/  TypeScript project config + generated typings (written by the dev server / `gpsb types`)
 animations/<Name>.anim.json  animation clips (inlined into pages that use them)
 prefabs/<Name>.prefab.json   prefab node trees (expanded into pages at build time; not shipped)
 build.js                     optional build hooks (Node only, not shipped)
@@ -272,8 +274,49 @@ export default class Spin {
 Injected before `start()`: `this.el`, `this.node` (runtime node data; a per-element clone for Repeat clones),
 `this.props` (defaults merged), `this.GPSB`, `this.find(path)` (node),
 `this.apply()` is `GPSB.applyNode(this.node, parent, this.el)` (own element only). `this.animator` (controller of the nearest Animator on self/ancestors or null), `this.setActive(bool)`.
-One instance per element. `update` driven by one shared rAF loop, dt in seconds.
+One instance per element. `update(dt)` / `lateUpdate(dt)` run on the shared frame loop (`lib/frame.js`, orders 0 / 30),
+dt = `Time.deltaTime` in seconds. After injection the runtime calls `inst._gpsbReady?.()` (engine `Behaviour`: re-binds
+prop accessors a class field may have hidden). Methods are listed for event pickers from the class's own prototype
+(data properties only, not getters); `start`, `update`, `lateUpdate` and `_`-prefixed names are hidden.
 Modules are loaded from `behaviours/<Name>.js` relative to the page (`new URL('../behaviours/…', import.meta.url)` from gpsb/).
+
+## Scripting API (`lib/frame.js`, `lib/engine.js`, `lib/tween.js`)
+
+Browser-side layer over the plain script contract; importable in Node too (no browser APIs at import time). Docs:
+`docs/engine-api.md`, `docs/tweening.md`; typings `lib/*.d.ts` must be kept in step with the code.
+- `frame.js`: `Time` (`deltaTime` scaled by `timeScale`, clamped to `maximumDeltaTime` 0.1), `onFrame(fn, order)` (one
+  rAF loop, started while anything is subscribed; orders: behaviours `update` 0, coroutines 10, tweens 20, `lateUpdate`
+  30), `markDirty(node, el?)` → one `GPSB.applyNode` per marked node in a microtask (el set: that element only),
+  `manualFrames()` + `step(dt)` for tests. Animators keep their own loop and clock.
+- `engine.js`: `Behaviour` (static `props` → own accessors onto `this.props`; values converted: vec2/vec4 ↔
+  `Vector2`/`Vector4`, color ↔ `Color`, node id ↔ `WebObject` or the component named by the schema's `component`,
+  event ↔ `WebEvent`; reserved names throw), `WebObject` (one per node+element, cached), `RectTransform`,
+  `ComponentRef` (typed component props), coroutines (generators on frame order 10), value types (immutable, `toJSON`
+  → stored form), `Mathf`, `Random`, `Assets`, `prop.*` schema builders, `defineExtension(Class)` (class → definition;
+  hooks only for methods the class has; `init` gets live accessors that `markDirty`), `html`/`raw` (escaping template).
+  Wrapper setters change node data and `markDirty`; nothing else writes to the page.
+- `tween.js`: `Tween` / `Sequence` (shared `Timeline`: delay, loops restart|yoyo|incremental, speed, unscaled,
+  callbacks, thenable → true completed / false killed), targets: node / WebObject / id or path (property paths via
+  `getProp`/`setProp` + `markDirty`; `rect.pos` sets `rect._layoutPos` while it plays, like the animator), plain objects
+  (dotted fields), `Tween.value(from, to, s, setter)`. Values lerp via `Ctor.lerpUnclamped` (engine types) or
+  `lerpValue`. Auto-play on the next microtask; tweens added to a sequence are driven by it.
+
+## TypeScript
+
+`lib/compile.js` `compileTS(src, file)` → `{ code, map }`: Node's `module.stripTypeScriptTypes` in transform mode (enums,
+namespaces, parameter properties; no type checking), relative `*.ts` imports rewritten to `.js`, map with the source
+embedded (`sourcesContent`). Needs Node ≥ 22.15 (`stripTypeScriptTypes`, `registerHooks`); only when TS is used.
+- `loadProject`: `behaviours/*.ts` and top-level `extensions/<Name>.ts` count like `.js` (entries `{ path, module, lang }`,
+  `module` = the published `.js` URL; the same name as `.js` and `.ts` is an error).
+- Node (`cli.js`, `module.registerHooks`): `.ts` files compile on load; a missing `./x.js` resolves to `./x.ts`; a
+  missing `…/gpsb/<file>.js` resolves to the tool's `lib/<file>.js` (extensions importing `../gpsb/engine.js` at build).
+- Dev server: `/project/(behaviours|extensions)/<path>.js` with no `.js` file but a `.ts` → compiled, inline map; a
+  syntax error is served as `throw new SyntaxError("<file>: …")`. Build: `.ts` → `.js` + `.js.map`, `.d.ts` skipped.
+- `<script lang="ts">` in `components/<Name>.html`: compiled into `<Name>.script.js`.
+- Typings: `writeTypes(root, P)` writes `.gpsb/types/gpsb/{engine,tween,frame}.d.ts` (copies of `lib/`),
+  `project.d.ts` (augments `ComponentTypes` in `./engine.js` with every built-in, extension and custom component's props),
+  `.gpsb/.gitignore`, and `tsconfig.json` if missing (`rootDirs: ['.', '.gpsb/types']` maps `../gpsb/engine.js`). Run by
+  `/api/project` when the project has `.ts` scripts or a `tsconfig.json`, and by `gpsb types [dir]`.
 
 ## Events (`event` prop type, e.g. `Button.onClick`; animation events use the same `call` syntax)
 
@@ -351,9 +394,10 @@ The output is meant to grow: dynamic components (runtime data, embeds, third-par
 the build. Anything below is a stable contract; changes to the build (minify, clean URLs, asset versions, ...) must
 keep it working.
 
-**Extension components** (`extensions/<Name>.js`, `Name` a JS identifier, not a built-in name). The default export is
-a component definition (format at the top of `lib/components.js`) or a factory `kit => definition` where `kit` =
-`{ esc, cssUrl, control, near, findComp, fontFamily }`, so the module needs no imports. The file must load in Node and
+**Extension components** (`extensions/<Name>.js` or `.ts`, `Name` a JS identifier, not a built-in name). The default
+export is a component definition (format at the top of `lib/components.js`), a factory `kit => definition` where `kit` =
+`{ esc, cssUrl, control, near, findComp, fontFamily }`, so the module needs no imports, or `defineExtension(Class)` from
+`../gpsb/engine.js` (resolved to the tool's `lib/` when imported in Node). The file must load in Node and
 the browser: browser-only work goes in `init` / `patch` / `state`. Registered with `registerComponent(name, def)`
 (`lib/components.js`; `isExtension`, `extensionNames`, `unregisterComponent`) and from then on indistinguishable from
 a built-in (Add Component, Inspector, animation, overrides, build, runtime). Default category: `Extensions`.
@@ -387,10 +431,12 @@ Binds 127.0.0.1 only. Every project path is resolved and rejected (403) if outsi
 ```
 GET  /                         editor/hub.html (Project Hub)   GET /editor/  editor/index.html   GET /editor/* /lib/*  tool files
 GET  /project/gpsb/*            lib/*                      GET /project/components/<Name>.js|.script.js  compiled on the fly
+GET  /project/(behaviours|extensions)/<path>.js   <path>.ts compiled on the fly when there's no .js file
 GET  /project/<page>.html      that page rendered on the fly (Links / IFrames inside the editor preview)
 GET  /project/*                project files (Range requests supported)
 GET  /api/project  -> { root, project, pages, components, behaviours, clips, json, assets[{path,type,size}], errors[{file,error}] }
-                   (unparseable pages/clips are left out, a bad JSON asset is null, project.json falls back to defaults)
+                   (unparseable pages/clips are left out, a bad JSON asset is null, project.json falls back to defaults;
+                   a project with TypeScript also gets its typings rewritten, see TypeScript)
 GET|PUT|DELETE /api/file?path= read / write (raw body, streamed) / delete a project file (never the project folder itself)
 POST /api/rename?from=&to=     POST /api/build -> { out, pages, warnings[] }
 GET  /api/events               SSE { file } on external changes (editor hot-reloads components/behaviours/assets)

@@ -23,6 +23,64 @@ export default class ${name} {
 }
 `;
 
+// TypeScript versions use the engine API (gpsb/engine.js, docs/engine-api.md): typed prop fields, applied automatically
+export const behaviourTemplateTS = name => `// ${name}: attach with Add Component > Scripts > ${name}.
+// Props show up in the Inspector. Any public method can be called from an event: behaviour:${name}.<method>
+import { Behaviour, prop, Time, wait } from '../gpsb/engine.js';
+
+export default class ${name} extends Behaviour {
+  static props = {
+    speed: prop.number(90, { help: 'degrees per second' }),
+  };
+  declare speed: number; // typed field for the prop above (reads and writes this.props.speed)
+
+  start() {}
+
+  update() {
+    this.rectTransform.rotation += this.speed * Time.deltaTime; // changes are applied at the end of the frame
+  }
+
+  onClick() {
+    this.webObject.punchScale(0.15, 0.3);
+  }
+
+  // behaviour:${name}.pulse
+  pulse() {
+    this.startCoroutine(function* (this: ${name}) {
+      yield this.webObject.scaleTo(1.2, 0.2).ease('outBack');
+      yield wait(0.1);
+      yield this.webObject.scaleTo(1, 0.2);
+    });
+  }
+}
+`;
+
+export const extensionTemplateTS = name => `// ${name}: an extension component. Add it with Add Component > Extensions > ${name}.
+// It works like a built-in: props show in the Inspector, can be animated and overridden per breakpoint.
+// This file runs at build time (Node) and in the browser, so keep browser-only code inside init / patch.
+import { Extension, defineExtension, prop, html, type Color } from '../gpsb/engine.js';
+
+class ${name} extends Extension {
+  static props = {
+    text: prop.string('Hello'),
+    color: prop.color('#202020'),
+  };
+  declare text: string;
+  declare color: Color;
+
+  // CSS declarations for the element
+  style() { return { color: this.color }; }
+  // HTML written into the page at build time (and shown in the editor); values are escaped
+  inner() { return html\`<span class="ext-text">\${this.text}</span>\`; }
+  // a prop changed (Inspector, animation, breakpoint): update the element
+  patch(el: HTMLElement) { const t = el.querySelector(':scope > .ext-text'); if (t) t.textContent = this.text; }
+  // published page / Play mode, once per element (setting a prop field re-applies the element)
+  init(el: HTMLElement) {}
+}
+
+export default defineExtension(${name});
+`;
+
 export const extensionTemplate = name => `// ${name}: an extension component. Add it with Add Component > Extensions > ${name}.
 // It works like a built-in: props show in the Inspector, can be animated and overridden per breakpoint.
 // This file runs at build time (Node) and in the browser, so keep browser-only code inside init / patch.
@@ -83,11 +141,13 @@ export function uniqueName(base, taken, sep = ' ') {
   for (let i = 1; ; i++) if (!taken(`${base}${sep}${i}`)) return `${base}${sep}${i}`;
 }
 
-export async function createScript(name) {
-  await S.api.put(`behaviours/${name}.js`, behaviourTemplate(name));
+export async function createScript(name, lang = 'js') {
+  await S.api.put(`behaviours/${name}.${lang}`, (lang === 'ts' ? behaviourTemplateTS : behaviourTemplate)(name));
   await S.reloadMeta();
-  S.log(`Created behaviours/${name}.js`);
+  S.log(`Created behaviours/${name}.${lang}`);
 }
+// the language new scripts default to: TypeScript once the project has any
+export const defaultLang = () => [...Object.values(S.S.P.behaviours ?? {}), ...Object.values(S.S.P.extensions ?? {})].some(x => x.lang === 'ts') ? 'ts' : 'js';
 export async function createComponent(name) {
   await S.api.put(`components/${name}.html`, componentTemplate(name));
   await S.reloadMeta();

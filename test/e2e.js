@@ -127,11 +127,66 @@ async function main() {
   check('editor: Hierarchy lists the example node names', !missing.length, missing.length ? `missing ${missing.join(', ')}` : '');
   await sleep(1000);
   check('editor: zero console errors / exceptions', page.errors.length === 0, page.errors.join(' | '));
+
+  // ---- TypeScript + engine API + tweens: test/fixtures/scripting, built ----
+  const TS = path.join(ROOT, '.tmp/e2e-scripting'), TS_PORT = 4210, TS_EDITOR_PORT = 4211;
+  fs.rmSync(TS, { recursive: true, force: true });
+  fs.cpSync(path.join(ROOT, 'test/fixtures/scripting'), TS, { recursive: true });
+  const tb = spawnSync(process.execPath, ['cli.js', 'build', TS], { cwd: ROOT, encoding: 'utf8' });
+  check('scripting: TypeScript project builds', tb.status === 0, (tb.stderr || tb.stdout).trim());
+  cleanups.push(await serveDir(path.join(TS, 'dist'), TS_PORT));
+  await page.open(`http://127.0.0.1:${TS_PORT}/index.html`);
+  const tsDone = await page.until(`GPSB.behaviour?.('mover', 'TweenDemo')?.phase === 2`, 5000);
+  check('scripting: TS behaviour runs a coroutine of tweens to the end', !!tsDone);
+  const st = await page.eval(`(() => { const n = id => GPSB.nodeFor(GPSB.el(id)); return { label: GPSB.el('label').textContent, pos: n('mover').rect.pos, scale: n('mover').rect.scale, color: n('mover').components[0].props.color, lp: n('mover').rect._layoutPos ?? null, speed: GPSB.behaviour('box', 'Spinner').speed }; })()`);
+  check('scripting: tweens moved, scaled and recoloured the object (and cleaned up _layoutPos)', JSON.stringify([st.pos, st.scale, st.color, st.lp]) === JSON.stringify([[300, 300], [1.5, 1.5], '#ff3366', null]), JSON.stringify(st));
+  check('scripting: typed node prop wrote into a Text, WebEvent called another behaviour', st.label === 'done:2' && st.speed === -180, JSON.stringify(st));
+  const rot1 = await page.eval(`GPSB.nodeFor(GPSB.el('box')).rect.rotation`); await sleep(300);
+  check('scripting: update() + rectTransform rotate the object (applied automatically)', (await page.eval(`GPSB.nodeFor(GPSB.el('box')).rect.rotation`)) !== rot1 && (await page.eval(`GPSB.el('box').style.transform`)).includes('rotate'));
+  await page.eval(`GPSB.el('badge').click()`); await sleep(100);
+  check('scripting: TS extension: build-time HTML, init + prop field re-applies (patch)', (await page.eval(`GPSB.el('badge').textContent`)) === 'BETA x1');
+  check('scripting: zero console errors / exceptions', page.errors.length === 0, page.errors.join(' | '));
+
+  // ---- the same project in the editor (dev server compiles .ts on request) ----
+  const ted = spawn(process.execPath, ['cli.js', 'serve', TS, '--port', String(TS_EDITOR_PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GPSB_CONFIG_DIR: cfg } });
+  cleanups.push(() => ted.kill());
+  await new Promise((ok, err) => { ted.stdout.on('data', d => /editor:/.test(d) && ok()); ted.on('exit', c => err(new Error(`editor server exited ${c}`))); });
+  await page.open(`http://127.0.0.1:${TS_EDITOR_PORT}/editor/`);
+  await page.until(`document.querySelector('[data-panel=hierarchy]')?.innerText.includes('Mover')`, 5000);
+  await sleep(800);
+  const meta = await page.eval(`(async () => { const S = await import('/editor/state.js'), C = await import('/lib/components.js'); return { tween: S.S.behaviourMeta.TweenDemo, spin: S.S.behaviourMeta.Spinner, badge: !!C.builtins.Badge?.extension }; })()`);
+  check('editor (TS): behaviour props + methods read from compiled .ts', JSON.stringify(Object.keys(meta.tween?.props ?? {})) === '["target","distance","tint","onDone"]' && meta.spin?.methods?.includes('reverse') && !meta.tween?.error, JSON.stringify(meta));
+  check('editor (TS): .ts extension registered like a built-in', meta.badge);
+  check('editor (TS): Scene preview shows the extension HTML', !!await page.until(`[...document.querySelectorAll('iframe[title=Preview]')].some(f => f.contentDocument?.body?.innerHTML.includes('>BETA<'))`, 5000));
+  check('editor (TS): typings + tsconfig.json written for the IDE', fs.existsSync(path.join(TS, '.gpsb/types/gpsb/project.d.ts')) && fs.existsSync(path.join(TS, 'tsconfig.json')));
+  await page.eval(`import('/editor/state.js').then(S => S.setPlaying(true))`);
+  const played = await page.until(`[...document.querySelectorAll('iframe[title=Preview]')].some(f => f.contentWindow?.GPSB?.behaviour?.('mover', 'TweenDemo')?.phase === 2 && f.contentDocument.querySelector('[data-gpsb=label]').textContent === 'done:2')`, 6000);
+  check('editor (TS): Play mode runs the TS behaviours and tweens', !!played);
+  await page.eval(`import('/editor/state.js').then(S => S.setPlaying(false))`);
+  await sleep(300);
+  check('editor (TS): zero console errors / exceptions', page.errors.length === 0, page.errors.join(' | '));
+  const served = await fetch(`http://127.0.0.1:${TS_EDITOR_PORT}/project/behaviours/Spinner.js`).then(r => r.text());
+  check('dev server: .ts served compiled under its .js name', /class Spinner extends Behaviour/.test(served) && !/declare|: number/.test(served) && /sourceMappingURL=data:/.test(served));
+  fs.writeFileSync(path.join(TS, 'behaviours/Bad.ts'), 'export default class { x: = 1 }\n');
+  const bad = await fetch(`http://127.0.0.1:${TS_EDITOR_PORT}/project/behaviours/Bad.js`).then(r => r.text());
+  check('dev server: a TS syntax error comes back as a script that throws it', /^throw new SyntaxError\(".*behaviours\/Bad\.ts/.test(bad), bad.slice(0, 120));
+}
+
+// static file server for a built site -> cleanup function
+async function serveDir(dir, port) {
+  const s = http.createServer((req, res) => {
+    const f = path.join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+    if (!f.startsWith(dir + path.sep) || !fs.existsSync(f) || !fs.statSync(f).isFile()) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { 'content-type': MIME[path.extname(f).slice(1)] ?? 'application/octet-stream' });
+    fs.createReadStream(f).pipe(res);
+  });
+  await new Promise(r => s.listen(port, '127.0.0.1', r));
+  return () => s.close();
 }
 
 // minimal CDP client (same approach as test/browser.js)
 async function chrome(W = 1440, H = 900) {
-  const bin = ['/usr/bin/google-chrome', '/snap/bin/chromium', '/usr/bin/chromium'].find(f => fs.existsSync(f));
+  const bin = [process.env.CHROME, '/usr/bin/google-chrome', '/snap/bin/chromium', '/usr/bin/chromium'].find(f => f && fs.existsSync(f));
   if (!bin) throw new Error('no chrome found');
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'gpsb-e2e-'));
   const port = 9300 + Math.floor(Math.random() * 500);

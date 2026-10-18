@@ -4,7 +4,7 @@
 import * as S from '../state.js';
 import { h, menu, fmtSize, hidden, setDragAsset } from '../fields.js';
 import { icon } from '../icons.js';
-import { openCode, createClip, uniqueName, renamePath, deletePath, behaviourTemplate, componentTemplate, extensionTemplate, validName } from '../files.js';
+import { openCode, createClip, uniqueName, renamePath, deletePath, behaviourTemplate, behaviourTemplateTS, componentTemplate, extensionTemplate, extensionTemplateTS, validName } from '../files.js';
 
 const ROOTS = { assets: 'Assets', prefabs: 'Prefabs', components: 'Components', behaviours: 'Behaviours', extensions: 'Extensions', animations: 'Animations' };
 const OPENABLE = ['component', 'behaviour', 'extension', 'json', 'text', 'file'];
@@ -203,7 +203,7 @@ function reveal(p) {
 
 const targetPath = (it, v) => ({
   asset: () => join(it.dir, v), folder: () => join(parentDir(it.folder), v),
-  component: () => `components/${v}.html`, behaviour: () => `behaviours/${v}.js`, extension: () => `extensions/${v}.js`, prefab: () => `prefabs/${v}.prefab.json`, anim: () => `animations/${v}.anim.json`,
+  component: () => `components/${v}.html`, behaviour: () => it.path.replace(/[^/]+(\.[jt]s)$/, `${v}$1`), extension: () => it.path.replace(/[^/]+(\.[jt]s)$/, `${v}$1`), prefab: () => `prefabs/${v}.prefab.json`, anim: () => `animations/${v}.anim.json`,
 }[it.ren]());
 
 function startRename(it) {
@@ -277,14 +277,14 @@ async function create(kind) {
       const n = uniqueName('NewComponent', x => P.components[x], '');
       path = `components/${n}.html`;
       await S.api.put(path, componentTemplate(n));
-    } else if (kind === 'behaviour') {
+    } else if (kind === 'behaviour' || kind === 'behaviour-ts') {
       const n = uniqueName('NewBehaviour', x => P.behaviours[x], '');
-      path = `behaviours/${n}.js`;
-      await S.api.put(path, behaviourTemplate(n));
-    } else if (kind === 'extension') {
+      path = `behaviours/${n}.${kind === 'behaviour' ? 'js' : 'ts'}`;
+      await S.api.put(path, (kind === 'behaviour' ? behaviourTemplate : behaviourTemplateTS)(n));
+    } else if (kind === 'extension' || kind === 'extension-ts') {
       const n = uniqueName('NewExtension', x => P.extensions?.[x] || S.builtins[x], '');
-      path = `extensions/${n}.js`;
-      await S.api.put(path, extensionTemplate(n));
+      path = `extensions/${n}.${kind === 'extension' ? 'js' : 'ts'}`;
+      await S.api.put(path, (kind === 'extension' ? extensionTemplate : extensionTemplateTS)(n));
     } else if (kind === 'anim') {
       const n = uniqueName('NewAnimation', x => P.clips[x], '');
       path = `animations/${n}.anim.json`;
@@ -306,7 +306,9 @@ function createMenu(x, y) {
     { label: 'JSON File', action: () => create('json') },
     { label: 'Component', action: () => create('component') },
     { label: 'Behaviour Script', action: () => create('behaviour') },
+    { label: 'Behaviour Script (TypeScript)', action: () => create('behaviour-ts') },
     { label: 'Extension Component', action: () => create('extension') },
+    { label: 'Extension Component (TypeScript)', action: () => create('extension-ts') },
     { label: 'Animation Clip', action: () => create('anim') },
     '-',
     { label: 'Import New Asset…', action: () => fileIn.click() },
@@ -333,8 +335,8 @@ async function importFiles(files, folder) {
     S.log(`Importing ${i + 1}/${files.length}: ${f.name} (${fmtSize(f.size)})`);
     try {
       if (folder === 'components' && f.name.endsWith('.html')) { await S.api.put('components/' + f.name, f); meta = true; last = 'components/' + f.name; }
-      else if (folder === 'behaviours' && f.name.endsWith('.js')) { await S.api.put('behaviours/' + f.name, f); meta = true; last = 'behaviours/' + f.name; }
-      else if (folder === 'extensions' && f.name.endsWith('.js')) { await S.api.put('extensions/' + f.name, f); meta = true; last = 'extensions/' + f.name; }
+      else if (folder === 'behaviours' && /\.[jt]s$/.test(f.name)) { await S.api.put('behaviours/' + f.name, f); meta = true; last = 'behaviours/' + f.name; }
+      else if (folder === 'extensions' && /\.[jt]s$/.test(f.name)) { await S.api.put('extensions/' + f.name, f); meta = true; last = 'extensions/' + f.name; }
       else if (f.name.endsWith('.anim.json')) {
         const text = await f.text(), n = f.name.slice(0, -10);
         S.S.P.clips[n] = JSON.parse(text);

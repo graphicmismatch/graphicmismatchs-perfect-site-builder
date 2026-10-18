@@ -12,7 +12,7 @@ const shot = opt('--shot'), expr = opt('--eval'), wait = +opt('--wait', 1500), [
 const url = args[0];
 if (!url) { console.log('usage: node test/browser.js <url> [--shot f.png] [--eval expr] [--wait ms] [--size WxH]'); process.exit(2); }
 
-const bin = ['/usr/bin/google-chrome', '/snap/bin/chromium', '/usr/bin/chromium'].find(f => fs.existsSync(f));
+const bin = [process.env.CHROME, '/usr/bin/google-chrome', '/snap/bin/chromium', '/usr/bin/chromium'].find(f => f && fs.existsSync(f));
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'gpsb-chrome-'));
 const port = 9300 + Math.floor(Math.random() * 500);
 const chrome = spawn(bin, ['--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--mute-audio', '--autoplay-policy=no-user-gesture-required',

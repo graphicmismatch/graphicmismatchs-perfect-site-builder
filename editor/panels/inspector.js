@@ -6,7 +6,7 @@ import { withDefaults } from '/lib/components.js';
 import { componentPath, clearOverride } from '/lib/node.js';
 import { h, nice, fmt, fmtSize, field, numInput, scrub, menu, popup, listNav, closePopup, accept, hidden } from '../fields.js';
 import { icon, compIcon } from '../icons.js';
-import { openCode, createScript, createComponent, validName } from '../files.js';
+import { openCode, createScript, createComponent, validName, defaultLang } from '../files.js';
 
 let el, live = [], sig = '', assetPath = null, clipboard = null, presetN = 0;
 const fold = (() => { try { return JSON.parse(localStorage.gpsbFold || '{}'); } catch { return {}; } })();
@@ -449,6 +449,8 @@ function addComponentPopup(n, anchor) {
     const name = h('input', { class: 'pk-q', value: base.replace(/^[^A-Za-z_]+/, '') || 'New', spellcheck: 'false' });
     const msg = h('div', { class: 'ac-msg' });
     const go = h('button', { class: 'btn' }, 'Create and Add');
+    const lang = h('select', { class: 'pk-q' }, h('option', { value: 'js' }, 'JavaScript'), h('option', { value: 'ts' }, 'TypeScript'));
+    lang.value = defaultLang();
     const exists = v => (k === 'behaviour' ? S.S.P.behaviours : S.S.P.components)[v];
     const check = () => { const v = name.value.trim(); const bad = !validName(v) ? 'Use letters, digits, _ or -, starting with a letter.' : exists(v) ? `${v} already exists.` : ''; msg.textContent = bad; go.disabled = !!bad; return !bad; };
     name.oninput = check;
@@ -457,14 +459,14 @@ function addComponentPopup(n, anchor) {
       const v = name.value.trim();
       go.disabled = true;
       try {
-        await (k === 'behaviour' ? createScript(v) : createComponent(v));
+        await (k === 'behaviour' ? createScript(v, lang.value) : createComponent(v));
         pop.close();
         S.addComponent(n.id, `${k}:${v}`);
       } catch (e) { msg.textContent = e.message; go.disabled = false; }
     };
     name.onkeydown = e => { if (e.key === 'Enter') go.click(); };
-    list.replaceChildren(h('div', { class: 'ac-create' }, h('label', {}, 'Name'), name, msg,
-      h('div', { class: 'in-note' }, k === 'behaviour' ? `Creates behaviours/<name>.js from a template (props, start, update, methods).` : `Creates components/<name>.html (template, style, props, script).`), go));
+    list.replaceChildren(h('div', { class: 'ac-create' }, h('label', {}, 'Name'), name, msg, ...(k === 'behaviour' ? [h('label', {}, 'Language'), lang] : []),
+      h('div', { class: 'in-note' }, k === 'behaviour' ? `Creates behaviours/<name>.js or .ts from a template (props, start, update, methods). TypeScript uses the engine API.` : `Creates components/<name>.html (template, style, props, script).`), go));
     check();
     setTimeout(() => { name.focus(); name.select(); });
   }
@@ -552,7 +554,7 @@ function renderAsset(p) {
       const bm = S.S.behaviourMeta[m.name] ?? {};
       if (bm.error) body.prepend(h('div', { class: 'in-warn', html: icon('warn') }, h('span', {}, bm.error)));
       body.prepend(h('div', { class: 'as-kv' }, ...kv({ Props: Object.keys(bm.props ?? {}).join(', ') || '—', Methods: (bm.methods ?? []).join(', ') || '—' })));
-      usage('Add Component › Scripts › ', h('b', {}, m.name), ', or drag it onto the Inspector. Call methods from events: ', code(`behaviour:${m.name}.${(bm.methods ?? []).find(x => x !== 'start' && x !== 'update') ?? 'method'}`), '.');
+      usage('Add Component › Scripts › ', h('b', {}, m.name), ', or drag it onto the Inspector. Call methods from events: ', code(`behaviour:${m.name}.${(bm.methods ?? []).find(x => !['start', 'update', 'lateUpdate'].includes(x) && !x.startsWith('_')) ?? 'method'}`), '.');
     } else usage('Path: ', code(rel ?? p), m.kind === 'text' ? ' · load at runtime with ' : '', m.kind === 'text' ? code(`GPSB.assets.text('${rel}')`) : '');
     S.api.get(p).then(t => { sizeOf(t); pre.textContent = t.length > 20000 ? t.slice(0, 20000) + '\n…' : t; }, e => (pre.textContent = e.message));
   }

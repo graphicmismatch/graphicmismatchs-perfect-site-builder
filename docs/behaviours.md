@@ -10,6 +10,11 @@ object's node data and re-applying it, so they don't need to know how the page's
 Use a behaviour for motion, reacting to input, and driving other objects. If you want to add new HTML to the page, see
 [custom components](components.md) or [extension components](extensions.md) instead.
 
+> **Two styles.** This page describes the plain format: a class with injected fields and `this.apply()`. The
+> [engine API](engine-api.md) builds on it in Unity's style: `extends Behaviour`, typed prop fields, `getComponent`,
+> coroutines, [tweens](tweening.md), and changes that apply themselves. Both styles can be mixed, and both work in
+> [TypeScript](typescript.md) (`behaviours/<Name>.ts`).
+
 ## Create one
 
 - **From the Inspector:** select an object ▸ Add Component ▸ New Script. Type a name. gpsb creates
@@ -57,12 +62,13 @@ export default class Bob {
 |---|---|
 | `constructor()` | When the instance is created. The injected fields below are **not** set yet, so do set-up in `start`. |
 | `start()` | Once, after every behaviour on the page has been created. It may be `async`. |
-| `update(dt)` | Every animation frame. `dt` is the time since the last frame in seconds (at most 0.1). |
+| `update(dt)` | Every animation frame. `dt` is the time since the last frame in seconds (at most 0.1), scaled by `Time.timeScale` from the [engine API](engine-api.md#value-types-and-helpers). |
+| `lateUpdate(dt)` | Every frame, after every behaviour's `update` and after coroutines and tweens. |
 | `onClick(e)` | When the element is clicked. |
 | any other method | Whenever an event calls it (see below). |
 
-All hooks are optional. If `update` throws, that instance's `update` is turned off and the error is logged to the
-Console; other behaviours keep running.
+All hooks are optional. If `update` or `lateUpdate` throws, that instance's per-frame hooks are turned off and the
+error is logged to the Console; other behaviours keep running.
 
 ## What a behaviour can use
 
@@ -197,7 +203,7 @@ The demo project (`example/behaviours/`) has three behaviours worth reading:
   `this.GPSB.assets.url(path)`. `node` props are node ids: look them up with `this.GPSB.node(id)`.
 - **Data:** `await this.GPSB.assets.json('data/site.json')` inside an `async start()`.
 - **Imports:** behaviours are ES modules. They're published to `behaviours/`, next to the gpsb runtime in `gpsb/`, so
-  `import { lerpValue } from '../gpsb/anim.js'` works. Other files you import must be reachable from the published
+  `import { Behaviour, tween } from '../gpsb/engine.js'` or `import { lerpValue } from '../gpsb/anim.js'` works. Other files you import must be reachable from the published
   site, e.g. in `public/` or `assets/`.
 - **Several behaviours** can be attached to the same object, including more than one of the same script.
 - **Debugging:** `console.log` and errors appear in the editor's Console during Play mode. Errors name the behaviour
