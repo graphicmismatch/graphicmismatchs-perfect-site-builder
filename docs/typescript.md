@@ -35,9 +35,9 @@ A name can be used by only one file: `Spin.js` and `Spin.ts` side by side is an 
 When the editor opens a project that has TypeScript files (or a `tsconfig.json`), gpsb writes:
 
 - `.gpsb/types/gpsb/`: `engine.d.ts` (the whole engine API, tweens and the runtime included), plus `project.d.ts`,
-  generated from this project's components. `getComponent('Text')` knows `text`, `color` and `size`, and your own extensions and custom
-  components are in there too. It's updated whenever the editor reloads the project, so a new extension prop shows up
-  in your IDE. The folder has its own `.gitignore`.
+  generated from this project's components. `getComponent('Text')` knows `text`, `color` and `size`, and your own
+  extensions and custom components are in there too. It's updated whenever the editor reloads the project, so a new
+  extension prop shows up in your IDE. The folder has its own `.gitignore`.
 - `tsconfig.json`, if there isn't one. Its `rootDirs` setting makes `import … from '../gpsb/engine.js'` resolve to
   those types, the same path that works on the published site.
 
