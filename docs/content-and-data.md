@@ -27,6 +27,14 @@ Text with scripts or event handlers opens as HTML, since the formatted view neve
   - **Element: img** writes a real `<img>` tag: searchable, lazy-loaded, with **Alt** text. Use it for content images.
     Set Loading to `eager` for images that are visible straight away, such as a logo or hero picture.
   - **Element: background** uses a CSS background. Use it for decoration.
+  - **Focus** is the focal point (0–1 across and down; 0.5, 0.5 is the centre). When Fit is cover and the picture
+    is cut to fill its object, the focal point stays in view, at any screen size: put it on a face or a product.
+  - **Lightbox**: a click shows the picture full screen.
+- **Crop & Focus…** (under the Image's fields) opens the picture in a window: drag the frame to crop it, at a free or
+  fixed aspect (1:1, 16:9, the picture's own, or the object's), and drag the dot to set the focal point. Applying a
+  crop saves a cropped copy next to the original (`photo.crop-….png`), so visitors download only what shows; the
+  original stays untouched, and opening the window again starts from it, so you can change or remove the crop
+  (Reset, then Apply) at any time.
 - **Raw Image** shows part of a texture (UV Rect), for sprite sheets.
 
 Drag images into the Project panel to import them, then drag them onto the Scene to create an Image.

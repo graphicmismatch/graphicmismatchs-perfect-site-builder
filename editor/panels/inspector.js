@@ -7,6 +7,7 @@ import { componentPath, clearOverride } from '/lib/node.js';
 import { h, nice, fmt, fmtSize, field, numInput, scrub, menu, popup, listNav, closePopup, accept, hidden } from '../fields.js';
 import { icon, compIcon } from '../icons.js';
 import { openCode, createScript, createComponent, validName, defaultLang } from '../files.js';
+import { openCropper } from '../crop.js';
 
 let el, live = [], sig = '', assetPath = null, clipboard = null, presetN = 0;
 const fold = (() => { try { return JSON.parse(localStorage.gpsbFold || '{}'); } catch { return {}; } })();
@@ -357,11 +358,13 @@ function compSection(n, c, ci) {
   if (!props.length && !missing && !err) body.push(h('div', { class: 'in-note' }, d?.behaviour ? 'No exposed props. Export `props` from the script to show fields here.' : 'No properties.'));
   const wrap = h('div');
   for (const [k, sc] of props) {
+    if (sc.hidden) continue; // bookkeeping the editor keeps (Image.crop)
     const b = pb([id], `${cp}.${k}`, sc.default), w = add(wrap, field(sc, b, nice(k)), `${ci}.${k}`, b);
     if (t === 'Canvas' && k === 'height') // the page grows to its content
       w.el.append(h('button', { class: 'rt-fit f-fit', title: 'Fit the page height to its content', onclick: () => S.fitToChildren(id) }, '⤢'));
   }
   body.push(wrap);
+  if (t === 'Image') body.push(h('div', { class: 'in-actions' }, h('button', { class: 'btn', title: 'Crop the picture and set its focal point', onclick: () => openCropper(id, ci) }, 'Crop & Focus…')));
   if (d?.behaviour || d?.custom) body.push(h('div', { class: 'in-src' }, h('a', { onclick: () => openCode(d.behaviour ? S.S.P.behaviours[t.slice(10)]?.path : `components/${t.slice(10)}.html`) }, 'Edit Script')));
 
   const count = n.components.length;

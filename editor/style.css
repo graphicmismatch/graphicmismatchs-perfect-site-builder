@@ -240,3 +240,30 @@ input, textarea { user-select: text; }
 .sp-shot { width: 300px; height: 160px; overflow: hidden; border-radius: 4px; background: #fff; margin-bottom: 4px; }
 .sp-frame { border: 0; height: 640px; transform: scale(.25); transform-origin: 0 0; pointer-events: none; display: block; }
 .sp-foot { padding: 6px 12px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11px; }
+
+/* Crop & Focus window */
+.cr-win { width: min(1000px, 96vw); height: min(720px, 92vh); }
+.cr-bar, .cr-foot { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.cr-foot { border-bottom: 0; border-top: 1px solid var(--border); }
+.cr-grow { flex: 1; }
+.cr-info, .cr-hint { color: var(--text-dim); font-size: 11px; }
+.cr-stage { position: relative; flex: 1; overflow: hidden; background: repeating-conic-gradient(#0002 0 25%, transparent 0 50%) 0 0 / 16px 16px, var(--sunken); touch-action: none; user-select: none; }
+.cr-img { position: absolute; pointer-events: none; }
+.cr-box { position: absolute; box-shadow: 0 0 0 9999px rgb(0 0 0 / .55); outline: 1px solid #fff; cursor: move;
+  background: linear-gradient(#fff6, #fff6) 33.33% 0 / 1px 100% no-repeat, linear-gradient(#fff6, #fff6) 66.66% 0 / 1px 100% no-repeat,
+    linear-gradient(#fff6, #fff6) 0 33.33% / 100% 1px no-repeat, linear-gradient(#fff6, #fff6) 0 66.66% / 100% 1px no-repeat; }
+.cr-h { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; background: #fff; border: 1px solid #0008; border-radius: 2px; }
+.cr-h.nw { left: 0; top: 0; cursor: nwse-resize; } .cr-h.n { left: 50%; top: 0; cursor: ns-resize; } .cr-h.ne { left: 100%; top: 0; cursor: nesw-resize; }
+.cr-h.e { left: 100%; top: 50%; cursor: ew-resize; } .cr-h.se { left: 100%; top: 100%; cursor: nwse-resize; } .cr-h.s { left: 50%; top: 100%; cursor: ns-resize; }
+.cr-h.sw { left: 0; top: 100%; cursor: nesw-resize; } .cr-h.w { left: 0; top: 50%; cursor: ew-resize; }
+.cr-dot { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 2px solid #fff; background: color-mix(in srgb, var(--accent-hi) 70%, transparent); box-shadow: 0 0 0 1px #0008, 0 2px 8px #0008; cursor: grab; }
+.in-actions { display: flex; gap: 6px; padding: 4px 0 2px 0; }
+.btn.primary { background: var(--accent-hi); border-color: transparent; color: #fff; }
+
+/* text editing toolbar (editor/textedit.js) */
+.te-bar { position: fixed; z-index: 2000; display: flex; align-items: center; gap: 2px; padding: 3px; background: var(--panel); border: 1px solid var(--menu-border); border-radius: 6px; box-shadow: 0 4px 16px var(--shadow); }
+.te-b { min-width: 26px; height: 24px; padding: 0 6px; border: 0; border-radius: 4px; background: none; color: var(--text); cursor: pointer; font: inherit; }
+.te-b:hover { background: var(--hover-2); }
+.te-b.b { font-weight: 800; } .te-b.i { font-style: italic; font-family: Georgia, serif; } .te-b.u { text-decoration: underline; }
+.te-b.done { background: var(--accent-hi); color: #fff; }
+.te-sep { width: 1px; align-self: stretch; margin: 2px 3px; background: var(--border); }

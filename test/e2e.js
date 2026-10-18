@@ -228,6 +228,7 @@ async function main() {
   await widgetsSection(page);
   await contentSection(page);
   await sectionsSection(page);
+  await canvasSection(page);
 }
 
 // ---- forms: validation, sending, events (a local endpoint records submissions) ----
@@ -568,7 +569,7 @@ async function sectionsSection(page) {
     const cards = document.querySelectorAll('.sp-card'), shots = [...document.querySelectorAll('.sp-frame')].filter(f => f.contentDocument?.body?.innerText.trim().length > 5).length;
     const n0 = S.root().children.length;
     [...cards].find(c => c.querySelector('b').textContent === 'Team').click();
-    await w(800);
+    for (let i = 0; i < 60 && !S.S.previewWin.document.body.innerText.includes('The people behind it'); i++) await w(100); // the preview rebuilds
     const names = S.root().children.map(c => c.name);
     return JSON.stringify({ cards: cards.length, of: SECTIONS.length, shots, added: names.length - n0, after: names[names.indexOf('Hero') + 1], open: !!document.querySelector('.sp-win'),
       preview: S.S.previewWin.document.body.innerText.includes('The people behind it') });
@@ -576,6 +577,75 @@ async function sectionsSection(page) {
   const r = JSON.parse(ins);
   check('editor: Insert Section previews every section and inserts one after the selected section', r.cards === r.of && r.shots === r.of && r.added === 1 && r.after === 'Team' && !r.open && r.preview, ins);
   check('editor: sections zero console errors', page.errors.length === 0, page.errors.join(' | '));
+}
+
+// ---- editing on the canvas: double-click text to type into it; Crop & Focus on an image ----
+async function canvasSection(page) {
+  const CV = path.join(ROOT, '.tmp/e2e-canvas'), PORT = 4223, cfg = path.join(ROOT, '.tmp', 'e2e-config-canvas');
+  fs.rmSync(CV, { recursive: true, force: true });
+  spawnSync(process.execPath, ['cli.js', 'new', CV, '--template', 'landing'], { cwd: ROOT });
+  const ed = spawn(process.execPath, ['cli.js', 'serve', CV, '--port', String(PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GPSB_CONFIG_DIR: cfg } });
+  cleanups.push(() => ed.kill());
+  await new Promise((ok, err) => { ed.stdout.on('data', d => /editor:/.test(d) && ok()); ed.on('exit', c => err(new Error(`editor exited ${c}`))); });
+  page.errors.length = 0;
+  await page.open(`http://127.0.0.1:${PORT}/editor/`);
+  await page.until(`document.querySelector('[data-panel=hierarchy]')?.innerText.includes('Footer')`, 8000);
+  page.errors.length = 0; // leaving the previous editor (unsaved on purpose) logs a beforeunload notice
+  const t = await page.eval(`(async () => {
+    const S = await import('/editor/state.js'), w = ms => new Promise(r => setTimeout(r, ms));
+    await w(500);
+    const hero = S.root().children.find(c => c.name === 'Hero'), find = (n, name) => { for (const [x] of S.walk(n)) if (x.name === name) return x; };
+    const head = find(hero, 'Lead'), win = S.S.previewWin, el = win.GPSB.el(head.id), fr = win.frameElement.getBoundingClientRect(), z = fr.width / win.frameElement.offsetWidth;
+    const r = el.getBoundingClientRect(), x = fr.left + (r.left + 10) * z, y = fr.top + (r.top + r.height / 2) * z;
+    const view = document.querySelector('.sc-view');
+    view.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: x, clientY: y }));
+    await w(100);
+    const span = el.querySelector('.gpsb-text'), out = { editable: span.isContentEditable, bar: !!document.querySelector('.te-bar') };
+    const doc = win.document;
+    doc.execCommand('selectAll'); doc.execCommand('insertText', false, 'Hello ');
+    doc.execCommand('insertText', false, 'world'); 
+    doc.execCommand('selectAll'); 
+    const sel = doc.getSelection(), rg = doc.createRange(); rg.setStart(span.firstChild, 6); rg.setEnd(span.firstChild, 11); sel.removeAllRanges(); sel.addRange(rg);
+    document.querySelector('.te-b.b').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    span.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await w(100);
+    out.text = head.components[0].props.text; out.bar2 = !!document.querySelector('.te-bar'); out.editable2 = span.isContentEditable;
+    S.undo(); await w(50);
+    const again = find(S.root().children.find(c => c.name === 'Hero'), 'Lead'); // undo restored a copy of the page
+    out.undone = again.components[0].props.text.slice(0, 20);
+    // a bound text can't be edited in place
+    again.components[0].props.text = '{{item.x}}';
+    out.bound = (await import('/editor/textedit.js')).startTextEdit(again.id, el);
+    return JSON.stringify(out);
+  })()`);
+  check('editor: double-click a text to edit it on the canvas (toolbar, bold), Escape commits, undo restores',
+    t === JSON.stringify({ editable: true, bar: true, text: 'Hello <b>world</b>', bar2: false, editable2: false, undone: 'A short sentence tha', bound: false }), t);
+
+  const c = await page.eval(`(async () => {
+    const S = await import('/editor/state.js'), { openCropper } = await import('/editor/crop.js'), w = ms => new Promise(r => setTimeout(r, ms));
+    const hero = S.root().children.find(x => x.name === 'Hero');
+    let pic; for (const [x] of S.walk(hero)) if (x.name === 'Picture') pic = x;
+    await openCropper(pic.id, 0);
+    await w(200);
+    const stage = document.querySelector('.cr-stage'), handle = document.querySelector('.cr-h.se'), dot = document.querySelector('.cr-dot');
+    const drag = (el, dx, dy) => { const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, o = { bubbles: true, pointerId: 1, clientX: x, clientY: y };
+      el.dispatchEvent(new PointerEvent('pointerdown', o)); stage.dispatchEvent(new PointerEvent('pointermove', { ...o, clientX: x + dx, clientY: y + dy })); stage.dispatchEvent(new PointerEvent('pointerup', { ...o, clientX: x + dx, clientY: y + dy })); };
+    const sw = document.querySelector('.cr-img').getBoundingClientRect().width;
+    drag(handle, -sw / 2, -document.querySelector('.cr-img').getBoundingClientRect().height / 2); // keep the top-left quarter
+    drag(dot, -sw / 4, 0);
+    const info = document.querySelector('.cr-info').textContent;
+    [...document.querySelectorAll('.cr-foot .btn')].find(b => b.textContent === 'Apply').click();
+    for (let i = 0; i < 50 && document.querySelector('.cr-win'); i++) await w(50);
+    const p = pic.components[0].props;
+    const img = S.S.previewWin.GPSB.el(pic.id).querySelector('img');
+    return JSON.stringify({ info, sprite: p.sprite, src: p.cropSource, crop: p.crop.map(v => Math.round(v * 100) / 100), focus: p.focus.map(v => Math.round(v * 10) / 10), pos: img && getComputedStyle(img).objectPosition });
+  })()`);
+  const cr = JSON.parse(c), file = cr.sprite && path.join(CV, 'assets', cr.sprite);
+  const png = file && fs.existsSync(file) ? fs.readFileSync(file) : null;
+  check('editor: Crop & Focus writes a cropped copy (the original kept), and the focal point positions it',
+    /^img\/photo-1\.crop-\w+\.png$/.test(cr.sprite) && cr.src === 'img/photo-1.svg' && JSON.stringify(cr.crop) === '[0,0,0.5,0.5]' && JSON.stringify(cr.focus) === '[0.5,1]' && cr.pos === '50% 100%'
+    && png?.readUInt32BE(16) === 600 && png?.readUInt32BE(20) === 400 && cr.info === '600 × 400 px', c);
+  check('editor: canvas editing zero console errors', page.errors.length === 0, page.errors.join(' | '));
 }
 
 // static file server for a built site -> cleanup function
@@ -641,7 +711,7 @@ async function chrome(W = 1440, H = 900) {
 }
 
 // E2E_ONLY=forms|widgets runs just that section (quicker while working on it)
-const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p), content: p => contentSection(p), sections: p => sectionsSection(p) }[process.env.E2E_ONLY];
+const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p), content: p => contentSection(p), sections: p => sectionsSection(p), canvas: p => canvasSection(p) }[process.env.E2E_ONLY];
 try { if (ONLY) await ONLY(await chrome()); else await main(); } catch (e) { failed++; console.log('FAIL', e.stack ?? e); } finally { for (const f of cleanups.reverse()) try { f(); } catch {} }
 console.log(failed ? `\n${failed} assertion(s) failed` : '\nall e2e assertions passed');
 process.exit(failed ? 1 : 0);

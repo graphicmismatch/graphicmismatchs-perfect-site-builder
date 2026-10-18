@@ -164,7 +164,8 @@ Editor: Project Settings ▸ Design Tokens; `files.js` `renameToken(kind, from, 
 
 ## Prop types (component schemas)
 
-`{ type, default, ...opts }`, optional `help` (tooltip), `labels` (vec field labels).
+`{ type, default, ...opts }`, optional `help` (tooltip), `labels` (vec field labels), `hidden` (kept in the data, not
+shown in the Inspector: editor bookkeeping such as `Image.crop`).
 
 | type | value | inspector |
 |---|---|---|
@@ -252,6 +253,15 @@ SocialLinks, Carousel, Tabs, Accordion, Modal, Gallery, VideoEmbed, Map.
   node element, filling its rect, with browser default styling. User edits are written back into the element's node
   data (`def.state`), so `GPSB.nodeFor(el)` reads the current value and re-applies keep it. Interactive runtime set-up
   lives in `def.init({ el, GPSB, ci })` (run by `behaviours.js#boot`, not in the editor).
+- `Image.focus` [x, y] 0–1 → `object-position` / `background-position`. `Image.cropSource` + `crop` [x, y, w, h]
+  (hidden): written by the editor's Crop & Focus window (`editor/crop.js`), which cuts `cropSource` with a canvas into
+  a new asset `<name>.crop-<tag>.<png|jpg|webp>` (Sprite) and keeps the source for re-cropping; focus is relative to
+  what Sprite shows.
+- Canvas text editing (`editor/textedit.js`): Scene double-click on an element whose node has a Text → its
+  `.gpsb-text` span becomes contentEditable (raw prop HTML, so page links stay unresolved), toolbar via
+  `execCommand` (styleWithCSS off); end → `S.setProp(id, '<Text path>.text', html)`; `{{bindings}}` are refused.
+  The front preview iframe takes pointer events while editing (`.editing`); a Scene pointerdown or a preview rebuild
+  ends the edit.
 - `Element` sets the HTML tag (section, nav, …), id, title, role and ARIA attributes. `Shadow` and `Outline` filters stack.
 Definition shape is documented at the top of that file. `componentDef(type, customs, behaviourMeta)` resolves any type;
 `withDefaults(def, props)` fills defaults.

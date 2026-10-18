@@ -50,6 +50,10 @@ The real page, rendered live as it will be built.
 - The **breakpoint** buttons choose which breakpoint your edits apply to (see [Layout](layout.md#responsive-breakpoints)).
 - Scroll to zoom. Pan by dragging with the View tool (Q), the middle mouse button, or Space held down. F frames the
   selection.
+- **Double-click a text** (a Text, or a button's label) to type into it right there. A small toolbar offers bold,
+  italic, underline, a link (Ctrl+K) and clear formatting. Enter starts a new line; Escape, Ctrl+Enter or a click
+  elsewhere finishes. The change is one undo step and, like any other edit, becomes an override when you're editing a
+  breakpoint or a prefab instance. Texts filled from data (`{{…}}`) are edited in the Inspector or the Content window.
 
 **Play** switches to the Web view: scripts run, animations play, buttons work, links between pages work. Nothing you
 do in Play mode is saved.

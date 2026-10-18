@@ -3,6 +3,7 @@
 import * as S from '../state.js';
 import { reanchor } from '/lib/rect.js';
 import { activeBreakpoints } from '/lib/node.js';
+import { startTextEdit, endTextEdit, editingText, textPathOf } from '../textedit.js';
 
 const RES = [[1920, 1080], [1280, 720], [1366, 768], [1440, 900], [390, 844, 'phone'], [768, 1024, 'tablet']];
 const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 4];
@@ -368,6 +369,7 @@ function hoverAt(v) {
 // ---------- drags ----------
 function down(e) {
   if (mode !== 'scene') return;
+  if (editingText()) endTextEdit(); // a click outside the text being edited ends it
   view.focus({ preventScroll: true });
   const v = vpt(e), tool = S.S.tool;
   if (e.button === 1 || (e.button === 0 && (spaceDown || tool === 'hand'))) {
@@ -746,6 +748,14 @@ export function mount(root) {
 
   // view input
   view.addEventListener('pointerdown', down);
+  // double-click a Text (or a button's label) to edit it in place
+  view.addEventListener('dblclick', e => {
+    if (mode !== 'scene' || S.S.playing || !win) return;
+    const f = stage().inverse().transformPoint(vpt(e)), hit = win.document.elementsFromPoint(f.x, f.y).find(x => x.dataset?.gpsb && textPathOf(x.dataset.gpsb));
+    if (!hit) return;
+    S.select(hit.dataset.gpsb);
+    startTextEdit(hit.dataset.gpsb, hit, f);
+  });
   view.addEventListener('mousedown', e => e.button === 1 && e.preventDefault()); // no autoscroll
   view.addEventListener('pointermove', e => !drag && mode === 'scene' && hoverAt(vpt(e)));
   view.addEventListener('pointerleave', () => { if (!drag) hover = hotKey = null; });
@@ -791,6 +801,7 @@ export function mount(root) {
     if (!S.S.playing) rebuildLater(); // playing: keep the running page, patch only
   });
   S.on('frame', frameSel);
+  S.on('preview-ready', () => editingText() && endTextEdit()); // the preview was rebuilt under the edited text
   S.on('align', align);
   S.on('tool', () => { hotKey = null; });
   S.on('page', () => { hover = null; });

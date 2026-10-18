@@ -275,7 +275,7 @@ pg = canvasNode();
 const photo = newNode('Photo', [{ type: 'Image', props: { sprite: 'img/p.jpg', element: 'img', alt: 'A "cat"', fit: 'cover', loading: 'eager' } }]);
 pg.children.push(photo);
 const imgHtml = renderPage(pg, makeCtx()).body;
-assert.match(imgHtml, /<img class="gpsb-img" src="assets\/img\/p\.jpg" alt="A &#34;cat&#34;" loading="eager" decoding="async"[^>]*object-fit:cover;z-index:-1/);
+assert.match(imgHtml, /<img class="gpsb-img" src="assets\/img\/p\.jpg" alt="A &#34;cat&#34;" loading="eager" decoding="async"[^>]*object-fit:cover;object-position:50% 50%;z-index:-1/);
 assert.ok(!/role="img"/.test(imgHtml)); // the <img> carries the alt, not the element
 assert.deepEqual([nodeStyle(photo, pg, makeCtx())['background-image'], nodeStyle(photo, pg, makeCtx()).isolation], ['none', 'isolate']);
 const moving = rt({ anchorMin: [0, 0], anchorMax: [0, 0], pivot: [0, 0], pos: [30, 5], size: [10, 10], rotation: 45 });

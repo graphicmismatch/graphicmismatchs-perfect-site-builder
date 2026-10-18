@@ -58,3 +58,4 @@
 .sc-pop-r input:first-child { flex: 1; } .sc-pop-r input[type="number"] { width: 64px; }
 .sc-pop-f { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
 .sc-pop-f .err { flex: 1; color: var(--red); }
+.sc-world iframe.on.editing { pointer-events: auto; }
