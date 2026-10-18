@@ -19,6 +19,7 @@ Start here if you want to build a site.
 5. [Interactivity and events](events.md): Button On Click and the other event lists, and what each call does.
 6. [Animation](animation.md): clips, the Animation window, record mode, curves, sprite swaps, animation events.
 7. [Prefabs and design tokens](prefabs-and-tokens.md): reusable objects and project-wide colours, fonts and text styles.
+   [Sections, themes and templates](sections-and-themes.md): ready-made page sections, one-click themes, starter sites.
 8. [Publishing](publishing.md): building, project settings, hosting, custom code, build hooks.
 
 ## Developer guides

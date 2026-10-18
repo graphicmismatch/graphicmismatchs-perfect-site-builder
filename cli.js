@@ -2,7 +2,8 @@
 // graphicmismatch's perfect site builder
 //   gpsb [hub] [--port N]       open the Project Hub at http://127.0.0.1:4000
 //   gpsb serve [dir] [--port N] same, with <dir> registered and opened in the editor
-//   gpsb new   <dir>            create an empty project
+//   gpsb new   <dir> [--template landing|business|portfolio|blog] [--theme clean|editorial|bold|warm|mono]
+//                               create a project (empty, or a ready-made site)
 //   gpsb build [dir] [--out D]  write the static site (default <dir>/dist)
 //   gpsb types [dir]            write TypeScript typings + tsconfig.json for the project's scripts
 //   gpsb add <pkg>[@range]…     npm packages (pm.js): add, remove <pkg>…, update [pkg…], install, packages, search <text>
@@ -21,12 +22,13 @@ import { registerComponent, unregisterComponent, extensionNames, builtins } from
 import { parseComponent, compileComponent, isTS, compileTS, withMap, quiet } from './lib/compile.js';
 import { newNode, walk, getComponent } from './lib/node.js';
 import { expandPrefabs } from './lib/prefab.js';
+import { templateFiles, TEMPLATES } from './lib/sections.js';
 import * as pm from './pm.js';
 
 const TOOL = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const flag = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args.splice(i, 2)[1] : d; };
-const PORT = +flag('--port', 4000), OUT = flag('--out'), DIR = flag('--dir');
+const PORT = +flag('--port', 4000), OUT = flag('--out'), DIR = flag('--dir'), TEMPLATE = flag('--template'), THEME = flag('--theme');
 const [cmd = 'hub', dir = '.'] = args;
 const ROOT = path.resolve(dir);
 
@@ -292,6 +294,8 @@ async function checkOut(root, out, keep) {
     throw new Error(`refusing to build into ${out}: it is not empty and does not look like a previous build`);
 }
 
+// lib/ files the published runtime never loads (Node-only, or editor and project creation only)
+const NOT_SHIPPED = new Set(['compile.js', 'sections.js']);
 export async function build(root, out = path.join(root, 'dist')) {
   root = path.resolve(root); out = path.resolve(out);
   const restored = await pm.install(root); // packages the lock lists but packages/ lacks (a fresh clone): downloaded
@@ -312,7 +316,7 @@ export async function build(root, out = path.join(root, 'dist')) {
   }
   await clearOut(out, keep); // the previous build
   await fsp.mkdir(path.join(out, 'gpsb'), { recursive: true });
-  for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f !== 'compile.js' && !f.endsWith('.d.ts')) await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'gpsb', f));
+  for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (!NOT_SHIPPED.has(f) && !f.endsWith('.d.ts')) await fsp.copyFile(path.join(TOOL, 'lib', f), path.join(out, 'gpsb', f));
   if (fs.existsSync(path.join(root, 'assets'))) await fsp.cp(path.join(root, 'assets'), path.join(out, 'assets'), { recursive: true });
   for (const d of ['behaviours', 'extensions']) if (fs.existsSync(path.join(root, d))) await copyScripts(path.join(root, d), path.join(out, d));
   await copyPackages(root, out);
@@ -429,9 +433,17 @@ async function buildHooks(root) {
   return import(`${pathToFileURL(f).href}?v=${(await fsp.stat(f)).mtimeMs}`);
 }
 
-export async function create(root) {
+// a new project: empty, or one of lib/sections.js TEMPLATES (pages made of sections, a theme, sample content)
+export async function create(root, template = 'empty', theme) {
   if (fs.existsSync(path.join(root, 'project.json'))) throw new Error(`${root} already has a project.json`);
   for (const d of ['pages', 'assets', 'components', 'behaviours', 'animations']) await fsp.mkdir(path.join(root, d), { recursive: true });
+  if (template && template !== 'empty') {
+    for (const [f, text] of Object.entries(templateFiles(template, path.basename(root), theme))) {
+      await fsp.mkdir(path.dirname(path.join(root, f)), { recursive: true });
+      await fsp.writeFile(path.join(root, f), text);
+    }
+    return;
+  }
   await fsp.writeFile(path.join(root, 'project.json'), JSON.stringify({ name: path.basename(root) }, null, 2));
   const canvas = newNode('Canvas', [{ type: 'Canvas', props: { title: path.basename(root) } }, { type: 'CanvasScaler', props: {} }]);
   await fsp.writeFile(path.join(root, 'pages/index.json'), JSON.stringify(canvas, null, 2));
@@ -582,7 +594,10 @@ async function hubApi(req, res, p, q) {
       await fsp.cp(path.join(TOOL, 'example'), d, { recursive: true, filter: f => !f.includes(`${path.sep}dist`) });
       const pj = path.join(d, 'project.json');
       await fsp.writeFile(pj, JSON.stringify({ ...await readJSON(pj, {}), name }, null, 2));
-    } else await create(d);
+    } else {
+      if (b.template && b.template !== 'empty' && !TEMPLATES[b.template]) throw Object.assign(new Error(`unknown template ${b.template}`), { code: 400 });
+      await create(d, b.template, b.theme);
+    }
     await register(d);
     return sendJSON(res, { ok: true, path: d });
   }
@@ -715,14 +730,14 @@ function serve(initial) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (cmd === 'new') create(ROOT).then(() => console.log(`created ${ROOT}\nnext: gpsb serve ${dir}`), e => { console.error(e.message); process.exit(1); });
+  if (cmd === 'new') create(ROOT, TEMPLATE, THEME).then(() => console.log(`created ${ROOT}\nnext: gpsb serve ${dir}`), e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'build') build(ROOT, OUT && path.resolve(OUT)).then(r => { for (const w of r.warnings) console.warn('warning: ' + w); console.log(`built ${r.pages.length} page(s) -> ${r.out}`); }, e => { console.error(e.message); process.exit(1); });
   else if (['add', 'remove', 'update', 'install', 'packages', 'search'].includes(cmd)) packagesCli(cmd).catch(e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'types') loadProject(ROOT).then(async P => { await loadExtensions(ROOT, P, statExtVersions(P)); await writeTypes(ROOT, P); console.log(`wrote ${path.join(ROOT, '.gpsb/types')} and tsconfig.json`); }).catch(e => { console.error(e.message); process.exit(1); });
   else if (cmd === 'serve' || cmd === 'hub') {
     if (cmd === 'serve' && !isProject(ROOT)) { console.error(`no project.json in ${ROOT} (run: gpsb new ${dir})`); process.exit(1); }
     serve(cmd === 'serve' ? ROOT : null);
-  } else { console.log('usage: gpsb [hub] | gpsb serve [dir] [--port N] | gpsb new <dir> | gpsb build [dir] [--out D] | gpsb types [dir]\n'
+  } else { console.log('usage: gpsb [hub] | gpsb serve [dir] [--port N] | gpsb new <dir> [--template T] [--theme T] | gpsb build [dir] [--out D] | gpsb types [dir]\n'
     + '       gpsb add <pkg>[@range]… | remove <pkg>… | update [pkg…] | install | packages | search <text>   [--dir <project>]'); process.exit(1); }
 }
 

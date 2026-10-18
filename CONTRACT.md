@@ -116,6 +116,22 @@ generated CSS; text content, raw HTML/Style code and JS modules are never rewrit
   `S.P.json[file]` as one undo step (touched JSON files join undo snapshots), marks `assets/<file>` dirty (saved by
   `save()`), emits `content` (`'undo'` from undo/redo). `reloadMeta` keeps unsaved JSON edits.
 
+## Sections, themes, templates (`lib/sections.js`; editor + project creation, not copied into builds)
+
+- `THEMES` { id: { name, desc, tokens: { colors, fonts, textStyles } } }: colours primary, onPrimary, background, surface,
+  text, muted, border; fonts heading, body; text styles h1, h2, h3, lead, body, small, eyebrow, button.
+  `applyTheme(tokens, id, onlyMissing)` merges (returns a copy); `missingTokens(tokens)`.
+- `SECTIONS` [{ id, name, category, desc, make(o) → node }]: full-width subtrees for flowing pages (Element section +
+  Image `$background` + VerticalLayoutGroup + ContentSizeFitter; content in a 1120px `Container`), built only from
+  built-in components and those tokens; rows wrap (`HorizontalLayoutGroup.wrap`, children `LayoutElement` flexible +
+  min width); `Phone` breakpoint overrides shrink padding, h1 → h2 and tall pictures. `o`: site, nav, images, texts.
+- Editor: WebObject ▸ UI ▸ Section… (`editor/sectionpicker.js`: previews rendered with `renderPage` in the project's
+  tokens) → `S.insertSection(id)`: after the selected top-level section (else at the end), adding missing tokens from
+  Clean. Project Settings ▸ Design Tokens ▸ Theme applies `applyTheme`.
+- `TEMPLATES` { landing, business, portfolio, blog: { name, desc, theme } } and `templateFiles(id, name, theme)` →
+  { path: text } (project.json with the theme's tokens, flowing pages, collections + schemas, placeholder SVGs in
+  assets/img). `cli.js create(root, template, theme)`; `gpsb new <dir> --template T --theme T`; the Hub's New project.
+
 ## Prefabs (`lib/prefab.js`)
 
 `prefabs/<Name>.prefab.json` is a node subtree. A page (or another prefab) stores an instance as a reference:
@@ -460,7 +476,7 @@ GET  /api/hub/ls?path=<abs>   -> { path, parent, project, dirs: [{name, project}
 POST /api/hub/open   {path}   open a project in the editor (registers it, lastOpened = now)
 POST /api/hub/add    {path}   register an existing project folder (must contain project.json)
 POST /api/hub/remove {path}   forget it (files stay on disk)
-POST /api/hub/create {dir, name, template: 'empty'|'showcase'} -> { path }  (showcase = copy of example/)
+POST /api/hub/create {dir, name, template: 'empty'|'showcase'|<lib/sections.js TEMPLATES id>, theme?} -> { path }  (showcase = copy of example/)
 GET|PUT /api/prefs            the whole prefs object
 ```
 Project writes (`PUT/DELETE /api/file`, `/api/rename`, `/api/build`) must send `x-gpsb-project: encodeURIComponent(S.S.P.root)`

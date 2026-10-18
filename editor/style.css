@@ -218,3 +218,25 @@ input, textarea { user-select: text; }
 .pm-status.ok { color: #4caf50; }
 .pm-status.warn { color: #d29922; }
 .pm-status.err { color: #e5534b; white-space: normal; }
+
+/* Project Settings > Design Tokens > Theme */
+.tk-themes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.tk-theme { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px; min-width: 104px; background: var(--well); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; }
+.tk-theme:hover { border-color: var(--accent-hi); }
+.tk-sw { display: flex; }
+.tk-sw i { width: 20px; height: 20px; border-radius: 50%; margin-right: -5px; border: 2px solid var(--well); }
+
+/* Insert Section window */
+.sp-win { width: min(1080px, 96vw); height: min(760px, 92vh); }
+.sp-main { flex: 1; display: grid; grid-template-columns: 150px 1fr; min-height: 0; }
+.sp-cats { display: flex; flex-direction: column; gap: 2px; padding: 8px; border-right: 1px solid var(--border); background: var(--surface); }
+.sp-cat { text-align: left; padding: 5px 8px; border: 0; border-radius: 3px; background: none; color: var(--text); cursor: pointer; }
+.sp-cat:hover { background: var(--hover-2); }
+.sp-cat.on { background: var(--accent); color: var(--sel-text); }
+.sp-grid { overflow: auto; padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, 318px); justify-content: center; gap: 14px; align-content: start; }
+.sp-card { display: flex; flex-direction: column; gap: 4px; padding: 8px; text-align: left; background: var(--well); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; }
+.sp-card:hover { border-color: var(--accent-hi); }
+.sp-card > span { color: var(--text-dim); font-size: 11px; line-height: 1.4; }
+.sp-shot { width: 300px; height: 160px; overflow: hidden; border-radius: 4px; background: #fff; margin-bottom: 4px; }
+.sp-frame { border: 0; height: 640px; transform: scale(.25); transform-origin: 0 0; pointer-events: none; display: block; }
+.sp-foot { padding: 6px 12px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11px; }

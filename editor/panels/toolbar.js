@@ -6,6 +6,7 @@ import * as prefs from '../prefs.js';
 import { openPreferences, shortcut as sc } from '../preferences.js';
 import { openProjectSettings } from '../settings.js';
 import { openPackageManager } from '../packages.js';
+import { openSectionPicker } from '../sectionpicker.js';
 import { openFind } from '../find.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
@@ -85,6 +86,7 @@ const customNode = name => {
 export function createItems(parentId) {
   const customs = Object.keys(S.S.P?.components ?? {});
   return [
+    { label: 'Section…', action: () => openSectionPicker() }, '-',
     ...Object.keys(S.PRESETS).filter(k => k !== 'Create Empty' && !Object.values(S.PRESET_GROUPS).flat().includes(k)).map(k => ({ label: k, action: () => S.create(k, parentId) })),
     '-', ...Object.entries(S.PRESET_GROUPS).map(([g, ks]) => ({ label: g, sub: ks.map(k => ({ label: k, action: () => S.create(k, parentId) })) })),
     ...(customs.length ? ['-', ...customs.map(n => ({ label: n, action: () => S.addNode(customNode(n), parentId) }))] : []),

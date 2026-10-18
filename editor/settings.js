@@ -2,6 +2,7 @@
 // saved with the project (Save). Same look as Preferences (.prefs-* in style.css).
 import * as S from './state.js';
 import { renameToken, tokenUses } from './files.js';
+import { THEMES, applyTheme } from '/lib/sections.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 let win = null;
@@ -106,13 +107,21 @@ function tokens(body) {
       <input class="prefs-in" data-f="lineHeight" type="number" step="0.05" value="${f('lineHeight')}" placeholder="line h." title="Line height">
       <input class="prefs-in" data-f="letterSpacing" type="number" step="0.1" value="${f('letterSpacing')}" placeholder="spacing" title="Letter spacing (px)"></td><td>${del}</td></tr>`;
   };
+  const sw = th => ['background', 'surface', 'primary', 'text'].map(c => `<i style="background:${esc(th.tokens.colors[c])}"></i>`).join('');
   body.innerHTML = `<h3>Design Tokens</h3>
+    <h4 class="tk-h">Theme</h4><p class="prefs-note tk-help">Sets the colours, fonts and text styles that sections and templates use. Other tokens you added stay.</p>
+    <div class="tk-themes">${Object.entries(THEMES).map(([id, th]) => `<button class="tk-theme" data-theme="${id}" title="${esc(th.desc)}"><span class="tk-sw" style="font-family:${esc(th.tokens.fonts.heading)}">${sw(th)}</span>${esc(th.name)}</button>`).join('')}</div>
     <datalist id="tk-font-assets">${fontAssets.map(p => `<option value="${esc(p)}">`).join('')}</datalist>
     <datalist id="tk-fonts">${Object.keys(t.fonts ?? {}).map(n => `<option value="$${esc(n)}">`).join('')}</datalist>` +
     Object.entries(KINDS).map(([kind, k]) => `<h4 class="tk-h">${k.title}</h4><p class="prefs-note tk-help">${k.help}</p>
       <table class="tk-table"><tbody>${Object.entries(t[kind] ?? {}).map(([n, v]) => rowHtml(kind, n, v)).join('')}</tbody></table>
       <button class="btn tk-add" data-add="${kind}">Add ${k.add}</button>`).join('');
   const redraw = () => tokens(body);
+  body.querySelectorAll('[data-theme]').forEach(b => b.onclick = () => {
+    const th = THEMES[b.dataset.theme];
+    if (!confirm(`Apply the ${th.name} theme? Its colours, fonts and text styles replace the ones with the same names.`)) return;
+    save(applyTheme(tok(), b.dataset.theme)); redraw(); S.log(`Applied the ${th.name} theme`);
+  });
   body.querySelectorAll('[data-add]').forEach(b => b.onclick = () => {
     const kind = b.dataset.add, t2 = tok(), g = (t2[kind] ??= {});
     let i = 1; while (g[`${KINDS[kind].add.replace(' ', '-')}-${i}`]) i++;

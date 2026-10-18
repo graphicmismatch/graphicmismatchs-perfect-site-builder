@@ -4,6 +4,7 @@ import { componentDef, withDefaults, builtins, registerComponent, unregisterComp
 import { renderDocument, makeCtx, collectionItems } from '/lib/render.js';
 import * as iconSet from '/lib/icons.js';
 import { setIcons } from '/lib/widgets.js';
+import { sectionById, missingTokens, applyTheme } from '/lib/sections.js';
 import { expandPrefabs, collapsePrefabs, overrideKey, bakeInstance, unpackInstance, OWN } from '/lib/prefab.js';
 
 export const S = {
@@ -335,6 +336,23 @@ export const PRESETS = {
 };
 // presets shown in a submenu instead of the top level of WebObject > UI
 export const PRESET_GROUPS = { Widgets: ['Icon', 'Divider', 'Marquee', 'Countdown', 'Navigation Menu', 'Social Links', 'Carousel', 'Tabs', 'Accordion', 'Modal', 'Gallery', 'Video Embed', 'Map', 'Contact Form'] };
+
+// a section from the library (lib/sections.js) after the selected section of the page, or at its end. Sections use
+// the design tokens: missing ones are added from the Clean theme.
+export function insertSection(id) {
+  const def = sectionById(id), r = root();
+  if (!def || !r || S.prefabEdit) return;
+  const miss = missingTokens(S.P.project.tokens);
+  if (miss.length) { setProjectSetting('tokens', applyTheme(S.P.project.tokens, 'clean', true)); log(`Added the design tokens sections use (${miss.join(', ')}). Pick a theme in Project Settings ▸ Design Tokens.`); }
+  if (!r.components.some(c => /LayoutGroup$/.test(c.type))) log('Sections are made for flowing pages (File ▸ New Flowing Page): on this page it is placed at the top; add a Vertical Layout Group to the Canvas to stack them.', 'warn');
+  let top = active();
+  while (top && parentOf(top.id) && parentOf(top.id) !== r) top = parentOf(top.id);
+  const at = top && top !== r ? r.children.indexOf(top) + 1 : r.children.length;
+  const n = def.make({ site: S.P.project.name });
+  addNode(n, r.id, at);
+  select(n.id);
+  return n;
+}
 
 // ---------- prefabs ----------
 // the outermost instance a node belongs to (or the node itself if it is an instance root), else null

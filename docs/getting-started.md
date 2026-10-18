@@ -18,7 +18,7 @@ Without `npm link`, run `node cli.js` from the gpsb folder wherever these docs s
 |---|---|
 | `gpsb` or `gpsb hub` | Opens the Project Hub at <http://127.0.0.1:4000>. |
 | `gpsb serve <dir>` | Same, with `<dir>` registered and opened in the editor. |
-| `gpsb new <dir>` | Creates an empty project in `<dir>`. |
+| `gpsb new <dir>` | Creates an empty project in `<dir>`. Add `--template landing\|business\|portfolio\|blog` for a ready-made site, and `--theme clean\|editorial\|bold\|warm\|mono` to restyle it. |
 | `gpsb build <dir>` | Writes the static site to `<dir>/dist`. Add `--out <folder>` to write somewhere else. |
 
 `serve` and `hub` accept `--port <n>`. The server only listens on `127.0.0.1`, so it can't be reached from other machines.
@@ -30,6 +30,9 @@ To look around first, open the demo project: `gpsb serve example`.
 1. Run `gpsb` and open <http://127.0.0.1:4000> in your browser.
 2. Click **New project**. Pick a template:
    - **Empty**: one blank page.
+   - **Landing page**, **Business**, **Portfolio**, **Blog**: a complete site made of [sections](sections-and-themes.md),
+     with sample text and pictures to replace. Pick a **Theme** for its colours and fonts, or keep the template's own.
+     Portfolio and Blog keep their projects and posts in a collection you edit in Window ▸ Content.
    - **Showcase**: a copy of the demo project, with components, behaviours and animations to learn from.
 3. Choose a folder with the built-in folder browser and give the project a name.
 

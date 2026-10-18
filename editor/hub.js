@@ -1,12 +1,14 @@
 // Project Hub (served at /): registered projects, New / Add / Locate / Remove, preferences. API: CONTRACT.md "Project Hub".
 import * as prefs from './prefs.js';
 import { icon } from './icons.js';
+import { TEMPLATES as SITE_TEMPLATES, THEMES } from '/lib/sections.js';
 
 const $ = s => document.querySelector(s);
 const list = $('#list'), search = $('#search'), sortSel = $('#sort');
 const NAME = /^[\w.-][\w .-]*$/; // same rule as POST /api/hub/create
 const TEMPLATES = [
   { id: 'empty', name: 'Empty', desc: 'One blank page with a Canvas. Start from scratch.' },
+  ...Object.entries(SITE_TEMPLATES).map(([id, t]) => ({ id, name: t.name, desc: t.desc, theme: t.theme })), // lib/sections.js
   { id: 'showcase', name: 'Showcase', desc: 'The demo site: animations, custom components, behaviours and responsive breakpoints.' },
 ];
 let D = { projects: [], home: '/' };
@@ -244,6 +246,11 @@ function newProject() {
   const tpls = h('div', { class: 'hb-tpls', role: 'radiogroup', 'aria-label': 'Template' }, TEMPLATES.map((t, i) =>
     h('label', { class: 'hb-tpl' }, h('input', { type: 'radio', name: 'tpl', value: t.id, checked: i === 0 }),
       h('div', { class: `hb-art ${t.id}`, 'aria-hidden': 'true' }, h('i'), h('i'), h('i')), h('b', {}, t.name), h('span', {}, t.desc))));
+  // the theme of a site template (its own by default)
+  const theme = h('select', { id: 'np-theme' }, h('option', { value: '' }, "The template's own"), ...Object.entries(THEMES).map(([id, t]) => h('option', { value: id }, `${t.name}: ${t.desc}`)));
+  const themeRow = h('div', { class: 'hb-field' }, h('label', { for: 'np-theme' }, 'Theme'), theme);
+  const syncTheme = () => { themeRow.hidden = !SITE_TEMPLATES[tpls.querySelector('input:checked')?.value]; };
+  tpls.addEventListener('change', syncTheme);
   const name = h('input', { id: 'np-name', value: 'My Site', autocomplete: 'off', spellcheck: 'false', required: true });
   const out = h('div', { class: 'hb-out', 'aria-live': 'polite' });
   const br = browser(prefs.get('hub.lastDir'), { onChange: upd });
@@ -258,7 +265,7 @@ function newProject() {
   name.oninput = () => { d.err(''); upd(); };
   const d = dialog({
     title: 'New project', cls: 'hb-new', ok: 'Create',
-    body: [tpls,
+    body: [tpls, themeRow,
       h('div', { class: 'hb-field' }, h('label', { for: 'np-name' }, 'Project name'), name),
       h('div', { class: 'hb-field' }, h('label', {}, 'Location'), br.el),
       h('div', { class: 'hb-field' }, h('label', {}, 'Creates'), out)],
@@ -266,12 +273,13 @@ function newProject() {
       const n = name.value.trim();
       if (!NAME.test(n)) { name.focus(); throw new Error('Invalid project name: use letters, digits, spaces, . _ -'); }
       if (!br.cur) throw new Error('Pick a location first');
-      const r = await api('/api/hub/create', { dir: br.cur.path, name: n, template: d.querySelector('input[name=tpl]:checked').value });
+      const r = await api('/api/hub/create', { dir: br.cur.path, name: n, template: d.querySelector('input[name=tpl]:checked').value, theme: theme.value || undefined });
       toast(`Created ${r.path}`);
       await open(r.path);
       return false; // navigating away
     },
   });
+  syncTheme();
   name.focus(); name.select();
 }
 

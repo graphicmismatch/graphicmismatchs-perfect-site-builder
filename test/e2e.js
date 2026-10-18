@@ -227,6 +227,7 @@ async function main() {
   await formsSection(page);
   await widgetsSection(page);
   await contentSection(page);
+  await sectionsSection(page);
 }
 
 // ---- forms: validation, sending, events (a local endpoint records submissions) ----
@@ -507,6 +508,76 @@ async function contentSection(page) {
   check('editor: content zero console errors', page.errors.length === 0, page.errors.join(' | '));
 }
 
+// ---- section library: the Hub creates a project from a template; built templates run clean; Insert Section ----
+async function sectionsSection(page) {
+  const SC = path.join(ROOT, '.tmp/e2e-sections'), HUB_PORT = 4220, SITE = 4221, cfg = path.join(ROOT, '.tmp', 'e2e-config-sections');
+  fs.rmSync(SC, { recursive: true, force: true }); fs.rmSync(cfg, { recursive: true, force: true });
+  fs.mkdirSync(SC, { recursive: true });
+  const hub = spawn(process.execPath, ['cli.js', 'hub', '--port', String(HUB_PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GPSB_CONFIG_DIR: cfg } });
+  cleanups.push(() => hub.kill());
+  await new Promise((ok, err) => { hub.stdout.on('data', d => /hub:/.test(d) && ok()); hub.on('exit', c => err(new Error(`hub exited ${c}`))); });
+  page.errors.length = 0;
+  await page.open(`http://127.0.0.1:${HUB_PORT}/`);
+  await page.until(`document.querySelector('button')`, 5000);
+  const dlg = await page.eval(`(async () => {
+    [...document.querySelectorAll('button')].find(b => /new/i.test(b.textContent))?.click();
+    await new Promise(r => setTimeout(r, 300));
+    const tpls = [...document.querySelectorAll('.hb-tpl input')].map(i => i.value).join();
+    const theme = document.querySelector('#np-theme');
+    const before = theme.closest('.hb-field').hidden;
+    document.querySelector('.hb-tpl input[value=blog]').click();
+    return JSON.stringify([tpls, before, theme.closest('.hb-field').hidden, theme.options.length]);
+  })()`);
+  check('hub: New Project lists the site templates, and a theme for them', dlg === JSON.stringify(['empty,landing,business,portfolio,blog,showcase', true, false, 6]), dlg);
+  const made = await fetch(`http://127.0.0.1:${HUB_PORT}/api/hub/create`, { method: 'POST', headers: { 'x-gpsb': '1', 'content-type': 'application/json' }, body: JSON.stringify({ dir: SC, name: 'Bloggy', template: 'blog', theme: 'editorial' }) }).then(r => r.json());
+  const pj = JSON.parse(fs.readFileSync(path.join(SC, 'Bloggy/project.json'), 'utf8'));
+  check('hub: creates a project from a template with the chosen theme', made.ok && pj.name === 'Bloggy' && pj.tokens.colors.primary === '#b4441c' && fs.existsSync(path.join(SC, 'Bloggy/pages/post.json')), JSON.stringify(made));
+  check('hub: zero console errors', page.errors.length === 0, page.errors.join(' | '));
+
+  // every template, built, loads without errors (and its menus, forms and accordions start)
+  for (const t of ['landing', 'business', 'portfolio', 'blog']) {
+    const dir = path.join(SC, t);
+    spawnSync(process.execPath, ['cli.js', 'new', dir, '--template', t], { cwd: ROOT });
+    const b = spawnSync(process.execPath, ['cli.js', 'build', dir], { cwd: ROOT, encoding: 'utf8' });
+    if (b.status !== 0) { check(`template ${t} builds`, false, b.stderr); continue; }
+  }
+  cleanups.push(await serveDir(SC, SITE));
+  const pagesOk = [];
+  for (const u of ['landing/dist/index.html', 'business/dist/about.html', 'business/dist/contact.html', 'portfolio/dist/index.html', 'portfolio/dist/project/tidal.html', 'blog/dist/index.html', 'blog/dist/post/first-post.html', 'blog/dist/tags/work.html']) {
+    page.errors.length = 0;
+    await page.open(`http://127.0.0.1:${SITE}/${u}`);
+    await page.until(`window.GPSB?.els`, 5000);
+    await sleep(150);
+    pagesOk.push(page.errors.length ? `${u}: ${page.errors.join(' | ')}` : '');
+  }
+  check('templates: built pages load with zero console errors', pagesOk.every(x => !x), pagesOk.filter(Boolean).join(' || '));
+
+  // editor: Insert Section shows every section, previewed; a click adds it after the selected section
+  const ed = spawn(process.execPath, ['cli.js', 'serve', path.join(SC, 'landing'), '--port', String(HUB_PORT + 2)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GPSB_CONFIG_DIR: cfg } });
+  cleanups.push(() => ed.kill());
+  await new Promise((ok, err) => { ed.stdout.on('data', d => /editor:/.test(d) && ok()); ed.on('exit', c => err(new Error(`editor exited ${c}`))); });
+  page.errors.length = 0;
+  await page.open(`http://127.0.0.1:${HUB_PORT + 2}/editor/`);
+  await page.until(`document.querySelector('[data-panel=hierarchy]')?.innerText.includes('Footer')`, 8000);
+  const ins = await page.eval(`(async () => {
+    const S = await import('/editor/state.js'), { openSectionPicker } = await import('/editor/sectionpicker.js'), { SECTIONS } = await import('/lib/sections.js');
+    const w = ms => new Promise(r => setTimeout(r, ms));
+    S.select(S.root().children.find(c => c.name === 'Hero').id);
+    openSectionPicker();
+    await w(1500);
+    const cards = document.querySelectorAll('.sp-card'), shots = [...document.querySelectorAll('.sp-frame')].filter(f => f.contentDocument?.body?.innerText.trim().length > 5).length;
+    const n0 = S.root().children.length;
+    [...cards].find(c => c.querySelector('b').textContent === 'Team').click();
+    await w(800);
+    const names = S.root().children.map(c => c.name);
+    return JSON.stringify({ cards: cards.length, of: SECTIONS.length, shots, added: names.length - n0, after: names[names.indexOf('Hero') + 1], open: !!document.querySelector('.sp-win'),
+      preview: S.S.previewWin.document.body.innerText.includes('The people behind it') });
+  })()`);
+  const r = JSON.parse(ins);
+  check('editor: Insert Section previews every section and inserts one after the selected section', r.cards === r.of && r.shots === r.of && r.added === 1 && r.after === 'Team' && !r.open && r.preview, ins);
+  check('editor: sections zero console errors', page.errors.length === 0, page.errors.join(' | '));
+}
+
 // static file server for a built site -> cleanup function
 async function serveDir(dir, port) {
   const s = http.createServer((req, res) => {
@@ -570,7 +641,7 @@ async function chrome(W = 1440, H = 900) {
 }
 
 // E2E_ONLY=forms|widgets runs just that section (quicker while working on it)
-const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p), content: p => contentSection(p) }[process.env.E2E_ONLY];
+const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p), content: p => contentSection(p), sections: p => sectionsSection(p) }[process.env.E2E_ONLY];
 try { if (ONLY) await ONLY(await chrome()); else await main(); } catch (e) { failed++; console.log('FAIL', e.stack ?? e); } finally { for (const f of cleanups.reverse()) try { f(); } catch {} }
 console.log(failed ? `\n${failed} assertion(s) failed` : '\nall e2e assertions passed');
 process.exit(failed ? 1 : 0);

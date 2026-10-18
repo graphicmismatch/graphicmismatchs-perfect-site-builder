@@ -5,7 +5,7 @@
   "type": "module",
   "bin": { "gpsb": "cli.js" },
   "scripts": {
-    "test": "node test/core.test.js && node test/prefab.test.js && node test/markdown.test.js && node test/anim.test.js && node test/scripting.test.js && node test/packages.test.js && node test/content.test.js && node test/e2e.js",
+    "test": "node test/core.test.js && node test/prefab.test.js && node test/markdown.test.js && node test/anim.test.js && node test/scripting.test.js && node test/packages.test.js && node test/content.test.js && node test/sections.test.js && node test/e2e.js",
     "serve": "node cli.js serve example",
     "build": "node cli.js build example"
   },
