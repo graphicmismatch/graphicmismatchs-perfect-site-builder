@@ -15,7 +15,7 @@ addEventListener('gpsb:ready', () => {
 Put such a script in Project Settings ▸ Custom Code (end of body), Page Meta ▸ Head, or an HTML component.
 
 For a Unity-style API on top of this one (wrappers that apply their own changes, `Vector2`, coroutines, tweens), see
-the [engine API](engine-api.md) and [tweening](tweening.md).
+the [engine API](engine-api.md), which includes [tweening](engine-api.md#tweening).
 
 ## How runtime changes work
 

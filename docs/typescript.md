@@ -34,8 +34,8 @@ A name can be used by only one file: `Spin.js` and `Spin.ts` side by side is an 
 
 When the editor opens a project that has TypeScript files (or a `tsconfig.json`), gpsb writes:
 
-- `.gpsb/types/gpsb/`: types for the engine API, tweens and the runtime, plus `project.d.ts`, generated from this
-  project's components. `getComponent('Text')` knows `text`, `color` and `size`, and your own extensions and custom
+- `.gpsb/types/gpsb/`: `engine.d.ts` (the whole engine API, tweens and the runtime included), plus `project.d.ts`,
+  generated from this project's components. `getComponent('Text')` knows `text`, `color` and `size`, and your own extensions and custom
   components are in there too. It's updated whenever the editor reloads the project, so a new extension prop shows up
   in your IDE. The folder has its own `.gitignore`.
 - `tsconfig.json`, if there isn't one. Its `rootDirs` setting makes `import … from '../gpsb/engine.js'` resolve to
@@ -89,7 +89,7 @@ Not supported: decorators (they're left in the code, and browsers can't run them
 
 Imports work the way they do on the published site:
 
-- `'../gpsb/engine.js'` and the other runtime modules (`'../gpsb/tween.js'`)
+- `'../gpsb/engine.js'` (the whole API, tweens included) and the other runtime modules (`'../gpsb/anim.js'`)
 - your own `.ts` modules, written as `'./util.ts'` or `'./util.js'`; `.ts` imports are rewritten to `.js`
 - helper modules in subfolders, `extensions/lib/format.ts` for example. Every top-level `.js`/`.ts` file in
   `extensions/` is an extension, so keep helpers in a subfolder. Every file in `behaviours/` is listed as a behaviour,

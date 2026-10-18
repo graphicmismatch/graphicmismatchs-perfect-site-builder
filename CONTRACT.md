@@ -280,10 +280,11 @@ prop accessors a class field may have hidden). Methods are listed for event pick
 (data properties only, not getters); `start`, `update`, `lateUpdate` and `_`-prefixed names are hidden.
 Modules are loaded from `behaviours/<Name>.js` relative to the page (`new URL('../behaviours/…', import.meta.url)` from gpsb/).
 
-## Scripting API (`lib/frame.js`, `lib/engine.js`, `lib/tween.js`)
+## Scripting API (`lib/engine.js`, on `lib/frame.js`)
 
 Browser-side layer over the plain script contract; importable in Node too (no browser APIs at import time). Docs:
-`docs/engine-api.md`, `docs/tweening.md`; typings `lib/*.d.ts` must be kept in step with the code.
+`docs/engine-api.md`. Typings: `lib/engine.d.ts` (the whole public API) must be kept in step with the code.
+Project scripts import only `gpsb/engine.js`; `frame.js` is internal plumbing the runtime loads on every page.
 - `frame.js`: `Time` (`deltaTime` scaled by `timeScale`, clamped to `maximumDeltaTime` 0.1), `onFrame(fn, order)` (one
   rAF loop, started while anything is subscribed; orders: behaviours `update` 0, coroutines 10, tweens 20, `lateUpdate`
   30), `markDirty(node, el?)` → one `GPSB.applyNode` per marked node in a microtask (el set: that element only),
@@ -295,7 +296,7 @@ Browser-side layer over the plain script contract; importable in Node too (no br
   → stored form), `Mathf`, `Random`, `Assets`, `prop.*` schema builders, `defineExtension(Class)` (class → definition;
   hooks only for methods the class has; `init` gets live accessors that `markDirty`), `html`/`raw` (escaping template).
   Wrapper setters change node data and `markDirty`; nothing else writes to the page.
-- `tween.js`: `Tween` / `Sequence` (shared `Timeline`: delay, loops restart|yoyo|incremental, speed, unscaled,
+- tweening (in `engine.js`): `Tween` / `Sequence` (shared `Timeline`: delay, loops restart|yoyo|incremental, speed, unscaled,
   callbacks, thenable → true completed / false killed), targets: node / WebObject / id or path (property paths via
   `getProp`/`setProp` + `markDirty`; `rect.pos` sets `rect._layoutPos` while it plays, like the animator), plain objects
   (dotted fields), `Tween.value(from, to, s, setter)`. Values lerp via `Ctor.lerpUnclamped` (engine types) or
@@ -313,9 +314,9 @@ embedded (`sourcesContent`). Needs Node ≥ 22.15 (`stripTypeScriptTypes`, `regi
 - Dev server: `/project/(behaviours|extensions)/<path>.js` with no `.js` file but a `.ts` → compiled, inline map; a
   syntax error is served as `throw new SyntaxError("<file>: …")`. Build: `.ts` → `.js` + `.js.map`, `.d.ts` skipped.
 - `<script lang="ts">` in `components/<Name>.html`: compiled into `<Name>.script.js`.
-- Typings: `writeTypes(root, P)` writes `.gpsb/types/gpsb/{engine,tween,frame}.d.ts` (copies of `lib/`),
+- Typings: `writeTypes(root, P)` writes `.gpsb/types/gpsb/engine.d.ts` (copy of `lib/`),
   `project.d.ts` (augments `ComponentTypes` in `./engine.js` with every built-in, extension and custom component's props),
-  `.gpsb/.gitignore`, and `tsconfig.json` if missing (`rootDirs: ['.', '.gpsb/types']` maps `../gpsb/engine.js`). Run by
+  `.gpsb/.gitignore`, and `tsconfig.json` if missing (typings it no longer writes are removed) (`rootDirs: ['.', '.gpsb/types']` maps `../gpsb/engine.js`). Run by
   `/api/project` when the project has `.ts` scripts or a `tsconfig.json`, and by `gpsb types [dir]`.
 
 ## Events (`event` prop type, e.g. `Button.onClick`; animation events use the same `call` syntax)

@@ -8,7 +8,7 @@ engine API that feels like `UnityEngine`: `MonoBehaviour`-style classes, seriali
 Status legend: ☐ to do · ◐ in progress · ☑ done
 
 **Status (October 2026):** the engine API, the tweening library and TypeScript support are implemented (phases 1 and
-2, details in section 5). Docs: `docs/engine-api.md`, `docs/tweening.md`, `docs/typescript.md`.
+2, details in section 5). Docs: `docs/engine-api.md` (tweening included), `docs/typescript.md`.
 
 ---
 
@@ -421,14 +421,14 @@ party, some versions labelled experimental). Cheap once the shim route exists; s
 ### 5.1 Phase 1: engine API in JS (about 2–3 weeks)
 | | Item | Design |
 |---|---|---|
-| ☐ | `api/engine.json` | The machine-readable API description. For now the typings are hand-written (`lib/engine.d.ts`, `tween.d.ts`, `frame.d.ts`); the description is needed when a second language's bindings have to be generated. |
+| ☐ | `api/engine.json` | The machine-readable API description. For now the typings are hand-written (`lib/engine.d.ts`); the description is needed when a second language's bindings have to be generated. |
 | ☑ | `lib/engine.js` | `Behaviour`, `prop.*`, `Time`, `Mathf`, `Random`, `Assets`, `Vector2/4`, `Color`, `WebObject`, `RectTransform`, typed component wrappers (`ComponentRef`, from the registry's schemas), `WebEvent`, coroutines. `adapt()` waits for the first adapt-route language. |
 | ☑ | Shared frame loop | `lib/frame.js`: `Time` (with `timeScale`), one ordered loop for behaviours (`update`, new `lateUpdate`), coroutines and tweens. |
 | ☑ | Automatic apply | Wrapper setters call `markDirty`; every marked node is applied once at the end of the task (a microtask), so no extra hooks in `lib/behaviours.js` were needed. `apply()` keeps working. |
 | ☑ | `defineExtension(Class)` | Class-form extensions → today's definition object; `html` template tag that escapes by default. |
-| ☑ | Tweening library | `lib/tween.js` (not in the original plan): tweens on property paths, objects and setters; eases, loops, sequences, shortcuts on `WebObject`. |
+| ☑ | Tweening | Part of the engine API (`gpsb/engine.js`; not in the original plan): tweens on property paths, objects and setters; eases, loops, sequences, shortcuts on `WebObject`. Bindings for other languages get it with the rest of the API. |
 | ◐ | Editor reflection | Method scan skips getters. Reading `static methods` (for languages whose private methods can't be told apart) is still to do. |
-| ☑ | Docs + tests | `docs/engine-api.md`, `docs/tweening.md`; `test/scripting.test.js`; a fixture project (`test/fixtures/scripting/`) checked in headless Chromium by `test/e2e.js`. The demo project still uses plain behaviours. |
+| ☑ | Docs + tests | `docs/engine-api.md` (with tweening); `test/scripting.test.js`; a fixture project (`test/fixtures/scripting/`) checked in headless Chromium by `test/e2e.js`. The demo project still uses plain behaviours. |
 
 ### 5.2 Phase 2: TypeScript and the plugin hook (about 2–3 weeks)
 | | Item | Design |

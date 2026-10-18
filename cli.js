@@ -180,8 +180,10 @@ export async function writeTypes(root, P) {
   const dir = path.join(root, '.gpsb/types/gpsb');
   await fsp.mkdir(dir, { recursive: true });
   await writeIfChanged(path.join(root, '.gpsb/.gitignore'), '*\n');
-  for (const f of await fsp.readdir(path.join(TOOL, 'lib'))) if (f.endsWith('.d.ts')) await writeIfChanged(path.join(dir, f), await fsp.readFile(path.join(TOOL, 'lib', f), 'utf8'));
+  const libTypes = (await fsp.readdir(path.join(TOOL, 'lib'))).filter(f => f.endsWith('.d.ts'));
+  for (const f of libTypes) await writeIfChanged(path.join(dir, f), await fsp.readFile(path.join(TOOL, 'lib', f), 'utf8'));
   await writeIfChanged(path.join(dir, 'project.d.ts'), projectTypes(P));
+  for (const f of await fsp.readdir(dir)) if (f.endsWith('.d.ts') && f !== 'project.d.ts' && !libTypes.includes(f)) await fsp.rm(path.join(dir, f)); // from an older gpsb
   const tc = path.join(root, 'tsconfig.json');
   if (!fs.existsSync(tc)) await fsp.writeFile(tc, JSON.stringify(TSCONFIG, null, 2) + '\n');
 }

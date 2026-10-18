@@ -5,8 +5,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Time, manualFrames, step, markDirty } from '../lib/frame.js';
-import { tween, sequence, delayedCall, Tween, Ease, easeFn } from '../lib/tween.js';
-import { Vector2, Vector4, Color, Mathf, prop, Behaviour, WebObject, WebEvent, Extension, defineExtension, html, raw, wait, waitUntil } from '../lib/engine.js';
+import { Vector2, Vector4, Color, Mathf, prop, Behaviour, WebObject, WebEvent, Extension, defineExtension, html, raw, wait, waitUntil,
+  tween, sequence, delayedCall, Tween, Ease, easeFn } from '../lib/engine.js';
 import { compileTS, compileComponent } from '../lib/compile.js';
 import { registerComponent, unregisterComponent } from '../lib/components.js';
 import { renderPage, makeCtx } from '../lib/render.js';
@@ -317,6 +317,7 @@ assert.throws(() => easeFn('nope'), /unknown ease/);
   assert.deepEqual(list('behaviours'), ['Spinner.js', 'Spinner.js.map', 'TweenDemo.js', 'TweenDemo.js.map']);
   assert.deepEqual(list('extensions'), ['Badge.js', 'Badge.js.map', 'lib', 'lib/format.js', 'lib/format.js.map']);
   assert.ok(!fs.readdirSync(path.join(out, 'gpsb')).some(f => f.endsWith('.d.ts')), 'typings are not published');
+  assert.ok(!fs.existsSync(path.join(out, 'gpsb/tween.js')), 'tweens are part of gpsb/engine.js');
   assert.match(fs.readFileSync(path.join(out, 'index.html'), 'utf8'), /<span class="badge-text">BETA<\/span>/, 'TS extension + TS helper ran at build time');
   assert.match(fs.readFileSync(path.join(out, 'extensions/Badge.js'), 'utf8'), /from '\.\/lib\/format\.js'[\s\S]*sourceMappingURL=Badge\.js\.map/);
   // typings
@@ -325,6 +326,9 @@ assert.throws(() => easeFn('nope'), /unknown ease/);
   const pd = fs.readFileSync(path.join(tmp, '.gpsb/types/gpsb/project.d.ts'), 'utf8');
   assert.match(pd, /"Text": \{[^}]*text: string;/); assert.match(pd, /"Badge": \{\s*label: string;\s*color: Color;\s*clicks: number;/);
   assert.ok(fs.existsSync(path.join(tmp, 'tsconfig.json')) && fs.existsSync(path.join(tmp, '.gpsb/types/gpsb/engine.d.ts')));
+  fs.writeFileSync(path.join(tmp, '.gpsb/types/gpsb/tween.d.ts'), '// from an older gpsb\n');
+  cli('types', tmp);
+  assert.deepEqual(fs.readdirSync(path.join(tmp, '.gpsb/types/gpsb')).sort(), ['engine.d.ts', 'project.d.ts'], 'stale typings removed');
   // errors name the file
   fs.writeFileSync(path.join(tmp, 'extensions/Broken.ts'), 'export default { props: { x: } };\n');
   b = cli('build', tmp);

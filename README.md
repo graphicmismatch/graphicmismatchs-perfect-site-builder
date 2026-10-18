@@ -24,7 +24,7 @@ The [docs](docs/README.md) folder has user guides ([getting started](docs/gettin
 and developer guides for writing your own [behaviours](docs/behaviours.md), [custom components](docs/components.md)
 and [extension components](docs/extensions.md), with the [prop types](docs/prop-types.md) and the
 [runtime API](docs/runtime-api.md) they share. Scripts can use a Unity-style [engine API](docs/engine-api.md)
-(`Behaviour`, typed props, `getComponent`, `Vector2`, coroutines), a [tweening library](docs/tweening.md), and
+(`Behaviour`, typed props, `getComponent`, `Vector2`, coroutines, [tweens](docs/engine-api.md#tweening)), and
 [TypeScript](docs/typescript.md).
 
 ## Project Hub

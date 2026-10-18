@@ -12,7 +12,7 @@ Use a behaviour for motion, reacting to input, and driving other objects. If you
 
 > **Two styles.** This page describes the plain format: a class with injected fields and `this.apply()`. The
 > [engine API](engine-api.md) builds on it in Unity's style: `extends Behaviour`, typed prop fields, `getComponent`,
-> coroutines, [tweens](tweening.md), and changes that apply themselves. Both styles can be mixed, and both work in
+> coroutines, [tweens](engine-api.md#tweening), and changes that apply themselves. Both styles can be mixed, and both work in
 > [TypeScript](typescript.md) (`behaviours/<Name>.ts`).
 
 ## Create one

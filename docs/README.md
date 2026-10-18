@@ -33,8 +33,7 @@ Start here if you want to add your own code. There are three ways to extend gpsb
 All three get Inspector fields from a props schema, and all of them can be targets or sources of events.
 
 - [Engine API](engine-api.md): the Unity-style scripting API (`Behaviour`, typed props, `getComponent`, `Vector2`,
-  coroutines, class-form extensions).
-- [Tweening](tweening.md): animate anything from code, with eases, loops and sequences.
+  coroutines, [tweening](engine-api.md#tweening) with eases, loops and sequences, class-form extensions).
 - [TypeScript](typescript.md): write scripts in TypeScript, with types for your project's components.
 - [Prop types](prop-types.md): the schema format all three share.
 - [Runtime API](runtime-api.md): `window.GPSB`, which every script on a published page can use.
