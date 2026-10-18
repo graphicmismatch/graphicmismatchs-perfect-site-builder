@@ -131,7 +131,7 @@ Editor: Project Settings ▸ Design Tokens; `files.js` `renameToken(kind, from, 
 |---|---|---|
 | `number` | number (opts `min`,`max`,`step`; min+max → slider) | drag-label number field |
 | `int` | integer | same, rounded |
-| `string` | string (opt `asset: 'font'` → a CSS font-family list whose entries may be font assets, each gets `@font-face`) | text input |
+| `string` | string (opt `asset: 'font'` → a CSS font-family list whose entries may be font assets, each gets `@font-face`; opt `icon` → a built-in icon name) | text input (+ font / icon picker) |
 | `text` | multiline string (HTML allowed; opt `rich` → formatted editor + Source view, e.g. `Text.text`) | textarea / rich editor |
 | `code` | string (`lang`: html/css/js) | monospace textarea |
 | `bool` | boolean | checkbox |
@@ -174,7 +174,9 @@ Tablet and Phone apply, Phone last. `lib/node.js`: `sortBreakpoints`, `activeBre
 
 Canvas, CanvasScaler, PageMeta, Image, RawImage, Text, Button, Toggle, ToggleGroup, Slider, Scrollbar, InputField, Dropdown,
 Link, Video, Audio, IFrame, Form, Element, HTML, Style, HorizontalLayoutGroup, VerticalLayoutGroup, GridLayoutGroup,
-LayoutElement, ContentSizeFitter, AspectRatioFitter, ScrollRect, Mask, RectMask2D, CanvasGroup, Shadow, Outline, Animator, Repeat.
+LayoutElement, ContentSizeFitter, AspectRatioFitter, ScrollRect, Mask, RectMask2D, CanvasGroup, Shadow, Outline, Animator, Repeat,
+Captcha; widgets (`lib/widgets.js`, a factory merged into `builtins`): Icon, Divider, Marquee, Countdown, NavigationMenu,
+SocialLinks, Carousel, Tabs, Accordion, Modal, Gallery, VideoEmbed, Map.
 - Scroll views follow Unity: `Scroll View > Viewport (ScrollRect, native scrolling; its first child is the content) >
   Content`, with Scrollbars outside the viewport (`ScrollRect.horizontalScrollbar/verticalScrollbar` = node ids). A
   Scrollbar positions its `handle` node inside the handle's parent via `--gpsb-bar-start/size`; the runtime keeps
@@ -193,6 +195,16 @@ LayoutElement, ContentSizeFitter, AspectRatioFitter, ScrollRect, Mask, RectMask2
   solved before sending.
 - Component calls: `def.methods = { name(el, arg, GPSB, ci) }` → `GPSB.invoke(id, '<Type>.<name>', arg)` and event
   lists (editor `callGroups`); engine `WebObject.call(name, arg)`. Form: `submit`, `reset`.
+- Widgets render their full markup at build time; `init` adds interaction, `patch` re-renders what a prop change affects.
+  `inner(p, ctx, node)` gets the node (Carousel dots / Tabs labels count and name the children). Icons: `lib/icons.js`
+  (`ICONS` Lucide inner SVG markup by name, `BRANDS` Simple Icons paths + hosts; generated, licences in
+  `lib/icons.LICENSE.txt`) is imported by widgets.js in Node, set by the editor (`setIcons`), and loaded by pages only
+  when a patch needs an icon. Carousel/Tabs: every child is a slide/panel (`childStyle`); the start one is shown by CSS
+  (`:nth-child(n of [data-gpsb])`) until init sets `data-slide` / `data-tab`, `data-current` on the element. Modal is a
+  `<dialog>` (`open` attribute only in editor mode), `showModal()` at runtime. Events: `gpsb:change` {index} (Carousel,
+  Tabs), `gpsb:open` / `gpsb:close` (Modal), `gpsb:done` (Countdown). Calls: Carousel next/prev/goTo/play/pause, Tabs
+  select, Accordion openAll/closeAll, Modal open/close/toggle, NavigationMenu open/close/toggle, VideoEmbed play.
+  `openLightbox(items, i)` (one shared `<dialog class="gpsb-lightbox">`): Gallery and `Image.lightbox`.
 - `PageMeta` (root only): `<html lang>`, favicon, canonical URL, og:title/description/image/url, `noindex`, `head` code.
 - `Image.element: img` renders `<img class="gpsb-img" alt loading decoding=async>` filling the rect at `z-index: -1` inside an
   `isolation: isolate` element (children, Button tint, Mask and state sprites keep working); `background` (default) is a
@@ -518,7 +530,7 @@ view(id) breakpoints() editNames() setBreakpoint(name) setBreakpoints(list) isOv
 edit(label, fn, { kind, ids, merge, files })   undo() redo()
 setProp(id, path, value, opts)     // ALWAYS use this for property edits (record mode hooks in);
                                    // opts.label groups many setProps into one undo step (drags, presets)
-select(ids, additive) setTool(t) PRESETS create(preset, parentId) addNode(node, parentId, index)
+select(ids, additive) setTool(t) PRESETS PRESET_GROUPS (submenus of WebObject ▸ UI: Widgets) create(preset, parentId) addNode(node, parentId, index)
 deleteNodes(ids) duplicate(ids) cloneTree(node) reparent(id, newParentId, index) addComponent(id, type) removeComponent(id, i) moveComponent(id, i, to)
 // cloneTree: fresh ids, internal references remapped; remove/moveComponent keep <Type>[n] override/track paths on the same component
 setPage(name) newPage(name) previewHTML(editor) generatedCode() setPlaying(bool)

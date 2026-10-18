@@ -13,6 +13,8 @@ Start here if you want to build a site.
    breakpoints.
 4. [Content and data](content-and-data.md): text, images, media, forms, Markdown, JSON bindings, Repeat, collection pages.
    [Forms](forms.md): contact forms that send to a form service or your endpoint, validation, spam protection, events.
+   [Widgets](widgets.md): icons, navigation menu, social links, carousel, tabs, accordion, modal, gallery, video, map,
+   countdown.
 5. [Interactivity and events](events.md): Button On Click and the other event lists, and what each call does.
 6. [Animation](animation.md): clips, the Animation window, record mode, curves, sprite swaps, animation events.
 7. [Prefabs and design tokens](prefabs-and-tokens.md): reusable objects and project-wide colours, fonts and text styles.

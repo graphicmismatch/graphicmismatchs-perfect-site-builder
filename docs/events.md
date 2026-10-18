@@ -28,7 +28,7 @@ Events only run on the published page and in Play mode, not while you edit.
 | Animator.play | clip name (empty = the default clip) | Plays an animation on the target's Animator. |
 | Animator.stop, Animator.pause | | Stops or pauses it. |
 | Media.play, Media.pause, Media.toggle | | Controls the target's Video or Audio. |
-| *Component*.*call* | depends | A component's own calls, listed under its name: Form.submit, Form.reset, and those of other components (Modal.open, Carousel.next…). |
+| *Component*.*call* | depends | A component's own calls, listed under its name: Form.submit, Form.reset, and those of other components (Modal.open, Carousel.next…: see [Widgets](widgets.md)). |
 | *Script*.*method* | any text | Calls a method of a behaviour script on the target (`behaviour:Spin.reverse`). |
 
 Behaviour methods are listed under the script's name. Methods named `start`, `update` or starting with `_` are left

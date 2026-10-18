@@ -85,7 +85,8 @@ const customNode = name => {
 export function createItems(parentId) {
   const customs = Object.keys(S.S.P?.components ?? {});
   return [
-    ...Object.keys(S.PRESETS).filter(k => k !== 'Create Empty').map(k => ({ label: k, action: () => S.create(k, parentId) })),
+    ...Object.keys(S.PRESETS).filter(k => k !== 'Create Empty' && !Object.values(S.PRESET_GROUPS).flat().includes(k)).map(k => ({ label: k, action: () => S.create(k, parentId) })),
+    '-', ...Object.entries(S.PRESET_GROUPS).map(([g, ks]) => ({ label: g, sub: ks.map(k => ({ label: k, action: () => S.create(k, parentId) })) })),
     ...(customs.length ? ['-', ...customs.map(n => ({ label: n, action: () => S.addNode(customNode(n), parentId) }))] : []),
   ];
 }

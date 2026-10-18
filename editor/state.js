@@ -2,6 +2,8 @@
 import { findNode, walk, setProp as setPath, getProp, newNode, newId, clone, getComponent, sortBreakpoints, withOverrides, setOverride, clearOverride, isOverridden as overridden, componentPath, nodeAtPath } from '/lib/node.js';
 import { componentDef, withDefaults, builtins, registerComponent, unregisterComponent, extensionNames } from '/lib/components.js';
 import { renderDocument, makeCtx, collectionItems } from '/lib/render.js';
+import * as iconSet from '/lib/icons.js';
+import { setIcons } from '/lib/widgets.js';
 import { expandPrefabs, collapsePrefabs, overrideKey, bakeInstance, unpackInstance, OWN } from '/lib/prefab.js';
 
 export const S = {
@@ -201,6 +203,8 @@ export function setProjectSetting(path, value) {
   emit('project'); emit('structure'); // custom head code is part of the preview
 }
 
+setIcons(iconSet); // built-in icons in the preview (published pages get them inlined by the build)
+
 // ---------- selection / tools ----------
 export function select(ids, additive = false) {
   ids = [ids].flat().filter(Boolean);
@@ -270,7 +274,55 @@ export const PRESETS = {
     r.children.push(Object.assign(newNode('Item', [{ type: 'Text', props: { text: '{{index}}: {{item}}' } }]), { rect: rect({ size: [300, 30] }) }));
     return r;
   },
+  // built-in widgets (lib/widgets.js) and a ready-to-use contact form: WebObject > UI > Widgets
+  Icon: () => Object.assign(newNode('Icon', [{ type: 'Icon', props: {} }]), { rect: rect({ size: [32, 32] }) }),
+  Divider: () => Object.assign(newNode('Divider', [{ type: 'Divider', props: {} }]), { rect: rect({ size: [400, 16] }) }),
+  Marquee: () => Object.assign(newNode('Marquee', [{ type: 'Marquee', props: {} }]), { rect: rect({ anchorMin: [0, 0.5], anchorMax: [1, 0.5], size: [0, 48] }) }),
+  Countdown: () => Object.assign(newNode('Countdown', [{ type: 'Countdown', props: { until: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 16) } }]), { rect: rect({ size: [360, 80] }) }),
+  'Navigation Menu': () => Object.assign(newNode('Navigation Menu', [{ type: 'NavigationMenu', props: {} }]), { rect: rect({ size: [480, 48] }) }),
+  'Social Links': () => Object.assign(newNode('Social Links', [{ type: 'SocialLinks', props: {} }]), { rect: rect({ size: [200, 32] }) }),
+  Carousel: () => {
+    const c = Object.assign(newNode('Carousel', [{ type: 'Carousel', props: {} }]), { rect: rect({ size: [640, 360] }) });
+    ['#3366ff', '#e5534b', '#2e9e6b'].forEach((color, i) => {
+      const s = newNode(`Slide ${i + 1}`, [{ type: 'Image', props: { color } }]);
+      s.children.push(Object.assign(newNode('Text', [{ type: 'Text', props: { text: `Slide ${i + 1}`, size: 40, weight: 'bold', color: '#ffffff', align: 'center', valign: 'middle' } }]), { rect: rect(stretch) }));
+      c.children.push(s);
+    });
+    return c;
+  },
+  Tabs: () => {
+    const t = Object.assign(newNode('Tabs', [{ type: 'Tabs', props: {} }]), { rect: rect({ size: [560, 300] }) });
+    for (const name of ['Overview', 'Details', 'Reviews']) {
+      const pn = newNode(name);
+      pn.children.push(Object.assign(newNode('Text', [{ type: 'Text', props: { text: `${name}: put this tab's content here.`, size: 16, lineHeight: 1.5 } }]), { rect: rect({ ...stretch, size: [-32, -32] }) }));
+      t.children.push(pn);
+    }
+    return t;
+  },
+  Accordion: () => Object.assign(newNode('Accordion', [{ type: 'Accordion', props: {} }, { type: 'ContentSizeFitter', props: { vertical: 'preferred' } }]), { rect: rect({ size: [600, 200] }) }),
+  Modal: () => {
+    const m = Object.assign(newNode('Modal', [{ type: 'Image', props: { color: '#ffffff', radius: 12 } }, { type: 'Modal', props: {} }]), { rect: rect({ size: [440, 240] }) });
+    m.children.push(Object.assign(newNode('Text', [{ type: 'Text', props: { text: 'Hello! Open me with Modal.open from a button\'s On Click.', size: 18, lineHeight: 1.4, align: 'center', valign: 'middle' } }]), { rect: rect({ ...stretch, size: [-64, -64] }) }));
+    return m;
+  },
+  Gallery: () => Object.assign(newNode('Gallery', [{ type: 'Gallery', props: {} }]), { rect: rect({ size: [600, 400] }) }),
+  'Video Embed': () => Object.assign(newNode('Video Embed', [{ type: 'VideoEmbed', props: {} }]), { rect: rect({ size: [640, 360] }) }),
+  Map: () => Object.assign(newNode('Map', [{ type: 'Map', props: {} }]), { rect: rect({ size: [600, 360] }) }),
+  'Contact Form': () => {
+    const f = Object.assign(newNode('Contact Form', [{ type: 'Form', props: { provider: 'formspree' } },
+      { type: 'VerticalLayoutGroup', props: { spacing: 12, controlWidth: true, expandWidth: true } }, { type: 'ContentSizeFitter', props: { vertical: 'preferred' } }]), { rect: rect({ size: [420, 300] }) });
+    const field = (name, props, h = 40) => Object.assign(newNode(name, [{ type: 'Image', props: { color: '#f3f4f6', radius: 6 } }, { type: 'InputField', props: { required: true, ...props } }]), { rect: rect({ size: [420, h] }) });
+    const msg = Object.assign(newNode('Message', [{ type: 'Text', props: { text: '', size: 14, color: '#555555' } }]), { rect: rect({ size: [420, 20] }) });
+    const send = Object.assign(newNode('Send', [{ type: 'Image', props: { color: '#3366ff', radius: 6 } }, { type: 'Button', props: { type: 'submit', normal: '#3366ff', highlighted: '#4d7aff', pressed: '#2952cc' } }]), { rect: rect({ size: [420, 44] }) });
+    send.children.push(Object.assign(newNode('Text', [{ type: 'Text', props: { text: 'Send', size: 16, weight: '600', color: '#ffffff', align: 'center', valign: 'middle' } }]), { rect: rect(stretch) }));
+    f.children.push(field('name', { placeholder: 'Your name', autocomplete: 'name' }), field('email', { placeholder: 'Email address', contentType: 'email', autocomplete: 'email' }),
+      field('message', { placeholder: 'Message', lineType: 'multi' }, 120), send, msg);
+    f.components[0].props.message = msg.id;
+    return f;
+  },
 };
+// presets shown in a submenu instead of the top level of WebObject > UI
+export const PRESET_GROUPS = { Widgets: ['Icon', 'Divider', 'Marquee', 'Countdown', 'Navigation Menu', 'Social Links', 'Carousel', 'Tabs', 'Accordion', 'Modal', 'Gallery', 'Video Embed', 'Map', 'Contact Form'] };
 
 // ---------- prefabs ----------
 // the outermost instance a node belongs to (or the node itself if it is an instance root), else null

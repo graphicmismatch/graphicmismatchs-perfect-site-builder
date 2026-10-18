@@ -2,6 +2,7 @@
 // A binding is { id, get(), set(v), state?(), mixed?(), sub?(k, dflt) }; every widget returns { el, update }.
 import * as S from './state.js';
 import { icon } from './icons.js';
+import { ICONS } from '/lib/icons.js';
 
 export function h(tag, attrs = {}, ...kids) {
   const e = document.createElement(tag);
@@ -92,6 +93,25 @@ export function picker(title, items, current, onPick, anchor) {
   const p = popup(h('div', { class: 'picker' }, h('div', { class: 'pk-title' }, title), q, list), { anchor, cls: 'pk' });
   draw();
   list.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
+  q.focus();
+  return p;
+}
+
+// a searchable grid of the built-in icons (lib/icons.js)
+const iconSvg = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]}</svg>`;
+export function pickIcon(current, onPick, anchor) {
+  const q = h('input', { class: 'pk-q', placeholder: 'Search icons…', spellcheck: 'false' });
+  const grid = h('div', { class: 'ic-grid' }), name = h('div', { class: 'ic-name' }, current);
+  const draw = () => {
+    const s = q.value.trim().toLowerCase();
+    grid.replaceChildren(...Object.keys(ICONS).filter(n => !s || n.includes(s)).map(n =>
+      h('button', { class: 'ic-it' + (n === current ? ' on' : ''), title: n, html: iconSvg(n), onclick: () => { p.close(); onPick(n); }, onpointerenter: () => (name.textContent = n) })));
+  };
+  q.oninput = draw;
+  q.onkeydown = e => { if (e.key === 'Enter') grid.querySelector('.ic-it')?.click(); };
+  const p = popup(h('div', { class: 'picker ic-picker' }, h('div', { class: 'pk-title' }, 'Select Icon'), q, grid, name), { anchor, cls: 'pk' });
+  draw();
+  grid.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
   q.focus();
   return p;
 }
@@ -526,6 +546,10 @@ function widget(sc, b, label) {
     acceptAsset(s.el, kind, v => b.set(v));
     const extra = kind === 'font' ? [tokenSelect('fonts', b)] : [];
     return { el: h('div', { class: 'f-href' }, s.el, ...extra, pick), update: s.update };
+  }
+  if (t === 'string' && sc.icon) { // a built-in icon name (Icon.icon)
+    const s = textW(b), pick = h('button', { class: 'obj-p', html: icon('target'), title: 'Pick an icon', onclick: () => pickIcon(b.get() ?? '', v => b.set(v), s.el) });
+    return { el: h('div', { class: 'f-href' }, s.el, pick), update: s.update };
   }
   if (t === 'string' && sc.tokens) { // a token name (Text.textStyle)
     const sel = h('select', {});

@@ -225,6 +225,7 @@ async function main() {
   const pub = await fetch(`http://127.0.0.1:${PK_EDITOR_PORT}/project/vendor/v.js`).then(r => r.status === 200 && r.text());
   check('dev server: public/ is served at the site root, as on the built site', pub === 'export const v = 1;\n', String(pub));
   await formsSection(page);
+  await widgetsSection(page);
 }
 
 // ---- forms: validation, sending, events (a local endpoint records submissions) ----
@@ -301,6 +302,146 @@ async function formsSection(page) {
   check('forms: zero console errors', errs.length === 0, errs.join(' | '));
 }
 
+// ---- built-in widgets: carousel, tabs, modal, navigation menu, accordion, gallery/lightbox, video facade, countdown, icons ----
+async function widgetsSection(page) {
+  const WG = path.join(ROOT, '.tmp/e2e-widgets'), WG_PORT = 4216;
+  fs.rmSync(WG, { recursive: true, force: true });
+  for (const d of ['pages', 'assets']) fs.mkdirSync(path.join(WG, d), { recursive: true });
+  for (const [f, c] of [['a.svg', '#e5534b'], ['b.svg', '#3366ff']]) fs.writeFileSync(path.join(WG, 'assets', f), `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="${c}"/></svg>`);
+  const rect = (x, y, w = 200, h = 32) => ({ anchorMin: [0, 0], anchorMax: [0, 0], pivot: [0, 0], pos: [x, y], size: [w, h], rotation: 0, scale: [1, 1] });
+  const n = (id, name, components, r, children = [], extra = {}) => ({ id, name, active: true, rect: r, components, children, ...extra });
+  const slide = (id, color) => n(id, id, [{ type: 'Image', props: { color } }], rect(0, 0));
+  const root = n('root', 'Canvas', [{ type: 'Canvas', props: {} }, { type: 'CanvasScaler', props: {} }], rect(0, 0), [
+    n('nav', 'Nav', [{ type: 'NavigationMenu', props: { items: 'Home | index\nWork | #work', collapseBelow: 4000 } }], rect(900, 10, 500, 48)),
+    n('car', 'Car', [{ type: 'Carousel', props: { autoplay: false, onChange: [{ target: 'carlog', call: 'setActive', arg: 'true' }] } }], rect(20, 80, 400, 200), [slide('s1', '#f00'), slide('s2', '#0f0'), slide('s3', '#00f')]),
+    n('carlog', 'CarLog', [{ type: 'Text', props: { text: 'changed' } }], rect(20, 290, 100, 20), [], { active: false }),
+    n('tabs', 'Tabs', [{ type: 'Tabs', props: {} }], rect(460, 80, 400, 200), [n('t1', 'First', [], rect(0, 0)), n('t2', 'Second', [], rect(0, 0)), n('t3', 'Third', [], rect(0, 0))]),
+    n('acc', 'Acc', [{ type: 'Accordion', props: { items: '## One\nFirst answer\n## Two\nSecond answer' } }], rect(900, 80, 400, 200)),
+    n('open', 'Open', [{ type: 'Button', props: { onClick: [{ target: 'modal', call: 'Modal.open' }] } }], rect(20, 320, 100, 30)),
+    n('modal', 'Modal', [{ type: 'Image', props: { color: '#ffffff' } }, { type: 'Modal', props: { onClose: [{ target: 'closed', call: 'setActive', arg: 'true' }] } }], rect(0, 0, 300, 160)),
+    n('closed', 'Closed', [{ type: 'Text', props: { text: 'closed' } }], rect(140, 320, 100, 20), [], { active: false }),
+    n('gal', 'Gal', [{ type: 'Gallery', props: { images: ['a.svg', 'b.svg'], alts: ['Red', 'Blue'], columns: 2 } }], rect(20, 370, 400, 200)),
+    n('img', 'Img', [{ type: 'Image', props: { sprite: 'b.svg', element: 'img', lightbox: true, alt: 'Big blue' } }], rect(460, 370, 100, 75)),
+    n('vid', 'Vid', [{ type: 'VideoEmbed', props: { url: 'https://youtu.be/aqz-KE-bpKQ', poster: 'a.svg' } }], rect(600, 370, 320, 180)),
+    n('cd', 'Cd', [{ type: 'Countdown', props: { until: '2099-01-01T00:00:00Z', onComplete: [{ target: 'cddone', call: 'setActive', arg: 'true' }] } }], rect(960, 370, 360, 80)),
+    n('cddone', 'CdDone', [{ type: 'Text', props: { text: 'done' } }], rect(960, 460, 100, 20), [], { active: false }),
+    n('icon', 'Icon', [{ type: 'Icon', props: { icon: 'heart' } }], rect(460, 460, 32, 32)),
+  ]);
+  fs.writeFileSync(path.join(WG, 'pages/index.json'), JSON.stringify(root));
+  fs.writeFileSync(path.join(WG, 'project.json'), JSON.stringify({ name: 'widgets', inject: { bodyEnd: `<script type="module">
+    window.events = [];
+    for (const t of ['change', 'open', 'close', 'done']) document.addEventListener('gpsb:' + t, e => events.push([e.target.dataset.gpsb, t, e.detail?.index ?? '']));
+  </script>` } }));
+  const b = spawnSync(process.execPath, ['cli.js', 'build', WG], { cwd: ROOT, encoding: 'utf8' });
+  check('widgets: project builds', b.status === 0, (b.stderr || b.stdout).trim());
+  cleanups.push(await serveDir(path.join(WG, 'dist'), WG_PORT));
+  page.errors.length = 0;
+  await page.open(`http://127.0.0.1:${WG_PORT}/index.html`);
+  await page.until(`window.GPSB && GPSB.el('car')?.dataset.current === '0'`, 5000);
+  const ev = () => page.eval(`JSON.stringify(window.events.splice(0))`);
+  const vis = id => page.eval(`getComputedStyle(GPSB.el('${id}')).visibility`);
+  await ev();
+
+  // carousel: arrows, dots, keyboard, Carousel.goTo; event list + gpsb:change
+  await page.eval(`GPSB.el('car').querySelector('.gpsb-car-btn[data-dir="1"]').click()`);
+  await sleep(700);
+  const c1 = { cur: await page.eval(`GPSB.el('car').dataset.current`), s1: await vis('s1'), s2: await vis('s2'), dots: await page.eval(`[...GPSB.el('car').querySelectorAll('.gpsb-car-dots button')].map(d => d.getAttribute('aria-current')).join()`), log: await page.eval(`getComputedStyle(GPSB.el('carlog')).display`), ev: await ev() };
+  check('widgets: Carousel next arrow -> slide 2 shown, dots, gpsb:change, On Change event list', c1.cur === '1' && c1.s2 === 'visible' && c1.s1 === 'hidden' && c1.dots === 'false,true,false' && c1.log !== 'none' && c1.ev === '[["car","change",1]]', JSON.stringify(c1));
+  await page.eval(`GPSB.invoke('car', 'Carousel.goTo', '3')`);
+  await page.eval(`GPSB.el('car').querySelector('.gpsb-car-btn[data-dir="1"]').click()`); // loops
+  await sleep(700);
+  check('widgets: Carousel.goTo from an event; looping past the last slide', (await page.eval(`GPSB.el('car').dataset.current`)) === '0' && (await vis('s1')) === 'visible' && (await vis('s3')) === 'hidden');
+  await ev();
+
+  // tabs
+  await page.eval(`GPSB.el('tabs').querySelectorAll('[role=tab]')[1].click()`);
+  const t1 = { v: [await vis('t1'), await vis('t2')], sel: await page.eval(`[...GPSB.el('tabs').querySelectorAll('[role=tab]')].map(t => t.getAttribute('aria-selected')).join()`), labels: await page.eval(`GPSB.el('tabs').querySelector('[role=tablist]').textContent`), ev: await ev() };
+  check('widgets: Tabs labelled by panel names; a click shows its panel, gpsb:change', t1.v.join() === 'hidden,visible' && t1.sel === 'false,true,false' && t1.labels === 'FirstSecondThird' && t1.ev === '[["tabs","change",1]]', JSON.stringify(t1));
+  await page.eval(`GPSB.el('tabs').querySelectorAll('[role=tab]')[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))`);
+  check('widgets: Tabs arrow keys move to the next tab and focus it', (await vis('t3')) === 'visible' && (await page.eval(`document.activeElement === GPSB.el('tabs').querySelectorAll('[role=tab]')[2]`)));
+  await ev();
+
+  // modal
+  const m0 = await page.eval(`getComputedStyle(GPSB.el('modal')).display`);
+  await page.eval(`GPSB.el('open').click()`);
+  const m1 = { open: await page.eval(`GPSB.el('modal').open && GPSB.el('modal').matches(':modal')`), box: await page.eval(`(r => [Math.round(r.width), Math.round(r.height), Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)].join())(GPSB.el('modal').getBoundingClientRect())`) };
+  await page.eval(`GPSB.el('modal').querySelector('.gpsb-modal-x').click()`);
+  await sleep(50);
+  const m2 = { open: await page.eval(`GPSB.el('modal').open`), closed: await page.eval(`getComputedStyle(GPSB.el('closed')).display`), ev: await ev() };
+  check('widgets: Modal hidden until Modal.open (button event list), centred, × closes, gpsb:open/close + On Close', m0 === 'none' && m1.open && m1.box === '300,160,720,450' && !m2.open && m2.closed !== 'none' && m2.ev === '[["modal","open",""],["modal","close",""]]', JSON.stringify({ m0, m1, m2 }));
+
+  // navigation menu (burger forced on by collapseBelow)
+  const nav = page.eval.bind(page);
+  const n0 = { burger: await nav(`getComputedStyle(GPSB.el('nav').querySelector('.gpsb-burger')).display`), list: await nav(`getComputedStyle(GPSB.el('nav').querySelector('.gpsb-nav-list')).display`), cur: await nav(`GPSB.el('nav').querySelector('[aria-current=page]')?.textContent`) };
+  await nav(`GPSB.el('nav').querySelector('.gpsb-burger').click()`);
+  const n1 = { list: await nav(`getComputedStyle(GPSB.el('nav').querySelector('.gpsb-nav-list')).display`), exp: await nav(`GPSB.el('nav').querySelector('.gpsb-burger').getAttribute('aria-expanded')`) };
+  await nav(`GPSB.el('nav').querySelectorAll('a')[1].click()`);
+  const n2 = await nav(`GPSB.el('nav').hasAttribute('data-open')`);
+  check('widgets: NavigationMenu burger opens the links, a link click closes it, current page marked', n0.burger === 'flex' && n0.list === 'none' && n0.cur === 'Home' && n1.list === 'flex' && n1.exp === 'true' && !n2, JSON.stringify({ n0, n1, n2 }));
+
+  // accordion: one open at a time
+  await nav(`GPSB.el('acc').querySelectorAll('summary')[0].click()`);
+  await nav(`GPSB.el('acc').querySelectorAll('summary')[1].click()`);
+  await sleep(50);
+  const acc = await nav(`[...GPSB.el('acc').querySelectorAll('details')].map(d => d.open).join()`);
+  check('widgets: Accordion opens one answer at a time', acc === 'false,true', acc);
+
+  // gallery + image lightbox
+  await nav(`GPSB.el('gal').querySelectorAll('.gpsb-gal-item')[1].click()`);
+  const g1 = await nav(`(lb => [lb.open, lb.querySelector('img').getAttribute('src'), lb.querySelector('figcaption').textContent, lb.querySelector('.lb-n').textContent].join())(document.querySelector('.gpsb-lightbox'))`);
+  await nav(`document.querySelector('.gpsb-lightbox').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))`);
+  const g2 = await nav(`document.querySelector('.gpsb-lightbox img').getAttribute('src')`);
+  await nav(`document.querySelector('.gpsb-lightbox .lb-x').click()`);
+  await nav(`GPSB.el('img').querySelector('img').click()`);
+  const g3 = await nav(`(lb => [lb.open, lb.querySelector('figcaption').textContent, lb.querySelector('.lb-next').hidden].join())(document.querySelector('.gpsb-lightbox'))`);
+  await nav(`document.querySelector('.gpsb-lightbox').close()`);
+  check('widgets: Gallery opens the lightbox at the clicked image, arrows go round; Image lightbox', /^true,assets\/b\.svg\?v=\w+,Blue,2 \/ 2$/.test(g1) && /assets\/a\./.test(g2) && g3 === 'true,Big blue,true', JSON.stringify({ g1, g2, g3 }));
+
+  // video facade: no iframe until clicked
+  const v0 = await nav(`!!GPSB.el('vid').querySelector('iframe')`);
+  await nav(`GPSB.el('vid').querySelector('.gpsb-vid').click()`);
+  const v1 = await nav(`GPSB.el('vid').querySelector('iframe')?.getAttribute('src')`);
+  check('widgets: VideoEmbed loads the player only when clicked (privacy-enhanced)', !v0 && v1 === 'https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ?autoplay=1&rel=0', String(v1));
+
+  // countdown: ticking, then done
+  const cd0 = await nav(`GPSB.el('cd').querySelectorAll('.gpsb-cd-u b').length`);
+  await nav(`(n => { n.components[0].props.until = new Date(Date.now() + 1200).toISOString(); })(GPSB.nodeFor(GPSB.el('cd')))`);
+  await page.until(`getComputedStyle(GPSB.el('cddone')).display !== 'none'`, 4000);
+  const cd1 = { txt: await nav(`GPSB.el('cd').textContent`), ev: await ev() };
+  check('widgets: Countdown ticks to zero, then gpsb:done and On Complete', cd0 === 4 && /^0days00hours00minutes00seconds$/.test(cd1.txt.replace(/\s/g, '')) && cd1.ev.includes('["cd","done",""]'), JSON.stringify({ cd0, cd1 }));
+
+  // icon swapped at runtime (icons load on demand)
+  await nav(`(el => { const n = GPSB.nodeFor(el); n.components[0].props.icon = 'star'; GPSB.applyNode(n, undefined, el); })(GPSB.el('icon'))`);
+  await page.until(`GPSB.el('icon').querySelector('svg[data-icon=star] polygon, svg[data-icon=star] path')`, 3000);
+  check('widgets: Icon changed at runtime loads the icon set and swaps the SVG', !!(await nav(`GPSB.el('icon').querySelector('svg[data-icon=star]')`)));
+  check('widgets: zero console errors', page.errors.length === 0, page.errors.join(' | '));
+
+  // editor: every Widgets preset creates and previews (icons inlined in the preview, first slide / tab showing)
+  const ED_PORT = 4217, cfg = path.join(ROOT, '.tmp', 'e2e-config');
+  const ed = spawn(process.execPath, ['cli.js', 'serve', WG, '--port', String(ED_PORT)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GPSB_CONFIG_DIR: cfg } });
+  cleanups.push(() => ed.kill());
+  await new Promise((ok, err) => { ed.stdout.on('data', d => /editor:/.test(d) && ok()); ed.on('exit', c => err(new Error(`editor server exited ${c}`))); });
+  await page.open(`http://127.0.0.1:${ED_PORT}/editor/`);
+  await page.until(`document.querySelector('[data-panel=hierarchy]')?.innerText.includes('CdDone')`, 8000);
+  const made = await page.eval(`(async () => {
+    const S = await import('/editor/state.js'), keys = S.PRESET_GROUPS.Widgets;
+    for (const k of keys) S.create(k);
+    const wait = async f => { for (let i = 0; i < 100; i++) { const v = f(); if (v) return v; await new Promise(r => setTimeout(r, 50)); } return null; };
+    const doc = () => S.S.previewWin?.document;
+    await wait(() => doc()?.querySelector('.gpsb-tablist [role=tab]') && doc().querySelectorAll('[data-icon="star"] path, [data-icon="star"] polygon').length);
+    const d = doc(), byName = n => d.querySelector('[data-gpsb="' + S.root().children.findLast(c => c.name === n).id + '"]');
+    const car = byName('Carousel'), tabs = byName('Tabs');
+    return { n: keys.length, created: keys.filter(k => S.root().children.some(c => c.name === k)).length,
+      icon: !!byName('Icon').querySelector('svg path, svg polygon'), slide1: getComputedStyle(car.querySelector('[data-gpsb]')).visibility,
+      slide2: getComputedStyle(car.querySelectorAll(':scope > [data-gpsb]')[1]).visibility, tabs: tabs.querySelector('[role=tablist]').textContent,
+      modal: byName('Modal').open, form: byName('Contact Form').tagName + ':' + byName('Contact Form').querySelectorAll('input, textarea').length };
+  })()`);
+  check('editor: every Widgets preset creates and previews (icons, first slide and tab shown, modal open while editing)',
+    made.created === made.n && made.icon && made.slide1 === 'visible' && made.slide2 === 'hidden' && made.tabs === 'OverviewDetailsReviews' && made.modal === true && made.form === 'FORM:4', JSON.stringify(made));
+  const edErrs = page.errors.filter(e => !/i\.ytimg\.com/.test(e)); // the Video Embed preset's YouTube poster (no network in CI)
+  check('editor: widgets zero console errors', edErrs.length === 0, edErrs.join(' | '));
+}
+
 // static file server for a built site -> cleanup function
 async function serveDir(dir, port) {
   const s = http.createServer((req, res) => {
@@ -363,6 +504,8 @@ async function chrome(W = 1440, H = 900) {
   return page;
 }
 
-try { await main(); } catch (e) { failed++; console.log('FAIL', e.stack ?? e); } finally { for (const f of cleanups.reverse()) try { f(); } catch {} }
+// E2E_ONLY=forms|widgets runs just that section (quicker while working on it)
+const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p) }[process.env.E2E_ONLY];
+try { if (ONLY) await ONLY(await chrome()); else await main(); } catch (e) { failed++; console.log('FAIL', e.stack ?? e); } finally { for (const f of cleanups.reverse()) try { f(); } catch {} }
 console.log(failed ? `\n${failed} assertion(s) failed` : '\nall e2e assertions passed');
 process.exit(failed ? 1 : 0);

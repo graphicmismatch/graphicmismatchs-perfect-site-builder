@@ -389,4 +389,41 @@ assert.equal(collectionItems(canvasNode(), cctx), null);
   assert.match(r.body, /name="_gotcha"/, 'Formspree honeypot');
   assert.equal(typeof componentDef('Form').methods.submit, 'function');
 }
+// built-in widgets: icons inlined at build time, markup per child (carousel dots, tab labels), static first slide/tab
+{
+  const pg = newNode('C', [{ type: 'Canvas', props: {} }]);
+  const car = newNode('Car', [{ type: 'Carousel', props: { startSlide: 1 } }]), tabs = newNode('Tabs', [{ type: 'Tabs', props: {} }]);
+  car.children.push(newNode('A'), newNode('B'), newNode('C'));
+  tabs.children.push(newNode('One <x>'), newNode('Two'));
+  pg.children.push(newNode('Ic', [{ type: 'Icon', props: { icon: 'heart', label: 'Likes' } }]), car, tabs,
+    newNode('Acc', [{ type: 'Accordion', props: { items: '## Q1\nA **1**\n## Q2\nA2', firstOpen: true } }]),
+    newNode('Soc', [{ type: 'SocialLinks', props: { links: 'https://www.instagram.com/me\nmailto:a@b.c\nhttps://example.org' } }]),
+    newNode('Nav', [{ type: 'NavigationMenu', props: { items: 'Home | index\nAbout | about\nTop | #top' } }]),
+    newNode('Vid', [{ type: 'VideoEmbed', props: { url: 'https://youtu.be/aqz-KE-bpKQ' } }]),
+    newNode('Map', [{ type: 'Map', props: { lat: 10, lng: 20, zoom: 10 } }]),
+    newNode('Gal', [{ type: 'Gallery', props: { images: ['a.png', 'b.png'], alts: ['first'] } }]),
+    newNode('Mod', [{ type: 'Modal', props: {} }]),
+    newNode('Cd', [{ type: 'Countdown', props: { until: '2000-01-01T00:00:00Z', doneText: 'Over' } }]));
+  const r = renderPage(pg, makeCtx({ pages: ['index', 'about'] })), b = r.body;
+  assert.match(b, /<div class="ic" data-gpsb="[^"]+" role="img" aria-label="Likes"><svg class="gpsb-icon" data-icon="heart"[^>]*><path d=/);
+  assert.equal((b.match(/aria-label="Slide \d"/g) ?? []).length, 3);
+  assert.match(b, /aria-label="Slide 2" aria-current="true"/);
+  assert.ok(r.css.includes('.car > [data-gpsb]:nth-child(2 of [data-gpsb]):not([data-slide])'), 'start slide shown without JS');
+  assert.match(b, /role="tab" aria-selected="true" tabindex="0">One &#60;x&#62;<\/button><button type="button" role="tab" aria-selected="false" tabindex="-1">Two</);
+  assert.match(b, /<details class="gpsb-acc" name="gpsb-acc-[^"]+" open><summary>Q1<\/summary><div class="gpsb-acc-a"><p>A <strong>1<\/strong><\/p>/);
+  assert.match(b, /href="https:\/\/www.instagram.com\/me" aria-label="Instagram" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"/);
+  assert.match(b, /href="mailto:a@b.c" aria-label="Email"><svg class="gpsb-icon" data-icon="mail"/);
+  assert.match(b, /aria-label="example.org"[^>]*><svg class="gpsb-icon" data-icon="globe"/);
+  assert.match(b, /<nav class="nav"[^>]*aria-label="Main"><button type="button" class="gpsb-burger"[^]*<a href="index.html">Home<\/a><\/li><li><a href="about.html">About<\/a><\/li><li><a href="#top">Top</);
+  assert.match(b, /<a class="gpsb-vid" href="https:\/\/youtu.be\/aqz-KE-bpKQ"[^>]*><img src="https:\/\/i.ytimg.com\/vi\/aqz-KE-bpKQ\/hqdefault.jpg"/);
+  assert.ok(!b.includes('<iframe src="https://www.youtube'), 'no player before a click');
+  assert.match(b, /openstreetmap.org\/export\/embed.html\?bbox=19\.82422,9\.89613,20\.17578,10\.10387&#38;layer=mapnik&#38;marker=10\.00000,20\.00000/);
+  assert.match(b, /<button type="button" class="gpsb-gal-item" data-i="0" aria-label="Open image 1"><img src="assets\/a.png" alt="first"/);
+  assert.match(b, /<dialog class="mod"[^>]*><button type="button" class="gpsb-modal-x"/);
+  assert.ok(!/<dialog[^>]* open/.test(b), 'a modal is closed on the page');
+  assert.match(renderPage(pg, makeCtx({ editor: true })).body, /<dialog[^>]* open/, 'and open while editing');
+  assert.match(b, /<span class="gpsb-cd-done">Over<\/span>/);
+  assert.equal(typeof componentDef('Carousel').methods.next, 'function');
+  assert.throws(() => registerComponent('Carousel', {}), /built-in/);
+}
 console.log('core ok');

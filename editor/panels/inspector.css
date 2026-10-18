@@ -151,6 +151,13 @@ textarea.mono { font: var(--mono); font-size: 11px; white-space: pre; tab-size: 
 .pk-it .th { width: 16px; height: 16px; flex: none; object-fit: contain; display: flex; }
 .pk-l { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .pk-it small { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
+.ic-picker { width: 300px; }
+.ic-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 0 6px; max-height: 260px; overflow: auto; }
+.ic-it { aspect-ratio: 1; display: grid; place-items: center; background: none; border: 0; border-radius: 3px; color: var(--text); padding: 6px; cursor: pointer; }
+.ic-it:hover { background: var(--hover-2); }
+.ic-it.on { background: var(--accent); }
+.ic-it svg { width: 100%; height: 100%; }
+.ic-name { padding: 4px 8px; color: var(--text-dim); font-size: 11px; min-height: 14px; border-top: 1px solid var(--border-soft); }
 .ac { width: 240px; }
 .ac-title { justify-content: center; position: relative; }
 .ac-back { position: absolute; left: 6px; font-size: 16px; line-height: 14px; cursor: pointer; color: var(--text-dim); padding: 0 4px; }

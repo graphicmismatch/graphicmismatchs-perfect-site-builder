@@ -288,6 +288,13 @@ declare global {
     'gpsb:success': CustomEvent<FormSuccessDetail>;
     'gpsb:error': CustomEvent<FormErrorDetail>;
     'gpsb:invalid': CustomEvent<FormInvalidDetail>;
+    /** Carousel (index, count) and Tabs (index, name): the shown slide / tab changed. */
+    'gpsb:change': CustomEvent<{ index: number; count?: number; name?: string }>;
+    /** Modal opened / closed. */
+    'gpsb:open': CustomEvent<{}>;
+    'gpsb:close': CustomEvent<{}>;
+    /** Countdown reached its time. */
+    'gpsb:done': CustomEvent<{ until: string }>;
   }
 }
 
