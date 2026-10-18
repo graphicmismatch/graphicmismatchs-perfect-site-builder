@@ -104,7 +104,7 @@ export async function loadProject(root) {
     const st = await fsp.stat(p('assets/' + f));
     assets.push({ path: f, type: assetType(f), size: st.size, mtime: st.mtimeMs });
     if (ext(f) === 'json') json[f] = await tryJSON(root, 'assets/' + f, null, null, errors);
-    else if (['md', 'txt'].includes(ext(f)) && st.size <= 512 * 1024) text[f] = await fsp.readFile(p('assets/' + f), 'utf8'); // Markdown component sources
+    else if (['md', 'txt', 'svg'].includes(ext(f)) && st.size <= 512 * 1024) text[f] = await fsp.readFile(p('assets/' + f), 'utf8'); // Markdown and SVG component sources
   }
   for (const c of Object.values(components)) if (c.error) errors.push({ file: `components/${c.name}.html`, error: c.error });
   // npm packages (pm.js): import map entries (paths inside packages/), and what the lock lists but isn't installed

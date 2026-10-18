@@ -360,6 +360,7 @@ function compSection(n, c, ci) {
   for (const [k, sc] of props) {
     if (sc.hidden) continue; // bookkeeping the editor keeps (Image.crop)
     const b = pb([id], `${cp}.${k}`, sc.default), w = add(wrap, field(sc, b, nice(k)), `${ci}.${k}`, b);
+    if (sc.when) live.push(() => { const c = S.view(id)?.components[ci]; if (c) w.el.hidden = !sc.when(S.propsOf(c)); }); // only the fields that apply
     if (t === 'Canvas' && k === 'height') // the page grows to its content
       w.el.append(h('button', { class: 'rt-fit f-fit', title: 'Fit the page height to its content', onclick: () => S.fitToChildren(id) }, '⤢'));
   }

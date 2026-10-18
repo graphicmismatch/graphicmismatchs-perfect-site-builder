@@ -28,6 +28,7 @@ const I = {
   data: '<ellipse cx="8" cy="4" rx="5.5" ry="2" stroke="#7fd0e0"/><path d="M2.5 4v8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V4M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2" stroke="#7fd0e0"/>',
   dots: '<circle cx="8" cy="3.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="8" cy="12.5" r="1.2" fill="currentColor" stroke="none"/>',
   target: '<circle cx="8" cy="8" r="5.5" stroke="currentColor"/><circle cx="8" cy="8" r="2" fill="currentColor" stroke="none"/>',
+  shape: '<path d="M8 2l6 10H2z" fill="#5a8fdc" stroke="#a9c8f5"/><circle cx="11.5" cy="11" r="3" fill="#d6b04a" stroke="#f3dc8e"/>',
   warn: '<path d="M8 1.8l6.5 12H1.5z" fill="#d8a02c" stroke="#d8a02c"/><path d="M8 6v4M8 11.8v.4" stroke="#222" stroke-width="1.6"/>',
 };
 
@@ -35,7 +36,7 @@ export const icon = name => svg(I[name] ?? I.file);
 
 const BY_TYPE = {
   Canvas: 'canvas', CanvasScaler: 'canvas', Image: 'image', Text: 'textc', Button: 'button', Link: 'link', Video: 'video',
-  Audio: 'audio', HTML: 'html', Style: 'style', Animator: 'anim', Repeat: 'data',
+  Audio: 'audio', HTML: 'html', Style: 'style', Animator: 'anim', Repeat: 'data', Shape: 'shape', SVG: 'image',
 };
 const BY_CAT = { Layout: 'layout', Effects: 'effect', Media: 'video', Web: 'html', Data: 'data', Animation: 'anim', Extensions: 'extension' };
 export function compIcon(type, def) {

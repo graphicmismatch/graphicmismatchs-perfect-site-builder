@@ -186,7 +186,8 @@ Editor: Project Settings ▸ Design Tokens; `files.js` `renameToken(kind, from, 
 ## Prop types (component schemas)
 
 `{ type, default, ...opts }`, optional `help` (tooltip), `labels` (vec field labels), `hidden` (kept in the data, not
-shown in the Inspector: editor bookkeeping such as `Image.crop`).
+shown in the Inspector: editor bookkeeping such as `Image.crop`), `when(props)` (the Inspector shows the field only
+while it returns true: `Shape.sides` for polygons).
 
 | type | value | inspector |
 |---|---|---|
@@ -236,7 +237,7 @@ Tablet and Phone apply, Phone last. `lib/node.js`: `sortBreakpoints`, `activeBre
 Canvas, CanvasScaler, PageMeta, Image, RawImage, Text, Button, Toggle, ToggleGroup, Slider, Scrollbar, InputField, Dropdown,
 Link, Video, Audio, IFrame, Form, Element, HTML, Style, HorizontalLayoutGroup, VerticalLayoutGroup, GridLayoutGroup,
 LayoutElement, ContentSizeFitter, AspectRatioFitter, ScrollRect, Mask, RectMask2D, CanvasGroup, Shadow, Outline, Animator, Repeat,
-Captcha, Pagination; widgets (`lib/widgets.js`, a factory merged into `builtins`): Icon, Divider, Marquee, Countdown, NavigationMenu,
+Captcha, Pagination; Shape and SVG (`lib/shapes.js`); widgets (`lib/widgets.js`, a factory merged into `builtins`): Icon, Divider, Marquee, Countdown, NavigationMenu,
 SocialLinks, Carousel, Tabs, Accordion, Modal, Gallery, VideoEmbed, Map.
 - Scroll views follow Unity: `Scroll View > Viewport (ScrollRect, native scrolling; its first child is the content) >
   Content`, with Scrollbars outside the viewport (`ScrollRect.horizontalScrollbar/verticalScrollbar` = node ids). A
@@ -274,6 +275,16 @@ SocialLinks, Carousel, Tabs, Accordion, Modal, Gallery, VideoEmbed, Map.
   node element, filling its rect, with browser default styling. User edits are written back into the element's node
   data (`def.state`), so `GPSB.nodeFor(el)` reads the current value and re-applies keep it. Interactive runtime set-up
   lives in `def.init({ el, GPSB, ci })` (run by `behaviours.js#boot`, not in the editor).
+- `Shape` (`lib/shapes.js`): rectangle / ellipse are CSS (background or gradient, border, radius); the rest an inline
+  `<svg class="gpsb-shape" viewBox="0 0 100 100" preserveAspectRatio="none" data-k>` (geometry `shapeGeometry(p)`,
+  polygons scaled to fill the box, path data filtered to path characters) painted by rules from CSS variables
+  (`--gpsb-fill`, `--gpsb-fill2`, `--gpsb-paint` = fill or `url(#gpsb-grad-<id>)`, `--gpsb-stroke`, `--gpsb-sw`,
+  `--gpsb-dash`), `vector-effect: non-scaling-stroke`. `data-k` = hash of the geometry props: `patch` re-renders when
+  it no longer matches. `SVG`: `cleanSVG(text, { prefix, fit, title, key })` keeps the root `<svg>` (viewBox from
+  width/height, preserveAspectRatio from fit), drops scripts, `foreignObject`, `on*` attributes and `javascript:`
+  links, and prefixes ids (and `url(#…)` / `href="#…"`) with `s-<node id>`; the source is `code` or `ctx.text[src]`
+  (`loadProject` reads `.svg` assets ≤ 512 KB into `text`), fetched by `patch` when a page doesn't have it. Recolour
+  rules (`!important`, over `style="fill:…"`) only when `color` / `strokeColor` aren't transparent.
 - `Image.focus` [x, y] 0–1 → `object-position` / `background-position`. `Image.cropSource` + `crop` [x, y, w, h]
   (hidden): written by the editor's Crop & Focus window (`editor/crop.js`), which cuts `cropSource` with a canvas into
   a new asset `<name>.crop-<tag>.<png|jpg|webp>` (Sprite) and keeps the source for re-cropping; focus is relative to

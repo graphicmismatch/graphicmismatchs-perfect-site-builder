@@ -39,6 +39,32 @@ Text with scripts or event handlers opens as HTML, since the formatted view neve
 
 Drag images into the Project panel to import them, then drag them onto the Scene to create an Image.
 
+## Shapes and SVG
+
+**Shape** (WebObject ▸ UI ▸ Shapes, or Add Component ▸ UI ▸ Shape) draws a vector shape that fills its object:
+rectangle, ellipse, triangle, polygon (3–24 **Sides**), star (**Points**, **Inner Radius**), arrow (**Arrow Head**,
+**Arrow Shaft**), line, or **path**: your own SVG path data in a 100 × 100 box, stretched to the object
+(`M0,100 C20,0 80,0 100,100 Z` is a hill). The Inspector shows only the settings of the shape you picked.
+
+- **Fill**, or a gradient from Fill to **Fill 2** (**Fill Type** linear, at an **Angle**, or radial). Colours can be
+  design tokens (`$primary`), and all of them animate.
+- **Stroke** and **Stroke Width** draw an outline (lines need one); **Dash** makes it dashed. Outlines keep their width
+  in pixels however the shape is stretched. Rectangle and ellipse outlines sit inside the shape; the others are
+  centred on its edge. **Radius** rounds a rectangle's corners. Add a **Shadow** component for a drop shadow.
+- Rectangles and ellipses are plain CSS; the other shapes are inline SVG. Either way there's no image file to download.
+
+**SVG** (WebObject ▸ UI ▸ Shapes ▸ SVG Image) puts an `.svg` file from your assets, or SVG code you paste into
+**Code**, into the page itself, rather than as a picture. That lets you:
+
+- recolour it: **Color** paints every filled part, **Stroke Color** every outline (leave them transparent to keep the
+  file's own colours). Both can be tokens and both animate, which suits logos and illustrations that follow the theme;
+- style its parts with a Style component's Rules (`& path:hover { fill: red; }`), and select them from scripts.
+
+**Fit** contains, covers or stretches it in its object, and **Title** describes it for screen readers. Scripts, event
+handlers and `javascript:` links are removed from the SVG, and its ids are renamed for each object, so the same file can
+be used many times on a page. SVG files up to 512 KB are written into the pages at build time. To show an SVG as a
+plain picture (cached once, not styleable), use an Image with the file as its Sprite, as before.
+
 ## Media and embeds
 
 - **Video:** autoplay, loop, muted, controls, poster image and fit. Browsers only autoplay muted video.

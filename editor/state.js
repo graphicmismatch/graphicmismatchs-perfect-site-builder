@@ -367,9 +367,14 @@ export const PRESETS = {
     f.components[0].props.message = msg.id;
     return f;
   },
+  // vector shapes (lib/shapes.js): WebObject > UI > Shapes
+  ...Object.fromEntries([['Rectangle', 'rectangle', [160, 100], { radius: 8 }], ['Ellipse', 'ellipse', [120, 120]], ['Triangle', 'triangle', [120, 104]], ['Polygon', 'polygon', [120, 120]],
+    ['Star', 'star', [120, 120], { fill: '#ffb400' }], ['Arrow', 'arrow', [160, 80]], ['Line', 'line', [200, 20], { strokeWidth: 3, stroke: '#1a1a1a' }]]
+    .map(([name, shape, size, props = {}]) => [name, () => Object.assign(newNode(name, [{ type: 'Shape', props: { shape, ...props } }]), { rect: rect({ size }) })])),
+  'SVG Image': () => Object.assign(newNode('SVG', [{ type: 'SVG', props: {} }]), { rect: rect({ size: [120, 120] }) }),
 };
 // presets shown in a submenu instead of the top level of WebObject > UI
-export const PRESET_GROUPS = { Widgets: ['Icon', 'Divider', 'Marquee', 'Countdown', 'Navigation Menu', 'Social Links', 'Carousel', 'Tabs', 'Accordion', 'Modal', 'Gallery', 'Video Embed', 'Map', 'Contact Form'] };
+export const PRESET_GROUPS = { Shapes: ['Rectangle', 'Ellipse', 'Triangle', 'Polygon', 'Star', 'Arrow', 'Line', 'SVG Image'], Widgets: ['Icon', 'Divider', 'Marquee', 'Countdown', 'Navigation Menu', 'Social Links', 'Carousel', 'Tabs', 'Accordion', 'Modal', 'Gallery', 'Video Embed', 'Map', 'Contact Form'] };
 
 // a section from the library (lib/sections.js) after the selected section of the page, or at its end. Sections use
 // the design tokens: missing ones are added from the Clean theme.

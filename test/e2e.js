@@ -230,6 +230,7 @@ async function main() {
   await sectionsSection(page);
   await canvasSection(page);
   await languagesSection(page);
+  await shapesSection(page);
 }
 
 // ---- forms: validation, sending, events (a local endpoint records submissions) ----
@@ -714,6 +715,74 @@ async function languagesSection(page) {
   check('editor: languages zero console errors', page.errors.length === 0, page.errors.join(' | '));
 }
 
+// ---- Shape and SVG: built, changed at runtime, created in the editor ----
+async function shapesSection(page) {
+  const SH = path.join(ROOT, '.tmp/e2e-shapes'), SITE = 4226, ED = 4227, cfg = path.join(ROOT, '.tmp', 'e2e-config-shapes');
+  fs.rmSync(SH, { recursive: true, force: true });
+  for (const d of ['pages', 'assets/img']) fs.mkdirSync(path.join(SH, d), { recursive: true });
+  fs.writeFileSync(path.join(SH, 'project.json'), JSON.stringify({ name: 'shapes' }));
+  fs.writeFileSync(path.join(SH, 'assets/img/logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><defs><linearGradient id="g"><stop offset="0" stop-color="#0f0"/></linearGradient></defs><path id="p" style="fill:#00f" d="M0 0h10v10H0z"/><circle cx="5" cy="5" r="2" fill="url(#g)" stroke="#000"/></svg>');
+  fs.writeFileSync(path.join(SH, 'assets/img/other.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><rect id="other" width="4" height="4" fill="#f0f"/></svg>');
+  const r = (x, y, w = 120, h = 120) => ({ anchorMin: [0, 0], anchorMax: [0, 0], pivot: [0, 0], pos: [x, y], size: [w, h], rotation: 0, scale: [1, 1] });
+  const n = (id, comps, rr) => ({ id, name: id, active: true, rect: rr, components: comps, children: [] });
+  const root = n('root', [{ type: 'Canvas', props: {} }, { type: 'CanvasScaler', props: {} }], r(0, 0), []);
+  root.children = [
+    n('rect', [{ type: 'Shape', props: { shape: 'rectangle', radius: 10, strokeWidth: 2, stroke: '#ff0000' } }], r(10, 10)),
+    n('star', [{ type: 'Shape', props: { shape: 'star', fillType: 'linear', strokeWidth: 3 } }], r(150, 10)),
+    n('line', [{ type: 'Shape', props: { shape: 'line', strokeWidth: 4, stroke: '#00aa00' } }], r(290, 10, 200, 20)),
+    n('logo', [{ type: 'SVG', props: { src: 'img/logo.svg', color: '#ff0000' } }], r(10, 150)),
+    n('logo2', [{ type: 'SVG', props: { src: 'img/logo.svg' } }], r(150, 150)),
+  ];
+  fs.writeFileSync(path.join(SH, 'pages/index.json'), JSON.stringify(root));
+  const b = spawnSync(process.execPath, ['cli.js', 'build', SH], { cwd: ROOT, encoding: 'utf8' });
+  check('shapes: project builds', b.status === 0, b.stderr);
+  cleanups.push(await serveDir(path.join(SH, 'dist'), SITE));
+  page.errors.length = 0;
+  await page.open(`http://127.0.0.1:${SITE}/index.html`);
+  await page.until(`window.GPSB?.els`, 5000);
+  const got = await page.eval(`(() => {
+    const cs = (sel, k) => getComputedStyle(document.querySelector(sel))[k], el = id => GPSB.el(id);
+    return JSON.stringify({
+      rect: [cs('[data-gpsb=rect]', 'borderTopLeftRadius'), cs('[data-gpsb=rect]', 'borderTopColor'), cs('[data-gpsb=rect]', 'backgroundColor')],
+      star: [el('star').querySelectorAll('polygon').length, getComputedStyle(el('star').querySelector('polygon')).fill.startsWith('url('), getComputedStyle(el('star').querySelector('polygon')).strokeWidth, Math.round(el('star').querySelector('svg').getBoundingClientRect().width)],
+      line: [getComputedStyle(el('line').querySelector('line')).stroke, getComputedStyle(el('line').querySelector('line')).strokeWidth],
+      recolour: [getComputedStyle(el('logo').querySelector('path')).fill, getComputedStyle(el('logo2').querySelector('path')).fill],
+      ids: [...document.querySelectorAll('.gpsb-svg [id]')].map(x => x.id).join(),
+      gradOk: getComputedStyle(el('logo2').querySelector('circle')).fill.includes('#s-logo2-g'),
+    });
+  })()`);
+  check('shapes: CSS rectangle, SVG star (gradient, outline), line; SVG files inlined, recoloured, ids unique per object',
+    got === JSON.stringify({ rect: ['10px', 'rgb(255, 0, 0)', 'rgb(51, 102, 255)'], star: [1, true, '3px', 120], line: ['rgb(0, 170, 0)', '4px'], recolour: ['rgb(255, 0, 0)', 'rgb(0, 0, 255)'], ids: 's-logo-g,s-logo-p,s-logo2-g,s-logo2-p', gradOk: true }), got);
+  const rt = await page.eval(`(async () => {
+    const set = (id, k, v) => { const el = GPSB.el(id), n = GPSB.nodeFor(el); n.components[0].props[k] = v; GPSB.applyNode(n, undefined, el); };
+    set('star', 'shape', 'polygon'); set('star', 'sides', 8);
+    const pts = GPSB.el('star').querySelector('polygon').getAttribute('points').split(' ').length;
+    set('rect', 'fill', '#00ff00');
+    set('logo2', 'src', 'img/other.svg');
+    for (let i = 0; i < 40 && !GPSB.el('logo2').querySelector('rect'); i++) await new Promise(r => setTimeout(r, 50));
+    return JSON.stringify([pts, getComputedStyle(GPSB.el('rect')).backgroundColor, GPSB.el('logo2').querySelector('rect')?.id]);
+  })()`);
+  check('shapes: changed at runtime (polygon sides, fill colour; an SVG file loaded on demand)', rt === JSON.stringify([8, 'rgb(0, 255, 0)', 's-logo2-other']), rt);
+  check('shapes: built page zero console errors', page.errors.length === 0, page.errors.join(' | '));
+
+  const ed = spawn(process.execPath, ['cli.js', 'serve', SH, '--port', String(ED)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GPSB_CONFIG_DIR: cfg } });
+  cleanups.push(() => ed.kill());
+  await new Promise((ok, err) => { ed.stdout.on('data', d => /editor:/.test(d) && ok()); ed.on('exit', c => err(new Error(`editor exited ${c}`))); });
+  await page.open(`http://127.0.0.1:${ED}/editor/`);
+  await page.until(`document.querySelector('[data-panel=hierarchy]')?.innerText.includes('logo2') && window.document.querySelector('.sc-world iframe.on')`, 8000);
+  page.errors.length = 0;
+  const e = await page.eval(`(async () => {
+    const S = await import('/editor/state.js'), w = ms => new Promise(r => setTimeout(r, ms));
+    for (let i = 0; i < 50 && !S.S.previewWin; i++) await w(100);
+    for (const k of S.PRESET_GROUPS.Shapes) S.create(k);
+    for (let i = 0; i < 50 && S.S.previewWin?.document.querySelectorAll('.gpsb-shape').length < 7; i++) await w(100); // star + line on the page, and 5 drawn presets (rectangle and ellipse are CSS)
+    const d = S.S.previewWin.document;
+    return JSON.stringify([S.PRESET_GROUPS.Shapes.length, d.querySelectorAll('.gpsb-shape').length, d.querySelectorAll('.gpsb-svg').length, !!d.querySelector('.gpsb-svg-empty')]);
+  })()`);
+  check('editor: Shapes presets create and preview (SVG Image shows a hint until it has a file)', e === JSON.stringify([8, 7, 2, true]), e);
+  check('editor: shapes zero console errors', page.errors.length === 0, page.errors.join(' | '));
+}
+
 // static file server for a built site -> cleanup function
 async function serveDir(dir, port) {
   const s = http.createServer((req, res) => {
@@ -779,7 +848,7 @@ async function chrome(W = 1440, H = 900) {
 }
 
 // E2E_ONLY=forms|widgets runs just that section (quicker while working on it)
-const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p), content: p => contentSection(p), sections: p => sectionsSection(p), canvas: p => canvasSection(p), languages: p => languagesSection(p) }[process.env.E2E_ONLY];
+const ONLY = { forms: p => formsSection(p), widgets: p => widgetsSection(p), content: p => contentSection(p), sections: p => sectionsSection(p), canvas: p => canvasSection(p), languages: p => languagesSection(p), shapes: p => shapesSection(p) }[process.env.E2E_ONLY];
 try { if (ONLY) await ONLY(await chrome()); else await main(); } catch (e) { failed++; console.log('FAIL', e.stack ?? e); } finally { for (const f of cleanups.reverse()) try { f(); } catch {} }
 console.log(failed ? `\n${failed} assertion(s) failed` : '\nall e2e assertions passed');
 process.exit(failed ? 1 : 0);
